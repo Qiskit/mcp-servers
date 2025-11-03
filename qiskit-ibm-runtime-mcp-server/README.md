@@ -16,6 +16,16 @@ A comprehensive Model Context Protocol (MCP) server that provides AI assistants 
 
 ## Installation
 
+### Install from PyPI
+
+The easiest way to install is via pip:
+
+```bash
+pip install qiskit-ibm-runtime-mcp-server
+```
+
+### Install from Source
+
 This project recommends using [uv](https://astral.sh/uv) for virtual environments and dependencies management. If you don't have `uv` installed, check out the instructions in <https://docs.astral.sh/uv/getting-started/installation/>
 
 ### Setting up the Project with uv

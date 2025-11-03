@@ -23,6 +23,16 @@ The server implements one tool:
 
 ## Installation
 
+### Install from PyPI
+
+The easiest way to install is via pip:
+
+```bash
+pip install qiskit-code-assistant-mcp-server
+```
+
+### Install from Source
+
 This project uses [uv](https://astral.sh/uv) for virtual environments and dependencies management. If you don't have `uv` installed, check out the instructions in <https://docs.astral.sh/uv/getting-started/installation/>
 
 ### Setting up the Project with uv
