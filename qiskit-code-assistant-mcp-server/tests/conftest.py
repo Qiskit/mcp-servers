@@ -73,7 +73,10 @@ def mock_http_responses():
                 200,
                 json={
                     "data": [
-                        {"id": "granite-3.3-8b-qiskit", "name": "Granite 8B Qiskit"},
+                        {
+                            "id": "mistral-small-3.2-24b-qiskit",
+                            "name": "Mistral small 3.2 24b Qiskit",
+                        },
                         {"id": "test-model", "name": "Test Model"},
                     ]
                 },
@@ -81,12 +84,14 @@ def mock_http_responses():
         )
 
         # Mock model details endpoint
-        respx_mock.get(f"{QCA_TOOL_API_BASE}/v1/model/granite-3.3-8b-qiskit").mock(
+        respx_mock.get(
+            f"{QCA_TOOL_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit"
+        ).mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "id": "granite-3.3-8b-qiskit",
-                    "name": "Granite 8B Qiskit",
+                    "id": "mistral-small-3.2-24b-qiskit",
+                    "name": "Mistral small 3.2 24b Qiskit",
                     "description": "Test model for quantum code assistance",
                 },
             )
@@ -94,13 +99,13 @@ def mock_http_responses():
 
         # Mock model disclaimer endpoint
         respx_mock.get(
-            f"{QCA_TOOL_API_BASE}/v1/model/granite-3.3-8b-qiskit/disclaimer"
+            f"{QCA_TOOL_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit/disclaimer"
         ).mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "id": "disclaimer_123",
-                    "model_id": "granite-3.3-8b-qiskit",
+                    "model_id": "mistral-small-3.2-24b-qiskit",
                     "text": "This is a test disclaimer",
                 },
             )
@@ -124,7 +129,7 @@ def mock_http_responses():
 
         # Mock disclaimer acceptance endpoint
         respx_mock.post(
-            f"{QCA_TOOL_API_BASE}/v1/model/granite-3.3-8b-qiskit/disclaimer"
+            f"{QCA_TOOL_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit/disclaimer"
         ).mock(return_value=httpx.Response(200, json={"success": True}))
 
         # Mock completion acceptance endpoint
@@ -168,8 +173,11 @@ def sample_models_response():
     """Sample models API response."""
     return {
         "data": [
+            {
+                "id": "mistral-small-3.2-24b-qiskit",
+                "name": "Mistral Small 3.2 24b Qiskit",
+            },
             {"id": "granite-3.3-8b-qiskit", "name": "Granite 8B Qiskit"},
-            {"id": "granite-13b-qiskit", "name": "Granite 13B Qiskit"},
         ]
     }
 

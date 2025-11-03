@@ -37,7 +37,7 @@ class TestQCAListModels:
         assert result["status"] == "success"
         assert "models" in result
         assert len(result["models"]) == 2
-        assert result["models"][0]["id"] == "granite-3.3-8b-qiskit"
+        assert result["models"][0]["id"] == "mistral-small-3.2-24b-qiskit"
 
     @pytest.mark.asyncio
     async def test_list_models_empty_response(self, mock_env_vars):
@@ -85,11 +85,11 @@ class TestQCAGetModel:
     @pytest.mark.asyncio
     async def test_get_model_success(self, mock_env_vars, mock_http_responses):
         """Test successful model retrieval."""
-        result = await qca_get_model("granite-3.3-8b-qiskit")
+        result = await qca_get_model("mistral-small-3.2-24b-qiskit")
 
         assert result["status"] == "success"
         assert "model" in result
-        assert result["model"]["id"] == "granite-3.3-8b-qiskit"
+        assert result["model"]["id"] == "mistral-small-3.2-24b-qiskit"
 
     @pytest.mark.asyncio
     async def test_get_model_empty_id(self, mock_env_vars):
@@ -196,7 +196,7 @@ class TestQCAAcceptModelDisclaimer:
     async def test_accept_disclaimer_success(self, mock_env_vars, mock_http_responses):
         """Test successful disclaimer acceptance."""
         result = await qca_accept_model_disclaimer(
-            "granite-3.3-8b-qiskit", "disclaimer_123"
+            "mistral-small-3.2-24b-qiskit", "disclaimer_123"
         )
 
         assert result["status"] == "success"
@@ -213,7 +213,7 @@ class TestQCAAcceptModelDisclaimer:
             }  # Missing 'success' field
 
             result = await qca_accept_model_disclaimer(
-                "granite-3.3-8b-qiskit", "disclaimer_123"
+                "mistral-small-3.2-24b-qiskit", "disclaimer_123"
             )
 
             assert result["status"] == "error"

@@ -32,7 +32,7 @@ class TestQCAListModelsSync:
         mock_response = {
             "status": "success",
             "models": [
-                {"id": "granite-3.3-8b-qiskit", "name": "Granite Qiskit"},
+                {"id": "mistral-small-3.2-24b-qiskit", "name": "Granite Qiskit"},
                 {"id": "granite-3.3-2b-qiskit", "name": "Granite Qiskit Small"},
             ],
         }
@@ -66,16 +66,16 @@ class TestQCAGetModelSync:
         """Test successful model retrieval with sync wrapper."""
         mock_response = {
             "status": "success",
-            "model": {"id": "granite-3.3-8b-qiskit", "name": "Granite Qiskit"},
+            "model": {"id": "mistral-small-3.2-24b-qiskit", "name": "Granite Qiskit"},
         }
 
         with patch("qiskit_code_assistant_mcp_server.sync._run_async") as mock_run:
             mock_run.return_value = mock_response
 
-            result = qca_get_model_sync("granite-3.3-8b-qiskit")
+            result = qca_get_model_sync("mistral-small-3.2-24b-qiskit")
 
             assert result["status"] == "success"
-            assert result["model"]["id"] == "granite-3.3-8b-qiskit"
+            assert result["model"]["id"] == "mistral-small-3.2-24b-qiskit"
 
     def test_get_model_sync_empty_id(self, mock_env_vars):
         """Test validation of empty model_id."""

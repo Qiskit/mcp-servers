@@ -161,7 +161,9 @@ class TestEnvironmentVariableHandling:
                 constants_module.QCA_TOOL_API_BASE
                 == "https://qiskit-code-assistant.quantum.ibm.com"
             )
-            assert constants_module.QCA_TOOL_MODEL_NAME == "granite-3.3-8b-qiskit"
+            assert (
+                constants_module.QCA_TOOL_MODEL_NAME == "mistral-small-3.2-24b-qiskit"
+            )
             assert constants_module.QCA_REQUEST_TIMEOUT == 30.0
             assert constants_module.QCA_MCP_DEBUG_LEVEL == "INFO"
 

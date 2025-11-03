@@ -67,18 +67,18 @@ class TestResourceHandlers:
         """Test qca://model/{model_id} resource handler."""
         from qiskit_code_assistant_mcp_server.qca import qca_get_model
 
-        result = await qca_get_model("granite-3.3-8b-qiskit")
+        result = await qca_get_model("mistral-small-3.2-24b-qiskit")
 
         assert result["status"] == "success"
         assert "model" in result
-        assert result["model"]["id"] == "granite-3.3-8b-qiskit"
+        assert result["model"]["id"] == "mistral-small-3.2-24b-qiskit"
 
     @pytest.mark.asyncio
     async def test_disclaimer_resource(self, mock_env_vars, mock_http_responses):
         """Test qca://disclaimer/{model_id} resource handler."""
         from qiskit_code_assistant_mcp_server.qca import qca_get_model_disclaimer
 
-        result = await qca_get_model_disclaimer("granite-3.3-8b-qiskit")
+        result = await qca_get_model_disclaimer("mistral-small-3.2-24b-qiskit")
 
         assert result["status"] == "success"
         assert "disclaimer" in result
@@ -124,7 +124,7 @@ class TestToolHandlers:
         from qiskit_code_assistant_mcp_server.qca import qca_accept_model_disclaimer
 
         result = await qca_accept_model_disclaimer(
-            "granite-3.3-8b-qiskit", "disclaimer_123"
+            "mistral-small-3.2-24b-qiskit", "disclaimer_123"
         )
 
         assert result["status"] == "success"
@@ -227,13 +227,15 @@ class TestEndToEndScenarios:
         )
 
         # 1. Get disclaimer
-        disclaimer_result = await qca_get_model_disclaimer("granite-3.3-8b-qiskit")
+        disclaimer_result = await qca_get_model_disclaimer(
+            "mistral-small-3.2-24b-qiskit"
+        )
         assert disclaimer_result["status"] == "success"
         disclaimer_id = disclaimer_result["disclaimer"]["id"]
 
         # 2. Accept disclaimer
         accept_result = await qca_accept_model_disclaimer(
-            "granite-3.3-8b-qiskit", disclaimer_id
+            "mistral-small-3.2-24b-qiskit", disclaimer_id
         )
         assert accept_result["status"] == "success"
 

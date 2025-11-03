@@ -49,7 +49,7 @@ QCA_TOOL_API_BASE = os.getenv(
     "QCA_TOOL_API_BASE", "https://qiskit-code-assistant.quantum.ibm.com"
 ).rstrip("/")  # Remove trailing slash for consistent URLs
 
-QCA_TOOL_MODEL_NAME = os.getenv("QCA_TOOL_MODEL_NAME", "granite-3.3-8b-qiskit")
+QCA_TOOL_MODEL_NAME = os.getenv("QCA_TOOL_MODEL_NAME", "mistral-small-3.2-24b-qiskit")
 
 # Validate log level
 QCA_MCP_DEBUG_LEVEL = os.getenv("QCA_MCP_DEBUG_LEVEL", "INFO").upper()
