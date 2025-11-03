@@ -180,7 +180,8 @@ class TestVersionHandling:
             importlib.reload(constants_module)
 
             assert (
-                "qiskit-code-assistant-mcp-server/1.2.3" in constants_module.QCA_TOOL_X_CALLER
+                "qiskit-code-assistant-mcp-server/1.2.3"
+                in constants_module.QCA_TOOL_X_CALLER
             )
 
     def test_version_detection_failure(self):
