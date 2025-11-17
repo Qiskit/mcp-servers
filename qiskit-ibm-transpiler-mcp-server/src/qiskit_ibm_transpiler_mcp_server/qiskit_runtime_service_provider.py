@@ -20,7 +20,7 @@ class QiskitRuntimeServiceProvider:
             with cls._lock:
                 if (
                     cls._instance is None
-                ):  # double check to ensure multiple threads enter in
+                ):  # double check to ensure multiple threads not enter in
                     cls._instance = super().__new__(cls)
         return cls._instance
 
