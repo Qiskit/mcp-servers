@@ -4,13 +4,7 @@ from qiskit_ibm_transpiler_mcp_server.sync import (
     ai_linear_function_synthesis_sync,
     ai_pauli_network_synthesis_sync,
     ai_permutation_synthesis_sync,
-    get_backend_service_sync,
-    least_busy_backend_sync,
-    list_backends_sync,
-    get_backend_properties_sync,
-    list_my_jobs_sync,
-    cancel_job_sync,
-    get_job_status_sync,
+    setup_ibm_quantum_account_sync,
 )
 
 import pytest
@@ -505,324 +499,39 @@ class TestAIPauliNetworkSync:
         assert expected_message in result["message"]
 
 
-class TestGetBackendSync:
-    """Test get_backend function sync."""
+class TestSetupIBMQuantumAccountSync:
+    """Test setup_ibm_quantum_account_sync function."""
 
-    def test_ai_get_backend_sync_success(self, mocker, mock_backend):
-        """
-        Successful test get_backend_service sync tool.
-        """
+    def test_setup_account_sync_success(self, mocker):
+        """Test successful account setup with sync wrapper."""
         mock_response = {
             "status": "success",
-            "backend": "fake_backend",
+            "message": "IBM Quantum account set up successfully",
+            "channel": "ibm_quantum_platform",
+            "available_backends": 10,
         }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async",
-            return_value=mock_response,
+        run_async_mock = mocker.patch(
+            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
         )
-        result = get_backend_service_sync(backend_name=mock_backend)
+        run_async_mock.return_value = mock_response
+        result = setup_ibm_quantum_account_sync("test_token")
         assert result["status"] == "success"
-        assert result["backend"] == "fake_backend"
-        mocker_run_sync.assert_called_once()
+        assert result["available_backends"] == 10
 
-    def test_ai_get_backend_sync_failure(self, mocker, mock_backend):
-        """
-        Failed test get_backend_service sync tool.
-        """
-        mock_response = {
-            "status": "error",
-            "message": "No backend 'fake_backend' available",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async",
-            return_value=mock_response,
-        )
-        result = get_backend_service_sync(backend_name=mock_backend)
-        assert result["status"] == "error"
-        assert result["message"] == "No backend 'fake_backend' available"
-        mocker_run_sync.assert_called_once()
-
-
-class TestLeastBusyBackendSync:
-    """Test least_busy_backend sync function."""
-
-    def test_least_busy_backend_sync_success(self, mocker):
-        """
-        Successful test least_busy_backend sync tool.
-        """
+    def test_setup_account_sync_empty_token_uses_saved_credentials(self, mocker):
+        """Test that empty token falls back to saved credentials."""
         mock_response = {
             "status": "success",
-            "backend_name": "fake_backend",
-            "num_qubits": 127,
-            "pending_jobs": 100,
-            "operational": True,
+            "message": "IBM Quantum account set up successfully",
+            "channel": "ibm_quantum_platform",
+            "available_backends": 5,
         }
 
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async",
-            return_value=mock_response,
-        )
-        result = least_busy_backend_sync()
-        assert result["status"] == "success"
-        assert result["backend_name"] == "fake_backend"
-        assert result["num_qubits"] == 127
-        assert result["pending_jobs"] == 100
-        assert result["operational"] is True
-        mocker_run_sync.assert_called_once()
-
-    def test_least_busy_backend_sync_failure(self, mocker):
-        """
-        Failed test least_busy_backend sync tool
-        """
-        mock_response = {
-            "status": "error",
-            "message": "No operational quantum backends available",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async",
-            return_value=mock_response,
-        )
-        result = least_busy_backend_sync()
-        assert result["status"] == "error"
-        assert result["message"] == "No operational quantum backends available"
-        mocker_run_sync.assert_called_once()
-
-
-class TestListBackendSync:
-    """Test list_backend sync function."""
-
-    def test_list_backends_sync_success(self, mocker):
-        """Successful test backends listing with sync wrapper."""
-        mock_response = {
-            "status": "success",
-            "backends": [
-                {
-                    "name": "ibm_brisbane",
-                    "num_qubits": 133,
-                    "simulator": False,
-                    "operational": True,
-                    "pending_jobs": 5,
-                },
-                {
-                    "name": "ibm_kyoto",
-                    "num_qubits": 127,
-                    "simulator": False,
-                    "operational": True,
-                    "pending_jobs": 10,
-                },
-            ],
-            "total_backends": 2,
-        }
-
-        mocker_run_sync = mocker.patch(
+        run_async_mock = mocker.patch(
             "qiskit_ibm_transpiler_mcp_server.sync._run_async"
         )
-        mocker_run_sync.return_value = mock_response
-
-        result = list_backends_sync()
+        run_async_mock.return_value = mock_response
+        result = setup_ibm_quantum_account_sync("")
 
         assert result["status"] == "success"
-        assert result["total_backends"] == 2
-        assert len(result["backends"]) == 2
-        mocker_run_sync.assert_called_once()
-
-    def test_list_backends_sync_error(self, mocker):
-        """Test error handling in sync wrapper."""
-        mock_response = {
-            "status": "error",
-            "message": "Failed to list backends: service not initialized",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = list_backends_sync()
-
-        assert result["status"] == "error"
-        mocker_run_sync.assert_called_once()
-
-
-class TestGetBackendPropertiesSync:
-    """Test get_backend_properties_sync function."""
-
-    def test_get_backend_properties_sync_success(self, mocker):
-        """Test successful backend properties retrieval with sync wrapper."""
-        mock_response = {
-            "status": "success",
-            "backend_name": "ibm_brisbane",
-            "num_qubits": 133,
-            "simulator": False,
-            "operational": True,
-            "basis_gates": ["id", "rz", "sx", "x", "cx"],
-            "max_shots": 100000,
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = get_backend_properties_sync("ibm_brisbane")
-
-        assert result["status"] == "success"
-        assert result["backend_name"] == "ibm_brisbane"
-        assert result["num_qubits"] == 133
-
-    def test_get_backend_properties_sync_failure(self, mocker):
-        """Failed test backend properties retrieval with sync wrapper."""
-        mock_response = {
-            "status": "error",
-            "message": "Failed to get backend properties",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = get_backend_properties_sync("ibm_brisbane")
-
-        assert result["status"] == "error"
-        assert result["message"] == "Failed to get backend properties"
-
-
-class TestListMyJobsSync:
-    """Test list_my_jobs_sync function."""
-
-    def test_list_my_jobs_sync_success(self, mocker):
-        """Test successful jobs listing with sync wrapper."""
-        mock_response = {
-            "status": "success",
-            "jobs": [
-                {
-                    "job_id": "job_123",
-                    "status": "DONE",
-                    "backend": "ibm_brisbane",
-                    "creation_date": "2024-01-01",
-                },
-                {
-                    "job_id": "job_456",
-                    "status": "RUNNING",
-                    "backend": "ibm_kyoto",
-                    "creation_date": "2024-01-02",
-                },
-            ],
-            "total_jobs": 2,
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = list_my_jobs_sync(limit=10)
-
-        assert result["status"] == "success"
-        assert result["total_jobs"] == 2
-        assert len(result["jobs"]) == 2
-
-    def test_list_my_jobs_sync_failure(self, mocker):
-        """Failed test jobs listing with sync wrapper."""
-        mock_response = {
-            "status": "error",
-            "message": "Failed to list jobs",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = list_my_jobs_sync(limit=10)
-
-        assert result["status"] == "error"
-        assert result["message"] == "Failed to list jobs"
-        mocker_run_sync.assert_called_once()
-
-
-class TestGetJobStatusSync:
-    """Test get_job_status_sync function."""
-
-    def test_get_job_status_sync_success(self, mocker):
-        """Test successful job status retrieval with sync wrapper."""
-        mock_response = {
-            "status": "success",
-            "job_id": "job_123",
-            "job_status": "DONE",
-            "backend": "ibm_brisbane",
-            "creation_date": "2024-01-01",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = get_job_status_sync("job_123")
-
-        assert result["status"] == "success"
-        assert result["job_id"] == "job_123"
-        assert result["job_status"] == "DONE"
-
-    def test_get_job_status_sync_failure(self, mocker):
-        """Failed test job status retrieval with sync wrapper."""
-        mock_response = {
-            "status": "error",
-            "message": "Failed to get job status: service not initialized",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = get_job_status_sync("job_123")
-
-        assert result["status"] == "error"
-        assert result["message"] == "Failed to get job status: service not initialized"
-
-
-class TestCancelJobSync:
-    """Test cancel_job_sync function."""
-
-    def test_cancel_job_sync_success(self, mocker):
-        """Test successful job cancellation with sync wrapper."""
-        mock_response = {
-            "status": "success",
-            "job_id": "job_123",
-            "message": "Job cancellation requested",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = cancel_job_sync("job_123")
-
-        assert result["status"] == "success"
-        assert result["job_id"] == "job_123"
-        mocker_run_sync.assert_called_once()
-
-    def test_cancel_job_sync_failure(self, mocker):
-        """Failed test job cancellation with sync wrapper."""
-        mock_response = {
-            "status": "error",
-            "message": "Failed to cancel job: service not initialized",
-        }
-
-        mocker_run_sync = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.sync._run_async"
-        )
-        mocker_run_sync.return_value = mock_response
-
-        result = cancel_job_sync("job_123")
-
-        assert result["status"] == "error"
-        assert result["message"] == "Failed to cancel job: service not initialized"
-        mocker_run_sync.assert_called_once()
+        assert result["available_backends"] == 5
