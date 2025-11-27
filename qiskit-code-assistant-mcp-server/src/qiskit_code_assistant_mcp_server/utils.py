@@ -95,6 +95,7 @@ def with_sync(func: F) -> F:
     func.sync = sync_wrapper  # type: ignore[attr-defined]
     return func
 
+
 from qiskit_code_assistant_mcp_server.constants import (
     QCA_REQUEST_TIMEOUT,
     QCA_TOOL_X_CALLER,
