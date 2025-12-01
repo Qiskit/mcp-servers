@@ -65,7 +65,8 @@ def _run_async(coro: Coroutine[Any, Any, T]) -> T:
 
 
 def setup_ibm_quantum_account_sync(
-    token: str = "", channel: str = "ibm_quantum_platform"  # nosec B107
+    token: str = "",
+    channel: str = "ibm_quantum_platform",  # nosec B107
 ) -> dict[str, Any]:
     """Set up IBM Quantum account with credentials.
 
