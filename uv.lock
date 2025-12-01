@@ -1,6 +1,6 @@
 version = 1
 revision = 2
-requires-python = ">=3.10, <4.0"
+requires-python = ">=3.10, <3.15"
 resolution-markers = [
     "python_full_version >= '3.11'",
     "python_full_version < '3.11'",
@@ -1842,6 +1842,20 @@ test = [
 name = "qiskit-mcp-servers"
 version = "0.1.0"
 source = { editable = "." }
+
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.18.2" },
+    { name = "ruff", specifier = ">=0.14.6" },
+]
 
 [[package]]
 name = "referencing"
