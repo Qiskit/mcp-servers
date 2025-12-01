@@ -71,7 +71,9 @@ def _select_available_model() -> str:
 
         if models_result.get("status") == "success":
             available_models = models_result.get("models", [])
-            model_ids = [model.get("id") for model in available_models if model.get("id")]
+            model_ids: list[str] = [
+                model.get("id") for model in available_models if model.get("id")
+            ]
 
             # Check if default model is available
             if QCA_TOOL_MODEL_NAME in model_ids:

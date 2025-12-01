@@ -18,8 +18,11 @@ import httpx
 import pytest
 import respx
 
-from qiskit_code_assistant_mcp_server.constants import QCA_TOOL_API_BASE
 from qiskit_code_assistant_mcp_server.server import mcp
+
+
+# Use the test API base URL that matches mock_env_vars fixture
+TEST_QCA_API_BASE = "https://test-qca-api.example.com"
 
 
 class TestMCPServerIntegration:
@@ -148,7 +151,7 @@ class TestErrorHandling:
     async def test_network_timeout_handling(self, mock_env_vars):
         """Test handling of network timeouts."""
         with respx.mock() as respx_mock:
-            respx_mock.get(f"{QCA_TOOL_API_BASE}/v1/models").mock(
+            respx_mock.get(f"{TEST_QCA_API_BASE}/v1/models").mock(
                 side_effect=httpx.TimeoutException("Request timeout")
             )
 
@@ -163,7 +166,7 @@ class TestErrorHandling:
     async def test_authentication_error_handling(self, mock_env_vars):
         """Test handling of authentication errors."""
         with respx.mock() as respx_mock:
-            respx_mock.get(f"{QCA_TOOL_API_BASE}/v1/models").mock(
+            respx_mock.get(f"{TEST_QCA_API_BASE}/v1/models").mock(
                 return_value=httpx.Response(401, json={"detail": "Invalid token"})
             )
 
@@ -177,7 +180,7 @@ class TestErrorHandling:
     async def test_server_error_handling(self, mock_env_vars):
         """Test handling of server errors."""
         with respx.mock() as respx_mock:
-            respx_mock.post(f"{QCA_TOOL_API_BASE}/v1/completions").mock(
+            respx_mock.post(f"{TEST_QCA_API_BASE}/v1/completions").mock(
                 return_value=httpx.Response(500, json={"detail": "Internal server error"})
             )
 

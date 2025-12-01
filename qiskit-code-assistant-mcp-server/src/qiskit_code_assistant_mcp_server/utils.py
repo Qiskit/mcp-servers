@@ -47,7 +47,16 @@ def _get_token_from_system() -> str:
     return token
 
 
-QISKIT_IBM_TOKEN = _get_token_from_system()
+# Lazy token retrieval - only fetch when first needed
+_cached_token: str | None = None
+
+
+def _get_token() -> str:
+    """Get the IBM Quantum token, using cached value if available."""
+    global _cached_token
+    if _cached_token is None:
+        _cached_token = _get_token_from_system()
+    return _cached_token
 
 # Shared async client for better performance
 _client: httpx.AsyncClient | None = None
@@ -60,7 +69,7 @@ def get_http_client() -> httpx.AsyncClient:
         headers = {
             "x-caller": QCA_TOOL_X_CALLER,
             "Accept": "application/json",
-            "Authorization": f"Bearer {QISKIT_IBM_TOKEN}",
+            "Authorization": f"Bearer {_get_token()}",
         }
         _client = httpx.AsyncClient(
             headers=headers,

@@ -19,10 +19,15 @@ import httpx
 import pytest
 import respx
 
-from qiskit_code_assistant_mcp_server.constants import (
-    QCA_TOOL_API_BASE,
-    QCA_TOOL_MODEL_NAME,
-)
+
+# Note: We cannot import from qiskit_code_assistant_mcp_server at module level
+# because it triggers utils.py which calls _get_token_from_system() at import time.
+# This would fail in CI where no token is available. Instead, we use hardcoded
+# test values here and import lazily inside fixtures where needed.
+
+# Test constants (must match values set in mock_env_vars)
+TEST_QCA_API_BASE = "https://test-qca-api.example.com"
+TEST_QCA_MODEL_NAME = "test-model"
 
 
 @pytest.fixture(autouse=True)
@@ -32,11 +37,13 @@ async def reset_http_client():
     This fixture ensures clean state between tests and properly closes
     any async client that was created during the test.
     """
+    # Import here to avoid triggering token lookup at module load time
     import qiskit_code_assistant_mcp_server.utils as utils_module
 
     # Reset before test - force clear without trying to close
     # (might already be closed or in invalid state)
     utils_module._client = None
+    utils_module._cached_token = None  # Reset cached token for fresh state
 
     yield
 
@@ -49,6 +56,7 @@ async def reset_http_client():
             pass  # Ignore errors during cleanup
         finally:
             utils_module._client = None
+    utils_module._cached_token = None  # Reset cached token after test
 
 
 @pytest.fixture
@@ -60,23 +68,24 @@ async def http_client_for_tests(mock_env_vars):
     Use this fixture for tests that need to make actual HTTP requests
     (with respx mocking).
     """
+    # Import here after mock_env_vars has set up the environment
     import qiskit_code_assistant_mcp_server.utils as utils_module
-    from qiskit_code_assistant_mcp_server.constants import (
-        QCA_REQUEST_TIMEOUT,
-        QCA_TOOL_X_CALLER,
-    )
+
+    # Use test constants directly (matching mock_env_vars values)
+    test_timeout = 10.0
+    test_x_caller = "qiskit-mcp-server"
 
     # Get token from env (set by mock_env_vars)
     token = os.environ.get("QISKIT_IBM_TOKEN", "test_token")
 
     headers = {
-        "x-caller": QCA_TOOL_X_CALLER,
+        "x-caller": test_x_caller,
         "Accept": "application/json",
         "Authorization": f"Bearer {token}",
     }
     utils_module._client = httpx.AsyncClient(
         headers=headers,
-        timeout=httpx.Timeout(QCA_REQUEST_TIMEOUT),
+        timeout=httpx.Timeout(test_timeout),
         limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
     )
 
@@ -87,18 +96,28 @@ async def http_client_for_tests(mock_env_vars):
 
 @pytest.fixture
 def mock_env_vars():
-    """Mock environment variables for testing."""
+    """Mock environment variables for testing.
+
+    This fixture patches both environment variables AND the constants
+    in qca.py where they're already imported (since constants are
+    read at module import time).
+    """
     with patch.dict(
         os.environ,
         {
             "QISKIT_IBM_TOKEN": "test_token_12345",
-            "QCA_TOOL_API_BASE": "https://test-qca-api.example.com",
-            "QCA_TOOL_MODEL_NAME": "test-model",
+            "QCA_TOOL_API_BASE": TEST_QCA_API_BASE,
+            "QCA_TOOL_MODEL_NAME": TEST_QCA_MODEL_NAME,
             "QCA_REQUEST_TIMEOUT": "10.0",
             "QCA_MCP_DEBUG_LEVEL": "DEBUG",
         },
     ):
-        yield
+        # Also patch the constants in qca.py where they've already been imported
+        with patch("qiskit_code_assistant_mcp_server.qca.QCA_TOOL_API_BASE", TEST_QCA_API_BASE):
+            with patch(
+                "qiskit_code_assistant_mcp_server.qca.QCA_TOOL_MODEL_NAME", TEST_QCA_MODEL_NAME
+            ):
+                yield
 
 
 @pytest.fixture
@@ -125,11 +144,14 @@ def mock_qiskit_credentials(tmp_path):
 
 
 @pytest.fixture
-def mock_http_responses():
-    """Mock HTTP responses for QCA API calls."""
+def mock_http_responses(mock_env_vars):
+    """Mock HTTP responses for QCA API calls.
+
+    Note: This fixture depends on mock_env_vars to ensure constants are patched.
+    """
     with respx.mock(assert_all_called=False) as respx_mock:
         # Mock models list endpoint
-        respx_mock.get(f"{QCA_TOOL_API_BASE}/v1/models").mock(
+        respx_mock.get(f"{TEST_QCA_API_BASE}/v1/models").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -145,7 +167,7 @@ def mock_http_responses():
         )
 
         # Mock model details endpoint
-        respx_mock.get(f"{QCA_TOOL_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit").mock(
+        respx_mock.get(f"{TEST_QCA_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -158,7 +180,7 @@ def mock_http_responses():
 
         # Mock model disclaimer endpoint
         respx_mock.get(
-            f"{QCA_TOOL_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit/disclaimer"
+            f"{TEST_QCA_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit/disclaimer"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -171,7 +193,7 @@ def mock_http_responses():
         )
 
         # Mock completion endpoint
-        respx_mock.post(f"{QCA_TOOL_API_BASE}/v1/completions").mock(
+        respx_mock.post(f"{TEST_QCA_API_BASE}/v1/completions").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -188,11 +210,11 @@ def mock_http_responses():
 
         # Mock disclaimer acceptance endpoint
         respx_mock.post(
-            f"{QCA_TOOL_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit/disclaimer"
+            f"{TEST_QCA_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit/disclaimer"
         ).mock(return_value=httpx.Response(200, json={"success": True}))
 
         # Mock completion acceptance endpoint
-        respx_mock.post(f"{QCA_TOOL_API_BASE}/v1/completion/acceptance").mock(
+        respx_mock.post(f"{TEST_QCA_API_BASE}/v1/completion/acceptance").mock(
             return_value=httpx.Response(200, json={"result": "accepted"})
         )
 
@@ -200,16 +222,19 @@ def mock_http_responses():
 
 
 @pytest.fixture
-def mock_http_error_responses():
-    """Mock HTTP error responses for testing error handling."""
+def mock_http_error_responses(mock_env_vars):
+    """Mock HTTP error responses for testing error handling.
+
+    Note: This fixture depends on mock_env_vars to ensure constants are patched.
+    """
     with respx.mock(assert_all_called=False) as respx_mock:
         # Mock 401 Unauthorized
-        respx_mock.get(f"{QCA_TOOL_API_BASE}/v1/models").mock(
+        respx_mock.get(f"{TEST_QCA_API_BASE}/v1/models").mock(
             return_value=httpx.Response(401, json={"detail": "Invalid authentication credentials"})
         )
 
         # Mock 500 Server Error
-        respx_mock.post(f"{QCA_TOOL_API_BASE}/v1/completions").mock(
+        respx_mock.post(f"{TEST_QCA_API_BASE}/v1/completions").mock(
             return_value=httpx.Response(500, json={"detail": "Internal server error"})
         )
 
@@ -217,11 +242,11 @@ def mock_http_error_responses():
 
 
 @pytest.fixture
-def sample_completion_request():
+def sample_completion_request(mock_env_vars):
     """Sample completion request data."""
     return {
         "prompt": "Create a quantum circuit with 2 qubits",
-        "model": QCA_TOOL_MODEL_NAME,
+        "model": TEST_QCA_MODEL_NAME,
     }
 
 
