@@ -173,8 +173,8 @@ AI Assistant → MCP Client → setup_ibm_quantum_account tool
 2. **Installation**:
    ```bash
    # Clone the repository
-   git clone https://github.com/Qiskit/qiskit-mcp-servers.git
-   cd qiskit-mcp-servers
+   git clone https://github.com/Qiskit/mcp-servers.git
+   cd mcp-servers
 
    # Navigate to specific server
    cd qiskit-code-assistant-mcp-server
@@ -387,6 +387,8 @@ uv publish --repository testpypi
 
 ### Repository-Level Documentation
 - [README.md](README.md): Overview, quick start, architecture
+- [CONTRIBUTING.md](CONTRIBUTING.md): Contribution guidelines
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): Community guidelines
 - [PUBLISHING.md](PUBLISHING.md): PyPI publishing guide
 - [LICENSE](LICENSE): Apache 2.0 license
 - [AGENTS.md](AGENTS.md): This file
@@ -521,6 +523,8 @@ qiskit-mcp-servers/
 │   ├── .env.example
 │   └── run_tests.sh
 ├── README.md                   # Main repository docs
+├── CONTRIBUTING.md             # Contribution guidelines
+├── CODE_OF_CONDUCT.md          # Community guidelines
 ├── PUBLISHING.md               # Publishing guide
 ├── AGENTS.md                   # This file
 ├── LICENSE                     # Apache 2.0
