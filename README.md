@@ -129,6 +129,9 @@ Both servers maintain high code quality standards:
 - **[MCP Inspector](https://github.com/modelcontextprotocol/inspector)** - Interactive testing tool
 - **[FastMCP](https://github.com/jlowin/fastmcp)** - High-performance MCP framework
 
+### AI Development Assistant Support
+
+This repository includes AI-generated code and offers comprehensive guidance for AI coding assistants (like [IBM Bob](https://www.ibm.com/products/bob), Claude Code, GitHub Copilot, Cursor AI, and others) in [AGENTS.md](AGENTS.md). This helps AI assistants provide more accurate, context-aware suggestions when working with this codebase. 
 
 ## 📄 License
 
