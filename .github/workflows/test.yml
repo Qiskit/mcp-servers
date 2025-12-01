@@ -7,8 +7,49 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  # Fast feedback: linting and type checking
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+        enable-cache: true
+    
+    - name: Set up Python
+      run: uv python install 3.12
+    
+    - name: Install dependencies
+      run: |
+        cd qiskit-code-assistant-mcp-server && uv sync --group dev
+        cd ../qiskit-ibm-runtime-mcp-server && uv sync --group dev
+    
+    - name: Run ruff linting
+      run: |
+        cd qiskit-code-assistant-mcp-server && uv run ruff check src tests
+        cd ../qiskit-ibm-runtime-mcp-server && uv run ruff check src tests
+    
+    - name: Run ruff formatting check
+      run: |
+        cd qiskit-code-assistant-mcp-server && uv run ruff format --check src tests
+        cd ../qiskit-ibm-runtime-mcp-server && uv run ruff format --check src tests
+    
+    - name: Run type checking
+      run: |
+        cd qiskit-code-assistant-mcp-server && uv run mypy src
+        cd ../qiskit-ibm-runtime-mcp-server && uv run mypy src
+    
+    - name: Run security checks
+      run: |
+        cd qiskit-code-assistant-mcp-server && uv run bandit -c pyproject.toml -r src
+        cd ../qiskit-ibm-runtime-mcp-server && uv run bandit -c pyproject.toml -r src
+
   test-code-assistant:
     runs-on: ubuntu-latest
+    needs: lint
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
@@ -20,6 +61,7 @@ jobs:
       uses: astral-sh/setup-uv@v3
       with:
         version: "latest"
+        enable-cache: true
     
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
@@ -28,17 +70,6 @@ jobs:
       working-directory: ./qiskit-code-assistant-mcp-server
       run: |
         uv sync --group dev --group test
-    
-    - name: Run linting for Code Assistant server
-      working-directory: ./qiskit-code-assistant-mcp-server
-      run: |
-        uv run ruff check src tests
-        uv run ruff format --check src tests
-    
-    - name: Run type checking for Code Assistant server
-      working-directory: ./qiskit-code-assistant-mcp-server
-      run: |
-        uv run mypy src
     
     - name: Run tests for Code Assistant server
       working-directory: ./qiskit-code-assistant-mcp-server
@@ -56,6 +87,7 @@ jobs:
 
   test-runtime:
     runs-on: ubuntu-latest
+    needs: lint
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
@@ -67,6 +99,7 @@ jobs:
       uses: astral-sh/setup-uv@v3
       with:
         version: "latest"
+        enable-cache: true
     
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
@@ -75,17 +108,6 @@ jobs:
       working-directory: ./qiskit-ibm-runtime-mcp-server
       run: |
         uv sync --group dev --group test
-    
-    - name: Run linting for Runtime server
-      working-directory: ./qiskit-ibm-runtime-mcp-server
-      run: |
-        uv run ruff check src tests
-        uv run ruff format --check src tests
-    
-    - name: Run type checking for Runtime server
-      working-directory: ./qiskit-ibm-runtime-mcp-server
-      run: |
-        uv run mypy src
     
     - name: Run tests for Runtime server
       working-directory: ./qiskit-ibm-runtime-mcp-server
