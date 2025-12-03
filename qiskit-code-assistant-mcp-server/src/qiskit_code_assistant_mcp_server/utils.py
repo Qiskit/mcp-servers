@@ -35,7 +35,7 @@ nested event loops in Jupyter notebooks (via nest_asyncio).
 import asyncio
 import json
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from functools import wraps
 from pathlib import Path
 from typing import Any, TypeVar
@@ -50,7 +50,7 @@ from qiskit_code_assistant_mcp_server.constants import (
 
 # Apply nest_asyncio to allow running async code in environments with existing event loops
 try:
-    import nest_asyncio  # type: ignore[import-untyped]
+    import nest_asyncio
 
     nest_asyncio.apply()
 except ImportError:
@@ -58,9 +58,10 @@ except ImportError:
 
 
 F = TypeVar("F", bound=Callable[..., Any])
+T = TypeVar("T")
 
 
-def _run_async(coro):
+def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """Helper to run async functions synchronously.
 
     This handles both cases:
@@ -96,7 +97,7 @@ def with_sync(func: F) -> F:
     """
 
     @wraps(func)
-    def sync_wrapper(*args, **kwargs):
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         return _run_async(func(*args, **kwargs))
 
     func.sync = sync_wrapper  # type: ignore[attr-defined]
