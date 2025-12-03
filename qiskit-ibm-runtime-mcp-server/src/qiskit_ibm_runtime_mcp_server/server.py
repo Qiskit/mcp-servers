@@ -57,7 +57,7 @@ async def setup_ibm_quantum_account_tool(
 ) -> dict[str, Any]:
     """Set up IBM Quantum account with credentials.
 
-    If token is not provided, will attempt to use IBM_QUANTUM_TOKEN environment variable
+    If token is not provided, will attempt to use QISKIT_IBM_TOKEN environment variable
     or saved credentials from ~/.qiskit/qiskit-ibm.json
     """
     return await setup_ibm_quantum_account(token if token else None, channel)

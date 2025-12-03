@@ -153,11 +153,11 @@ AI Assistant → MCP Client → setup_ibm_quantum_account tool
 - `ibm_quantum://status`: Service status and connection info
 
 **Environment Variables**:
-- `IBM_QUANTUM_TOKEN`: IBM Quantum API token (optional, can use saved credentials)
+- `QISKIT_IBM_TOKEN`: IBM Quantum API token (optional, can use saved credentials)
 
 **Credential Resolution Priority**:
 1. Explicit token passed to `setup_ibm_quantum_account()`
-2. `IBM_QUANTUM_TOKEN` environment variable
+2. `QISKIT_IBM_TOKEN` environment variable
 3. Saved credentials in `~/.qiskit/qiskit-ibm.json`
 
 ## Development Guidelines
@@ -358,7 +358,7 @@ uv run ruff check --fix src/ tests/
    # Verify token is set
    echo $QISKIT_IBM_TOKEN
    # OR
-   echo $IBM_QUANTUM_TOKEN
+   echo $QISKIT_IBM_TOKEN
    ```
 
 ### Publishing to PyPI
@@ -428,7 +428,7 @@ uv publish --repository testpypi
 
 1. **"401 Unauthorized" or authentication errors**:
    - Check: Is IBM Quantum token set correctly?
-   - Verify: `echo $QISKIT_IBM_TOKEN` or `echo $IBM_QUANTUM_TOKEN`
+   - Verify: `echo $QISKIT_IBM_TOKEN` or `echo $QISKIT_IBM_TOKEN`
    - Check: Token is valid on https://quantum.cloud.ibm.com/
    - Try: Set token directly in `.env` file
    - For Runtime: Check saved credentials in `~/.qiskit/qiskit-ibm.json`

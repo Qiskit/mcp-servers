@@ -40,7 +40,7 @@ def get_token_from_env() -> str | None:
     Returns:
         Token string if found in environment, None otherwise
     """
-    token = os.getenv("IBM_QUANTUM_TOKEN")
+    token = os.getenv("QISKIT_IBM_TOKEN")
     if (
         token
         and token.strip()
@@ -137,7 +137,7 @@ async def setup_ibm_quantum_account(
     if not token or not token.strip():
         env_token = get_token_from_env()
         if env_token:
-            logger.info("Using token from IBM_QUANTUM_TOKEN environment variable")
+            logger.info("Using token from QISKIT_IBM_TOKEN environment variable")
             token = env_token
         else:
             # Try to use saved credentials

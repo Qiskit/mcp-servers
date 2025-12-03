@@ -36,7 +36,7 @@ class TestGetTokenFromEnv:
 
     def test_get_token_from_env_valid(self):
         """Test getting valid token from environment."""
-        with patch.dict(os.environ, {"IBM_QUANTUM_TOKEN": "valid_token_123"}):
+        with patch.dict(os.environ, {"QISKIT_IBM_TOKEN": "valid_token_123"}):
             token = get_token_from_env()
             assert token == "valid_token_123"
 
@@ -48,13 +48,13 @@ class TestGetTokenFromEnv:
 
     def test_get_token_from_env_placeholder(self):
         """Test that placeholder tokens are rejected."""
-        with patch.dict(os.environ, {"IBM_QUANTUM_TOKEN": "<PASSWORD>"}):
+        with patch.dict(os.environ, {"QISKIT_IBM_TOKEN": "<PASSWORD>"}):
             token = get_token_from_env()
             assert token is None
 
     def test_get_token_from_env_whitespace(self):
         """Test that whitespace-only tokens return None."""
-        with patch.dict(os.environ, {"IBM_QUANTUM_TOKEN": "   "}):
+        with patch.dict(os.environ, {"QISKIT_IBM_TOKEN": "   "}):
             token = get_token_from_env()
             assert token is None
 

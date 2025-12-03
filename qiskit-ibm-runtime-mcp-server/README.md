@@ -48,7 +48,7 @@ This project recommends using [uv](https://astral.sh/uv) for virtual environment
    cp .env.example .env
 
    # Edit .env and add your IBM Quantum API token
-   export IBM_QUANTUM_TOKEN="your_token_here"
+   export QISKIT_IBM_TOKEN="your_token_here"
    ```
 
    **Option B: Save Credentials Locally**
@@ -73,7 +73,7 @@ This project recommends using [uv](https://astral.sh/uv) for virtual environment
    **Token Resolution Priority:**
    The server looks for credentials in this order:
    1. Explicit token passed to `setup_ibm_quantum_account()`
-   2. `IBM_QUANTUM_TOKEN` environment variable
+   2. `QISKIT_IBM_TOKEN` environment variable
    3. Saved credentials in `~/.qiskit/qiskit-ibm.json`
 
 ## Quick Start
@@ -138,7 +138,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
 )
 
 # Optional: Setup account if not already configured
-# Will automatically use IBM_QUANTUM_TOKEN env var or saved credentials
+# Will automatically use QISKIT_IBM_TOKEN env var or saved credentials
 setup_ibm_quantum_account.sync()  # No token needed if already configured
 
 # Use .sync for synchronous execution - no setup needed if credentials saved
@@ -166,7 +166,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     get_backend_properties
 )
 
-# Load environment variables (includes IBM_QUANTUM_TOKEN)
+# Load environment variables (includes QISKIT_IBM_TOKEN)
 load_dotenv()
 
 # Use .sync versions for DSPy tools
@@ -193,13 +193,13 @@ Configure IBM Quantum account with API token.
 
 **Parameters:**
 - `token` (optional): IBM Quantum API token. If not provided, the function will:
-  1. Check for `IBM_QUANTUM_TOKEN` environment variable
+  1. Check for `QISKIT_IBM_TOKEN` environment variable
   2. Use saved credentials from `~/.qiskit/qiskit-ibm.json`
 - `channel`: Service channel (default: `"ibm_quantum_platform"`)
 
 **Returns:** Setup status and account information
 
-**Note:** If you already have saved credentials or have set the `IBM_QUANTUM_TOKEN` environment variable, you can call this function without parameters or skip it entirely and use other functions directly.
+**Note:** If you already have saved credentials or have set the `QISKIT_IBM_TOKEN` environment variable, you can call this function without parameters or skip it entirely and use other functions directly.
 
 #### `list_backends()`
 Get list of available quantum backends.
@@ -252,10 +252,10 @@ Get current service status and connection info.
 ## Security Considerations
 
 - **Store IBM Quantum tokens securely**: Never commit tokens to version control
-- **Use environment variables for production deployments**: Set `IBM_QUANTUM_TOKEN` environment variable
+- **Use environment variables for production deployments**: Set `QISKIT_IBM_TOKEN` environment variable
 - **Credential Priority**: The server automatically resolves credentials in this order:
   1. Explicit token parameter (highest priority)
-  2. `IBM_QUANTUM_TOKEN` environment variable
+  2. `QISKIT_IBM_TOKEN` environment variable
   3. Saved credentials in `~/.qiskit/qiskit-ibm.json` (lowest priority)
 - **Token Validation**: The server rejects placeholder values like `<PASSWORD>`, `<TOKEN>`, etc., to prevent accidental credential corruption
 - **Implement rate limiting for production use**: Monitor API request frequency
