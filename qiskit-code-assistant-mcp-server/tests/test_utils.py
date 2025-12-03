@@ -52,20 +52,18 @@ class TestGetTokenFromSystem:
             assert token == "test_token_from_file"
 
     def test_get_token_no_env_no_file(self):
-        """Test exception when no token is available."""
+        """Test None returned when no token is available."""
         with patch.dict("os.environ", {}, clear=True):
             with patch("pathlib.Path.exists", return_value=False):
                 from qiskit_code_assistant_mcp_server.utils import (
                     _get_token_from_system,
                 )
 
-                with pytest.raises(Exception) as exc_info:
-                    _get_token_from_system()
-
-                assert "does not exist" in str(exc_info.value)
+                token = _get_token_from_system()
+                assert token is None
 
     def test_get_token_file_missing_default(self, mock_qiskit_credentials):
-        """Test exception when credentials file exists but missing default entry."""
+        """Test None returned when credentials file exists but missing default entry."""
         import json
 
         # Create file without default-ibm-quantum-platform entry
@@ -75,10 +73,23 @@ class TestGetTokenFromSystem:
         with patch.dict("os.environ", {}, clear=True):
             from qiskit_code_assistant_mcp_server.utils import _get_token_from_system
 
-            with pytest.raises(Exception) as exc_info:
-                _get_token_from_system()
+            token = _get_token_from_system()
+            assert token is None
 
-            assert "default-ibm-quantum-platform not found" in str(exc_info.value)
+    def test_get_token_raises_when_no_token(self):
+        """Test _get_token raises exception when no token is available."""
+        import qiskit_code_assistant_mcp_server.utils as utils_module
+
+        # Reset state
+        utils_module._cached_token = None
+        utils_module._token_checked = False
+
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("pathlib.Path.exists", return_value=False):
+                with pytest.raises(Exception) as exc_info:
+                    utils_module._get_token()
+
+                assert "No IBM Quantum token available" in str(exc_info.value)
 
 
 class TestGetErrorMessage:

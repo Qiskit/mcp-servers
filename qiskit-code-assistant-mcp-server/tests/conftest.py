@@ -44,6 +44,7 @@ async def reset_http_client():
     # (might already be closed or in invalid state)
     utils_module._client = None
     utils_module._cached_token = None  # Reset cached token for fresh state
+    utils_module._token_checked = False  # Reset token check flag
 
     yield
 
@@ -57,6 +58,7 @@ async def reset_http_client():
         finally:
             utils_module._client = None
     utils_module._cached_token = None  # Reset cached token after test
+    utils_module._token_checked = False  # Reset token check flag after test
 
 
 @pytest.fixture

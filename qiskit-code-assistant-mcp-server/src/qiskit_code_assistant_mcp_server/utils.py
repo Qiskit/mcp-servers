@@ -104,39 +104,50 @@ def with_sync(func: F) -> F:
     return func
 
 
-def _get_token_from_system() -> str:
+def _get_token_from_system() -> str | None:
+    """Get the IBM Quantum token from environment or credentials file.
+
+    Returns:
+        Token string if found, None otherwise.
+    """
     token = os.getenv("QISKIT_IBM_TOKEN")
 
     if not token:
         qiskit_file = Path.home() / ".qiskit" / "qiskit-ibm.json"
         if not qiskit_file.exists():
-            raise Exception(
-                f"Credentials file {qiskit_file} does not exist. Please set env var QISKIT_IBM_TOKEN to access the service, or save your IBM Quantum API token using QiskitRuntimeService. "
-                "More info about saving your token using QiskitRuntimeService https://quantum.cloud.ibm.com/docs/en/api/qiskit-ibm-runtime/qiskit-runtime-service"
-            )
+            return None
 
-        with open(qiskit_file) as _sc:
-            creds = json.loads(_sc.read())
+        try:
+            with open(qiskit_file) as _sc:
+                creds = json.loads(_sc.read())
+            token = creds.get("default-ibm-quantum-platform", {}).get("token")
+        except Exception:
+            return None
 
-        token = creds.get("default-ibm-quantum-platform", {}).get("token")
-        if token is None:
-            raise Exception(
-                f"default-ibm-quantum-platform not found in {qiskit_file}. Please set env var QISKIT_IBM_TOKEN to access the service, or save your IBM Quantum API token using QiskitRuntimeService. "
-                "More info about saving your token using QiskitRuntimeService https://quantum.cloud.ibm.com/docs/en/api/qiskit-ibm-runtime/qiskit-runtime-service"
-            )
-
-    return token
+    return token if token else None
 
 
 # Lazy token retrieval - only fetch when first needed
 _cached_token: str | None = None
+_token_checked: bool = False
 
 
 def _get_token() -> str:
-    """Get the IBM Quantum token, using cached value if available."""
-    global _cached_token
-    if _cached_token is None:
+    """Get the IBM Quantum token, using cached value if available.
+
+    Raises:
+        Exception: If no token is available when actually needed for an API call.
+    """
+    global _cached_token, _token_checked
+    if not _token_checked:
         _cached_token = _get_token_from_system()
+        _token_checked = True
+    if _cached_token is None:
+        raise Exception(
+            "No IBM Quantum token available. Please set env var QISKIT_IBM_TOKEN to access the service, "
+            "or save your IBM Quantum API token using QiskitRuntimeService. "
+            "More info: https://quantum.cloud.ibm.com/docs/en/api/qiskit-ibm-runtime/qiskit-runtime-service"
+        )
     return _cached_token
 
 
