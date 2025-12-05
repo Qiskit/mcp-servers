@@ -1,6 +1,6 @@
 [project]
 name = "qiskit-ibm-runtime-mcp-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP server for IBM Quantum computing services through Qiskit IBM Runtime"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"

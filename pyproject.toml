@@ -25,18 +25,18 @@ classifiers = [
 
 # Meta-package dependencies: installs all MCP servers
 dependencies = [
-    "qiskit-code-assistant-mcp-server>=0.1.0",
-    "qiskit-ibm-runtime-mcp-server>=0.1.0",
+    "qiskit-code-assistant-mcp-server>=0.1.1",
+    "qiskit-ibm-runtime-mcp-server>=0.1.1",
 ]
 
 [project.optional-dependencies]
 # Install individual servers
-code-assistant = ["qiskit-code-assistant-mcp-server>=0.1.0"]
-runtime = ["qiskit-ibm-runtime-mcp-server>=0.1.0"]
+code-assistant = ["qiskit-code-assistant-mcp-server>=0.1.1"]
+runtime = ["qiskit-ibm-runtime-mcp-server>=0.1.1"]
 # Install all servers (same as default dependencies)
 all = [
-    "qiskit-code-assistant-mcp-server>=0.1.0",
-    "qiskit-ibm-runtime-mcp-server>=0.1.0",
+    "qiskit-code-assistant-mcp-server>=0.1.1",
+    "qiskit-ibm-runtime-mcp-server>=0.1.1",
 ]
 
 [project.urls]
