@@ -16,7 +16,10 @@ import logging
 import os
 from typing import Any
 
-from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit.circuit.library import real_amplitudes
+from qiskit.quantum_info import SparsePauliOp
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+from qiskit_ibm_runtime import EstimatorV2, QiskitRuntimeService  # type: ignore[import-untyped]
 
 from qiskit_ibm_runtime_mcp_server.utils import with_sync
 
@@ -116,6 +119,44 @@ def initialize_service(
     except Exception as e:
         if not isinstance(e, ValueError):
             logger.error(f"Failed to initialize IBM Runtime service: {e}")
+        raise
+
+
+def initialize_estimator():
+    """Initialize the EstimatorV2 instance.
+
+        This helper creates an :class:`qiskit_ibm_runtime.EstimatorV2` that
+        interacts with Qiskit Runtime Estimator primitive service.
+            Qiskit Runtime Estimator primitive service estimates expectation values of quantum circuits and
+            observables.
+
+        Args:
+            mode: The execution mode used to make the primitive query. It can be:
+
+                * A :class:`Backend` if you are using job mode.
+                * A :class:`Session` if you are using session execution mode.
+                * A :class:`Batch` if you are using batch execution mode.
+
+                Refer to the
+                `Qiskit Runtime documentation
+                <https://quantum.cloud.ibm.com/docs/guides/execution-modes>`_
+                for more information about the ``Execution modes``.
+            options: Estimator options, see :class:`EstimatorOptions` for detailed description.
+
+        Returns:
+            EstimatorV2: The initialized estimator.
+    """
+    global estimator_service
+    global service
+
+    try:
+        if service is None:
+            service = initialize_service()
+        backend = service.least_busy(operational=True, simulator=False)
+        estimator_service = EstimatorV2(mode=backend)
+        return estimator_service, backend
+    except Exception as e:
+        logger.error(f"Failed to initialize EstimatorV2: {e}")
         raise
 
 
@@ -472,6 +513,49 @@ async def get_service_status() -> str:
         logger.error(f"Failed to check service status: {e}")
         status_info = {"connected": False, "error": str(e), "service": "IBM Quantum"}
         return f"IBM Quantum Service Status: {status_info}"
+
+async def estimator_run(qubits, reps, sparse, theta) -> str:
+    """Submit a request to the estimator primitive.
+
+        Args:
+            num_qubits: The number of qubits of the RealAmplitudes circuit.
+            reps: Specifies how often the structure of a rotation layer followed by an entanglement
+                layer is repeated.
+            sparse: Pauli list of terms.
+                A list of Pauli strings or a Pauli string is also allowed
+            theta: An iterable of pub-like object as
+                tuples ``(circuit, observables)`` or ``(circuit, observables, parameter_values)``.
+        Returns:
+            Submitted job information.
+        """
+
+    try:
+        estimator_service, backend = initialize_estimator()
+        psi = real_amplitudes(num_qubits=qubits, reps=reps)
+        hamiltonian = SparsePauliOp.from_list(sparse)
+
+        pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+        isa_psi = pm.run(psi)
+        isa_observables = hamiltonian.apply_layout(isa_psi.layout)
+
+        job = estimator_service.run([(isa_psi, isa_observables, [theta])])
+
+        job_info = {
+                    "job_id": job.job_id(),
+                    "status": job.status(),
+                    "creation_date": getattr(job, "creation_date", "Unknown"),
+                    "backend": job.backend().name if job.backend() else "Unknown",
+                    "tags": getattr(job, "tags", []),
+                    "error_message": job.error_message()
+                    if hasattr(job, "error_message")
+                    else None
+                }
+
+        return f"Estimator job results: {job_info}"
+    except Exception as e:
+        logger.error(f"Failed run the estimator: {e}")
+        estimator_job_info = {"run": False, "error": str(e)}
+        return f"Error running the estimator: {estimator_job_info}"
 
 
 # Assisted by watsonx Code Assistant
