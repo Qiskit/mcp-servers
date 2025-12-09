@@ -725,5 +725,111 @@ class TestGetBackendCalibration:
             qubit_1 = next(q for q in qubit_data if q["qubit"] == 1)
             assert qubit_1["operational"] is True
 
+    @pytest.mark.asyncio
+    async def test_get_calibration_processor_type_string(self, mock_runtime_service):
+        """Test calibration includes processor_type when it's a string."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 100.0
+            mock_properties.t2.return_value = 50.0
+            mock_properties.readout_error.return_value = 0.02
+            mock_properties.prob_meas0_prep1.return_value = None
+            mock_properties.prob_meas1_prep0.return_value = None
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.frequency.return_value = 5.0e9
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+            mock_properties.faulty_qubits.return_value = []
+            mock_properties.faulty_gates.return_value = []
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+            mock_config.processor_type = "Heron"
+            mock_config.backend_version = "2.0.0"
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert "processor_type" in result
+            assert result["processor_type"] == "Heron"
+            assert "backend_version" in result
+            assert result["backend_version"] == "2.0.0"
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_processor_type_dict(self, mock_runtime_service):
+        """Test calibration handles processor_type as dict with family and revision."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 100.0
+            mock_properties.t2.return_value = 50.0
+            mock_properties.readout_error.return_value = 0.02
+            mock_properties.prob_meas0_prep1.return_value = None
+            mock_properties.prob_meas1_prep0.return_value = None
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.frequency.return_value = 5.0e9
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+            mock_properties.faulty_qubits.return_value = []
+            mock_properties.faulty_gates.return_value = []
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+            # processor_type as dict (common format from IBM backends)
+            mock_config.processor_type = {"family": "Eagle", "revision": "3"}
+            mock_config.backend_version = "1.5.2"
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert "processor_type" in result
+            assert result["processor_type"] == "Eagle r3"
+            assert "backend_version" in result
+            assert result["backend_version"] == "1.5.2"
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_processor_type_missing(self, mock_runtime_service):
+        """Test calibration handles missing processor_type gracefully."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 100.0
+            mock_properties.t2.return_value = 50.0
+            mock_properties.readout_error.return_value = 0.02
+            mock_properties.prob_meas0_prep1.return_value = None
+            mock_properties.prob_meas1_prep0.return_value = None
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.frequency.return_value = 5.0e9
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+            mock_properties.faulty_qubits.return_value = []
+            mock_properties.faulty_gates.return_value = []
+
+            mock_config = Mock(spec=[])  # Empty spec means no attributes
+            mock_config.coupling_map = [[0, 1]]
+            # Don't set processor_type or backend_version
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "success"
+            # Should have the keys but with None values
+            assert "processor_type" in result
+            assert result["processor_type"] is None
+            assert "backend_version" in result
+            assert result["backend_version"] is None
+
 
 # Assisted by watsonx Code Assistant

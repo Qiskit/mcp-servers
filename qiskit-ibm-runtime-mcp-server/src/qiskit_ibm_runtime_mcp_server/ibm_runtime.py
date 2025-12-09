@@ -351,6 +351,21 @@ async def get_backend_calibration(
         backend = service.backend(backend_name)
         num_qubits = getattr(backend, "num_qubits", 0)
 
+        # Get processor type and backend version from configuration
+        processor_type = None
+        backend_version = None
+        try:
+            config = backend.configuration()
+            processor_type = getattr(config, "processor_type", None)
+            # processor_type may be a dict with 'family' and 'revision' keys
+            if isinstance(processor_type, dict):
+                family = processor_type.get("family", "")
+                revision = processor_type.get("revision", "")
+                processor_type = f"{family}" + (f" r{revision}" if revision else "")
+            backend_version = getattr(config, "backend_version", None)
+        except Exception:
+            pass
+
         # Get backend properties (calibration data)
         try:
             properties = backend.properties()
@@ -523,6 +538,8 @@ async def get_backend_calibration(
             "status": "success",
             "backend_name": backend_name,
             "num_qubits": num_qubits,
+            "processor_type": processor_type,
+            "backend_version": backend_version,
             "last_calibration": last_update,
             "faulty_qubits": faulty_qubits,
             "faulty_gates": faulty_gates,
