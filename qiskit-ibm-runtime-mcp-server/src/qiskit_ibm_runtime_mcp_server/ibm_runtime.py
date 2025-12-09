@@ -482,7 +482,7 @@ async def get_backend_calibration(
         # Get processor type, backend version, and coupling map from configuration
         processor_type = None
         backend_version = None
-        coupling_map = []
+        coupling_map: list[list[int]] = []
         try:
             config = backend.configuration()
             processor_type = getattr(config, "processor_type", None)
