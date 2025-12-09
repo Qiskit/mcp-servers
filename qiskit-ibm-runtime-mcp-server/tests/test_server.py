@@ -21,6 +21,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     cancel_job,
     get_backend_calibration,
     get_backend_properties,
+    get_instance_from_env,
     get_job_status,
     get_service_status,
     get_token_from_env,
@@ -58,6 +59,34 @@ class TestGetTokenFromEnv:
         with patch.dict(os.environ, {"QISKIT_IBM_TOKEN": "   "}):
             token = get_token_from_env()
             assert token is None
+
+
+class TestGetInstanceFromEnv:
+    """Test get_instance_from_env function."""
+
+    def test_get_instance_from_env_valid(self):
+        """Test getting valid instance from environment."""
+        with patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "my-instance-crn"}):
+            instance = get_instance_from_env()
+            assert instance == "my-instance-crn"
+
+    def test_get_instance_from_env_empty(self):
+        """Test getting instance when environment variable is not set."""
+        with patch.dict(os.environ, {}, clear=True):
+            instance = get_instance_from_env()
+            assert instance is None
+
+    def test_get_instance_from_env_whitespace(self):
+        """Test that whitespace-only instance returns None."""
+        with patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "   "}):
+            instance = get_instance_from_env()
+            assert instance is None
+
+    def test_get_instance_from_env_strips_whitespace(self):
+        """Test that instance value is stripped of whitespace."""
+        with patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "  my-instance  "}):
+            instance = get_instance_from_env()
+            assert instance == "my-instance"
 
 
 class TestInitializeService:
@@ -135,6 +164,63 @@ class TestInitializeService:
             assert service == mock_runtime_service
             # Should NOT call save_account
             mock_qrs.save_account.assert_not_called()
+
+    def test_initialize_service_with_instance_parameter(self, mock_runtime_service):
+        """Test initialization with explicit instance parameter."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService") as mock_qrs:
+            mock_qrs.return_value = mock_runtime_service
+
+            service = initialize_service(instance="my-instance-crn")
+
+            assert service == mock_runtime_service
+            mock_qrs.assert_called_once_with(
+                channel="ibm_quantum_platform", instance="my-instance-crn"
+            )
+
+    def test_initialize_service_with_instance_from_env(self, mock_runtime_service):
+        """Test initialization with instance from environment variable."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService") as mock_qrs,
+            patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "env-instance-crn"}),
+        ):
+            mock_qrs.return_value = mock_runtime_service
+
+            service = initialize_service()
+
+            assert service == mock_runtime_service
+            mock_qrs.assert_called_once_with(
+                channel="ibm_quantum_platform", instance="env-instance-crn"
+            )
+
+    def test_initialize_service_explicit_instance_overrides_env(self, mock_runtime_service):
+        """Test that explicit instance parameter overrides environment variable."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService") as mock_qrs,
+            patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "env-instance-crn"}),
+        ):
+            mock_qrs.return_value = mock_runtime_service
+
+            service = initialize_service(instance="explicit-instance-crn")
+
+            assert service == mock_runtime_service
+            mock_qrs.assert_called_once_with(
+                channel="ibm_quantum_platform", instance="explicit-instance-crn"
+            )
+
+    def test_initialize_service_with_token_and_instance(self, mock_runtime_service):
+        """Test initialization with both token and instance."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService") as mock_qrs:
+            mock_qrs.return_value = mock_runtime_service
+
+            service = initialize_service(token="test_token", instance="my-instance-crn")
+
+            assert service == mock_runtime_service
+            mock_qrs.save_account.assert_called_once_with(
+                channel="ibm_quantum_platform", token="test_token", overwrite=True
+            )
+            mock_qrs.assert_called_with(
+                channel="ibm_quantum_platform", instance="my-instance-crn"
+            )
 
 
 class TestSetupIBMQuantumAccount:

@@ -24,14 +24,17 @@ from qiskit_ibm_runtime_mcp_server.utils import with_sync
 
 def get_instance_from_env() -> str | None:
     """
-    Get IBM Quantum instance from environment variables.
+    Get IBM Quantum instance from MCP server environment variable.
 
+    This is an MCP server-specific environment variable (not a standard Qiskit SDK variable).
     Setting an instance avoids the slow instance lookup during service initialization.
 
+    The instance should be a Cloud Resource Name (CRN) or service name for IBM Quantum Platform.
+
     Returns:
-        Instance string if found in environment (e.g., "your-instance-name"), None otherwise
+        Instance string if found in environment, None otherwise
     """
-    instance = os.getenv("QISKIT_IBM_INSTANCE")
+    instance = os.getenv("QISKIT_IBM_RUNTIME_MCP_INSTANCE")
     if instance and instance.strip():
         return instance.strip()
     return None
@@ -84,6 +87,28 @@ logger = logging.getLogger(__name__)
 service: QiskitRuntimeService | None = None
 
 
+def _create_runtime_service(channel: str, instance: str | None) -> QiskitRuntimeService:
+    """
+    Create a QiskitRuntimeService instance with the given channel and optional instance.
+
+    Args:
+        channel: Service channel ('ibm_quantum_platform')
+        instance: IBM Quantum instance (CRN or service name), or None
+
+    Returns:
+        QiskitRuntimeService: New service instance
+    """
+    if instance:
+        logger.info(f"Initializing with instance: {instance}")
+        return QiskitRuntimeService(channel=channel, instance=instance)
+    else:
+        logger.info(
+            "No instance specified - service will search all instances (slower). "
+            "Set QISKIT_IBM_RUNTIME_MCP_INSTANCE for faster startup."
+        )
+        return QiskitRuntimeService(channel=channel)
+
+
 def initialize_service(
     token: str | None = None,
     channel: str = "ibm_quantum_platform",
@@ -115,15 +140,7 @@ def initialize_service(
         # First, try to initialize from saved credentials (unless a new token is explicitly provided)
         if not token:
             try:
-                if instance:
-                    logger.info(f"Initializing with instance: {instance}")
-                    service = QiskitRuntimeService(channel=channel, instance=instance)
-                else:
-                    logger.info(
-                        "No instance specified - service will search all instances (slower). "
-                        "Set QISKIT_IBM_INSTANCE for faster startup."
-                    )
-                    service = QiskitRuntimeService(channel=channel)
+                service = _create_runtime_service(channel, instance)
                 logger.info(
                     f"Successfully initialized IBM Runtime service from saved credentials on channel: {channel}"
                 )
@@ -154,15 +171,7 @@ def initialize_service(
 
             # Initialize service with the new token
             try:
-                if instance:
-                    logger.info(f"Initializing with instance: {instance}")
-                    service = QiskitRuntimeService(channel=channel, instance=instance)
-                else:
-                    logger.info(
-                        "No instance specified - service will search all instances (slower). "
-                        "Set QISKIT_IBM_INSTANCE for faster startup."
-                    )
-                    service = QiskitRuntimeService(channel=channel)
+                service = _create_runtime_service(channel, instance)
                 logger.info(f"Successfully initialized IBM Runtime service on channel: {channel}")
                 return service
             except Exception as e:
@@ -243,57 +252,41 @@ async def list_backends() -> dict[str, Any]:
 
         backends = service.backends()
         backend_list = []
-        skipped_backends = []
 
         for backend in backends:
             backend_name = getattr(backend, "name", "unknown")
+            num_qubits = getattr(backend, "num_qubits", 0)
+            simulator = getattr(backend, "simulator", False)
+
+            # Try to get status (this is where API errors can occur)
             try:
-                # Get basic info first (these shouldn't fail)
-                num_qubits = getattr(backend, "num_qubits", 0)
-                simulator = getattr(backend, "simulator", False)
+                status = backend.status()
+                backend_info = {
+                    "name": backend_name,
+                    "num_qubits": num_qubits,
+                    "simulator": simulator,
+                    "operational": status.operational,
+                    "pending_jobs": status.pending_jobs,
+                    "status_msg": status.status_msg,
+                }
+            except Exception as status_err:
+                logger.warning(f"Failed to get status for backend {backend_name}: {status_err}")
+                backend_info = {
+                    "name": backend_name,
+                    "num_qubits": num_qubits,
+                    "simulator": simulator,
+                    "operational": False,
+                    "pending_jobs": 0,
+                    "status_msg": "Status unavailable",
+                }
 
-                # Try to get status (this is where API errors can occur)
-                try:
-                    status = backend.status()
-                    backend_info = {
-                        "name": backend_name,
-                        "num_qubits": num_qubits,
-                        "simulator": simulator,
-                        "operational": status.operational,
-                        "pending_jobs": status.pending_jobs,
-                        "status_msg": status.status_msg,
-                    }
-                except Exception as status_err:
-                    logger.warning(f"Failed to get status for backend {backend_name}: {status_err}")
-                    backend_info = {
-                        "name": backend_name,
-                        "num_qubits": num_qubits,
-                        "simulator": simulator,
-                        "operational": False,
-                        "pending_jobs": 0,
-                        "status_msg": "Status unavailable",
-                    }
+            backend_list.append(backend_info)
 
-                backend_list.append(backend_info)
-            except Exception as be:
-                # If even getting basic backend info fails, skip it entirely
-                logger.warning(f"Skipping backend {backend_name} due to error: {be}")
-                skipped_backends.append(backend_name)
-                continue
-
-        result = {
+        return {
             "status": "success",
             "backends": backend_list,
             "total_backends": len(backend_list),
         }
-
-        if skipped_backends:
-            result["skipped_backends"] = skipped_backends
-            result["note"] = (
-                f"Some backends ({len(skipped_backends)}) were skipped due to API errors"
-            )
-
-        return result
 
     except Exception as e:
         logger.error(f"Failed to list backends: {e}")
