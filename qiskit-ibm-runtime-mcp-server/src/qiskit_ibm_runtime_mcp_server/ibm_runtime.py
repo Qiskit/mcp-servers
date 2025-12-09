@@ -494,7 +494,7 @@ async def get_backend_calibration(
             backend_version = getattr(config, "backend_version", None)
             coupling_map = getattr(config, "coupling_map", []) or []
         except Exception:
-            pass
+            pass  # nosec B110 - Intentionally ignoring config errors; defaults are acceptable
 
         # Get backend properties (calibration data)
         try:
