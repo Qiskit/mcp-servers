@@ -19,7 +19,9 @@ import pytest
 
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     cancel_job,
+    get_backend_calibration,
     get_backend_properties,
+    get_instance_from_env,
     get_job_status,
     get_service_status,
     get_token_from_env,
@@ -57,6 +59,34 @@ class TestGetTokenFromEnv:
         with patch.dict(os.environ, {"QISKIT_IBM_TOKEN": "   "}):
             token = get_token_from_env()
             assert token is None
+
+
+class TestGetInstanceFromEnv:
+    """Test get_instance_from_env function."""
+
+    def test_get_instance_from_env_valid(self):
+        """Test getting valid instance from environment."""
+        with patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "my-instance-crn"}):
+            instance = get_instance_from_env()
+            assert instance == "my-instance-crn"
+
+    def test_get_instance_from_env_empty(self):
+        """Test getting instance when environment variable is not set."""
+        with patch.dict(os.environ, {}, clear=True):
+            instance = get_instance_from_env()
+            assert instance is None
+
+    def test_get_instance_from_env_whitespace(self):
+        """Test that whitespace-only instance returns None."""
+        with patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "   "}):
+            instance = get_instance_from_env()
+            assert instance is None
+
+    def test_get_instance_from_env_strips_whitespace(self):
+        """Test that instance value is stripped of whitespace."""
+        with patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "  my-instance  "}):
+            instance = get_instance_from_env()
+            assert instance == "my-instance"
 
 
 class TestInitializeService:
@@ -134,6 +164,61 @@ class TestInitializeService:
             assert service == mock_runtime_service
             # Should NOT call save_account
             mock_qrs.save_account.assert_not_called()
+
+    def test_initialize_service_with_instance_parameter(self, mock_runtime_service):
+        """Test initialization with explicit instance parameter."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService") as mock_qrs:
+            mock_qrs.return_value = mock_runtime_service
+
+            service = initialize_service(instance="my-instance-crn")
+
+            assert service == mock_runtime_service
+            mock_qrs.assert_called_once_with(
+                channel="ibm_quantum_platform", instance="my-instance-crn"
+            )
+
+    def test_initialize_service_with_instance_from_env(self, mock_runtime_service):
+        """Test initialization with instance from environment variable."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService") as mock_qrs,
+            patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "env-instance-crn"}),
+        ):
+            mock_qrs.return_value = mock_runtime_service
+
+            service = initialize_service()
+
+            assert service == mock_runtime_service
+            mock_qrs.assert_called_once_with(
+                channel="ibm_quantum_platform", instance="env-instance-crn"
+            )
+
+    def test_initialize_service_explicit_instance_overrides_env(self, mock_runtime_service):
+        """Test that explicit instance parameter overrides environment variable."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService") as mock_qrs,
+            patch.dict(os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "env-instance-crn"}),
+        ):
+            mock_qrs.return_value = mock_runtime_service
+
+            service = initialize_service(instance="explicit-instance-crn")
+
+            assert service == mock_runtime_service
+            mock_qrs.assert_called_once_with(
+                channel="ibm_quantum_platform", instance="explicit-instance-crn"
+            )
+
+    def test_initialize_service_with_token_and_instance(self, mock_runtime_service):
+        """Test initialization with both token and instance."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService") as mock_qrs:
+            mock_qrs.return_value = mock_runtime_service
+
+            service = initialize_service(token="test_token", instance="my-instance-crn")
+
+            assert service == mock_runtime_service
+            mock_qrs.save_account.assert_called_once_with(
+                channel="ibm_quantum_platform", token="test_token", overwrite=True
+            )
+            mock_qrs.assert_called_with(channel="ibm_quantum_platform", instance="my-instance-crn")
 
 
 class TestSetupIBMQuantumAccount:
@@ -269,7 +354,7 @@ class TestLeastBusyBackend:
             result = await least_busy_backend()
 
             assert result["status"] == "error"
-            assert "No operational quantum backends available" in result["message"]
+            assert "No quantum backends available" in result["message"]
 
 
 class TestGetBackendProperties:
@@ -309,6 +394,75 @@ class TestGetBackendProperties:
 
             assert result["status"] == "error"
             assert "Failed to get backend properties" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_backend_properties_processor_type_string(self, mock_runtime_service):
+        """Test properties includes processor_type when it's a string."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+            mock_config.basis_gates = ["cx", "id", "rz"]
+            mock_config.max_shots = 8192
+            mock_config.max_experiments = 300
+            mock_config.processor_type = "Heron"
+            mock_config.backend_version = "2.0.0"
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_properties("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert result["processor_type"] == "Heron"
+            assert result["backend_version"] == "2.0.0"
+
+    @pytest.mark.asyncio
+    async def test_get_backend_properties_processor_type_dict(self, mock_runtime_service):
+        """Test properties handles processor_type as dict with family and revision."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+            mock_config.basis_gates = ["cx", "id", "rz"]
+            mock_config.max_shots = 8192
+            mock_config.max_experiments = 300
+            mock_config.processor_type = {"family": "Eagle", "revision": "3"}
+            mock_config.backend_version = "1.5.2"
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_properties("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert result["processor_type"] == "Eagle r3"
+            assert result["backend_version"] == "1.5.2"
+
+    @pytest.mark.asyncio
+    async def test_get_backend_properties_missing_config_attrs(self, mock_runtime_service):
+        """Test properties handles missing config attributes gracefully."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_config = Mock(spec=[])  # Empty spec means no attributes
+            mock_config.coupling_map = [[0, 1]]
+            mock_config.basis_gates = ["cx", "id", "rz"]
+            mock_config.max_shots = 8192
+            mock_config.max_experiments = 300
+            # Don't set processor_type or backend_version
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_properties("ibm_brisbane")
+
+            assert result["status"] == "success"
+            # Should have the keys but with None values
+            assert result["processor_type"] is None
+            assert result["backend_version"] is None
 
 
 class TestListMyJobs:
@@ -439,6 +593,290 @@ class TestGetServiceStatus:
 
             assert "IBM Quantum Service Status" in result
             assert "error" in result
+
+
+class TestGetBackendCalibration:
+    """Test get_backend_calibration function."""
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_success(self, mock_runtime_service):
+        """Test successful calibration data retrieval."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            # Mock backend properties (calibration data)
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 150.5  # microseconds
+            mock_properties.t2.return_value = 80.2  # microseconds
+            mock_properties.readout_error.return_value = 0.015
+            mock_properties.prob_meas0_prep1.return_value = 0.012
+            mock_properties.prob_meas1_prep0.return_value = 0.018
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+
+            # Mock backend configuration
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1], [1, 2], [2, 3]]
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert result["backend_name"] == "ibm_brisbane"
+            assert "qubit_calibration" in result
+            assert "gate_errors" in result
+            assert "last_calibration" in result
+            assert len(result["qubit_calibration"]) > 0
+
+            # Check qubit data
+            qubit_data = result["qubit_calibration"][0]
+            assert "t1_us" in qubit_data
+            assert "t2_us" in qubit_data
+            assert "readout_error" in qubit_data
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_specific_qubits(self, mock_runtime_service):
+        """Test calibration data for specific qubits."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 100.0
+            mock_properties.t2.return_value = 50.0
+            mock_properties.readout_error.return_value = 0.02
+            mock_properties.prob_meas0_prep1.return_value = None
+            mock_properties.prob_meas1_prep0.return_value = None
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane", qubit_indices=[0, 5, 10])
+
+            assert result["status"] == "success"
+            # Should have data for requested qubits (filtered by num_qubits)
+            assert len(result["qubit_calibration"]) <= 3
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_no_properties(self, mock_runtime_service):
+        """Test calibration when properties are not available (e.g., simulator)."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = None
+
+            result = await get_backend_calibration("ibmq_qasm_simulator")
+
+            assert result["status"] == "error"
+            assert "No calibration data available" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_properties_exception(self, mock_runtime_service):
+        """Test calibration when properties() raises an exception."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.side_effect = Exception("Properties not available")
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "error"
+            assert "Calibration data not available" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_service_failure(self):
+        """Test calibration when service initialization fails."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.side_effect = Exception("Service initialization failed")
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "error"
+            assert "Failed to get backend calibration" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_partial_data(self, mock_runtime_service):
+        """Test calibration when some data points are missing."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            # Mock properties where some methods raise exceptions
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 120.0
+            mock_properties.t2.side_effect = Exception("T2 not available")
+            mock_properties.readout_error.return_value = 0.01
+            mock_properties.prob_meas0_prep1.side_effect = Exception("Not available")
+            mock_properties.prob_meas1_prep0.side_effect = Exception("Not available")
+            mock_properties.gate_error.side_effect = Exception("Not available")
+            mock_properties.last_update_date = None
+            mock_properties.faulty_qubits.return_value = []
+            mock_properties.faulty_gates.return_value = []
+            mock_properties.frequency.side_effect = Exception("Not available")
+
+            mock_config = Mock()
+            mock_config.coupling_map = []
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "success"
+            # Should still return partial data
+            qubit_data = result["qubit_calibration"][0]
+            assert qubit_data["t1_us"] is not None
+            assert qubit_data["t2_us"] is None  # Was exception
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_faulty_qubits(self, mock_runtime_service):
+        """Test calibration includes faulty_qubits data."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 100.0
+            mock_properties.t2.return_value = 50.0
+            mock_properties.readout_error.return_value = 0.02
+            mock_properties.prob_meas0_prep1.return_value = None
+            mock_properties.prob_meas1_prep0.return_value = None
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.frequency.return_value = 5.0e9  # 5 GHz in Hz
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+            mock_properties.faulty_qubits.return_value = [3, 7, 15]
+            mock_properties.faulty_gates.return_value = []
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert "faulty_qubits" in result
+            assert result["faulty_qubits"] == [3, 7, 15]
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_faulty_gates(self, mock_runtime_service):
+        """Test calibration includes faulty_gates data."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 100.0
+            mock_properties.t2.return_value = 50.0
+            mock_properties.readout_error.return_value = 0.02
+            mock_properties.prob_meas0_prep1.return_value = None
+            mock_properties.prob_meas1_prep0.return_value = None
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.frequency.return_value = 5.0e9
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+            mock_properties.faulty_qubits.return_value = []
+
+            # Mock faulty gates
+            mock_faulty_gate = Mock()
+            mock_faulty_gate.gate = "cx"
+            mock_faulty_gate.qubits = [5, 6]
+            mock_properties.faulty_gates.return_value = [mock_faulty_gate]
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert "faulty_gates" in result
+            assert len(result["faulty_gates"]) == 1
+            assert result["faulty_gates"][0]["gate"] == "cx"
+            assert result["faulty_gates"][0]["qubits"] == [5, 6]
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_frequency(self, mock_runtime_service):
+        """Test calibration includes qubit frequency in GHz."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 100.0
+            mock_properties.t2.return_value = 50.0
+            mock_properties.readout_error.return_value = 0.02
+            mock_properties.prob_meas0_prep1.return_value = None
+            mock_properties.prob_meas1_prep0.return_value = None
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.frequency.return_value = 5.123456e9  # 5.123456 GHz in Hz
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+            mock_properties.faulty_qubits.return_value = []
+            mock_properties.faulty_gates.return_value = []
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane")
+
+            assert result["status"] == "success"
+            qubit_data = result["qubit_calibration"][0]
+            assert "frequency_ghz" in qubit_data
+            assert qubit_data["frequency_ghz"] == 5.123456  # Converted to GHz
+
+    @pytest.mark.asyncio
+    async def test_get_calibration_operational_status(self, mock_runtime_service):
+        """Test calibration marks qubits as non-operational if in faulty_qubits list."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_properties = Mock()
+            mock_properties.t1.return_value = 100.0
+            mock_properties.t2.return_value = 50.0
+            mock_properties.readout_error.return_value = 0.02
+            mock_properties.prob_meas0_prep1.return_value = None
+            mock_properties.prob_meas1_prep0.return_value = None
+            mock_properties.gate_error.return_value = 0.001
+            mock_properties.frequency.return_value = 5.0e9
+            mock_properties.last_update_date = "2024-01-15T10:00:00Z"
+            # Mark qubit 0 as faulty
+            mock_properties.faulty_qubits.return_value = [0]
+            mock_properties.faulty_gates.return_value = []
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1]]
+
+            mock_backend = mock_runtime_service.backend.return_value
+            mock_backend.properties.return_value = mock_properties
+            mock_backend.configuration.return_value = mock_config
+
+            result = await get_backend_calibration("ibm_brisbane", qubit_indices=[0, 1])
+
+            assert result["status"] == "success"
+            qubit_data = result["qubit_calibration"]
+
+            # Qubit 0 should be marked as non-operational (in faulty_qubits)
+            qubit_0 = next(q for q in qubit_data if q["qubit"] == 0)
+            assert qubit_0["operational"] is False
+
+            # Qubit 1 should be operational (not in faulty_qubits)
+            qubit_1 = next(q for q in qubit_data if q["qubit"] == 1)
+            assert qubit_1["operational"] is True
 
 
 # Assisted by watsonx Code Assistant
