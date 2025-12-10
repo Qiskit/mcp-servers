@@ -40,7 +40,15 @@ jobs:
     - name: Build package
       working-directory: ./qiskit-code-assistant-mcp-server
       run: |
-        uv build
+        uv build --out-dir dist
+
+    - name: Verify build output
+      run: |
+        ls -la qiskit-code-assistant-mcp-server/dist/
+        if [ ! -d "qiskit-code-assistant-mcp-server/dist" ] || [ -z "$(ls -A qiskit-code-assistant-mcp-server/dist)" ]; then
+          echo "ERROR: Build did not produce any distribution files"
+          exit 1
+        fi
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
@@ -71,7 +79,15 @@ jobs:
     - name: Build package
       working-directory: ./qiskit-ibm-runtime-mcp-server
       run: |
-        uv build
+        uv build --out-dir dist
+
+    - name: Verify build output
+      run: |
+        ls -la qiskit-ibm-runtime-mcp-server/dist/
+        if [ ! -d "qiskit-ibm-runtime-mcp-server/dist" ] || [ -z "$(ls -A qiskit-ibm-runtime-mcp-server/dist)" ]; then
+          echo "ERROR: Build did not produce any distribution files"
+          exit 1
+        fi
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
