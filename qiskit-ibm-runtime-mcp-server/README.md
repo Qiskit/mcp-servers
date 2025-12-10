@@ -49,6 +49,9 @@ This project recommends using [uv](https://astral.sh/uv) for virtual environment
 
    # Edit .env and add your IBM Quantum API token
    export QISKIT_IBM_TOKEN="your_token_here"
+
+   # Optional: Set instance for faster startup (skips instance lookup)
+   export QISKIT_IBM_RUNTIME_MCP_INSTANCE="your-instance-crn"
    ```
 
    **Option B: Save Credentials Locally**
@@ -70,11 +73,24 @@ This project recommends using [uv](https://astral.sh/uv) for virtual environment
    await setup_ibm_quantum_account(token="your_token_here")
    ```
 
-   **Token Resolution Priority:**
+   **Credential Resolution Priority:**
    The server looks for credentials in this order:
    1. Explicit token passed to `setup_ibm_quantum_account()`
    2. `QISKIT_IBM_TOKEN` environment variable
    3. Saved credentials in `~/.qiskit/qiskit-ibm.json`
+
+   **Instance Configuration (Optional):**
+   To speed up service initialization, you can specify your IBM Quantum instance:
+   - Set `QISKIT_IBM_RUNTIME_MCP_INSTANCE` environment variable with your instance CRN
+   - This skips the automatic instance lookup which can be slow
+   - Find your instance CRN in [IBM Quantum Platform](https://quantum.cloud.ibm.com/instances)
+
+   **Instance Priority:**
+   - If you saved credentials with an instance (via `save_account(instance="...")`), the SDK uses it automatically
+   - `QISKIT_IBM_RUNTIME_MCP_INSTANCE` **overrides** any instance saved in credentials
+   - If neither is set, the SDK performs a slow lookup across all instances
+
+   > **Note:** `QISKIT_IBM_RUNTIME_MCP_INSTANCE` is an MCP server-specific variable, not a standard Qiskit SDK environment variable.
 
 ## Quick Start
 

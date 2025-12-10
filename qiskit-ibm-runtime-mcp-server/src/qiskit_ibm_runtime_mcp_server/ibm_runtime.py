@@ -12,6 +12,7 @@
 
 """Core IBM Runtime functions for the MCP server."""
 
+import contextlib
 import logging
 import os
 from typing import Any
@@ -21,16 +22,46 @@ from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime_mcp_server.utils import with_sync
 
 
+def get_instance_from_env() -> str | None:
+    """
+    Get IBM Quantum instance from MCP server environment variable.
+
+    This is an MCP server-specific environment variable (not a standard Qiskit SDK variable).
+    Setting an instance avoids the slow instance lookup during service initialization.
+
+    The instance should be a Cloud Resource Name (CRN) or service name for IBM Quantum Platform.
+
+    Returns:
+        Instance string if found in environment, None otherwise
+    """
+    instance = os.getenv("QISKIT_IBM_RUNTIME_MCP_INSTANCE")
+    if instance and instance.strip():
+        return instance.strip()
+    return None
+
+
 def least_busy(backends: list[Any]) -> Any | None:
     """Find the least busy backend from a list of backends."""
     if not backends:
         return None
 
-    operational_backends = [b for b in backends if hasattr(b, "status") and b.status().operational]
+    operational_backends = []
+    for b in backends:
+        try:
+            if hasattr(b, "status"):
+                status = b.status()
+                if status.operational:
+                    operational_backends.append((b, status.pending_jobs))
+        except Exception as e:
+            logger.warning(f"Skipping backend {getattr(b, 'name', 'unknown')} in least_busy: {e}")
+            continue
+
     if not operational_backends:
         return None
 
-    return min(operational_backends, key=lambda b: b.status().pending_jobs)
+    # Sort by pending jobs and return the backend with fewest pending jobs
+    operational_backends.sort(key=lambda x: x[1])
+    return operational_backends[0][0]
 
 
 def get_token_from_env() -> str | None:
@@ -56,8 +87,32 @@ logger = logging.getLogger(__name__)
 service: QiskitRuntimeService | None = None
 
 
+def _create_runtime_service(channel: str, instance: str | None) -> QiskitRuntimeService:
+    """
+    Create a QiskitRuntimeService instance with the given channel and optional instance.
+
+    Args:
+        channel: Service channel ('ibm_quantum_platform')
+        instance: IBM Quantum instance (CRN or service name), or None
+
+    Returns:
+        QiskitRuntimeService: New service instance
+    """
+    if instance:
+        logger.info(f"Initializing with instance: {instance}")
+        return QiskitRuntimeService(channel=channel, instance=instance)
+    else:
+        logger.info(
+            "No instance specified - service will search all instances (slower). "
+            "Set QISKIT_IBM_RUNTIME_MCP_INSTANCE for faster startup."
+        )
+        return QiskitRuntimeService(channel=channel)
+
+
 def initialize_service(
-    token: str | None = None, channel: str = "ibm_quantum_platform"
+    token: str | None = None,
+    channel: str = "ibm_quantum_platform",
+    instance: str | None = None,
 ) -> QiskitRuntimeService:
     """
     Initialize the Qiskit IBM Runtime service.
@@ -65,17 +120,27 @@ def initialize_service(
     Args:
         token: IBM Quantum API token (optional if saved)
         channel: Service channel ('ibm_quantum_platform')
+        instance: IBM Quantum instance (e.g., 'ibm-q/open/main'). If provided,
+                 significantly speeds up initialization by skipping instance lookup.
 
     Returns:
         QiskitRuntimeService: Initialized service instance
     """
     global service
 
+    # Return existing service if already initialized (singleton pattern)
+    if service is not None and token is None:
+        return service
+
+    # Check for instance in environment if not explicitly provided
+    if instance is None:
+        instance = get_instance_from_env()
+
     try:
         # First, try to initialize from saved credentials (unless a new token is explicitly provided)
         if not token:
             try:
-                service = QiskitRuntimeService(channel=channel)
+                service = _create_runtime_service(channel, instance)
                 logger.info(
                     f"Successfully initialized IBM Runtime service from saved credentials on channel: {channel}"
                 )
@@ -106,7 +171,7 @@ def initialize_service(
 
             # Initialize service with the new token
             try:
-                service = QiskitRuntimeService(channel=channel)
+                service = _create_runtime_service(channel, instance)
                 logger.info(f"Successfully initialized IBM Runtime service on channel: {channel}")
                 return service
             except Exception as e:
@@ -189,28 +254,33 @@ async def list_backends() -> dict[str, Any]:
         backend_list = []
 
         for backend in backends:
+            backend_name = getattr(backend, "name", "unknown")
+            num_qubits = getattr(backend, "num_qubits", 0)
+            simulator = getattr(backend, "simulator", False)
+
+            # Try to get status (this is where API errors can occur)
             try:
                 status = backend.status()
                 backend_info = {
-                    "name": backend.name,
-                    "num_qubits": getattr(backend, "num_qubits", 0),
-                    "simulator": getattr(backend, "simulator", False),
+                    "name": backend_name,
+                    "num_qubits": num_qubits,
+                    "simulator": simulator,
                     "operational": status.operational,
                     "pending_jobs": status.pending_jobs,
                     "status_msg": status.status_msg,
                 }
-                backend_list.append(backend_info)
-            except Exception as be:
-                logger.warning(f"Failed to get status for backend {backend.name}: {be}")
+            except Exception as status_err:
+                logger.warning(f"Failed to get status for backend {backend_name}: {status_err}")
                 backend_info = {
-                    "name": backend.name,
-                    "num_qubits": getattr(backend, "num_qubits", 0),
-                    "simulator": getattr(backend, "simulator", False),
+                    "name": backend_name,
+                    "num_qubits": num_qubits,
+                    "simulator": simulator,
                     "operational": False,
                     "pending_jobs": 0,
                     "status_msg": "Status unavailable",
                 }
-                backend_list.append(backend_info)
+
+            backend_list.append(backend_info)
 
         return {
             "status": "success",
@@ -237,30 +307,44 @@ async def least_busy_backend() -> dict[str, Any]:
         if service is None:
             service = initialize_service()
 
-        backends = service.backends(operational=True, simulator=False)
+        # Don't filter by operational=True here since that filter might trigger
+        # API calls for problematic backends. Let least_busy() handle the filtering.
+        backends = service.backends(simulator=False)
 
         if not backends:
             return {
                 "status": "error",
-                "message": "No operational quantum backends available",
+                "message": "No quantum backends available",
             }
 
         backend = least_busy(backends)
         if backend is None:
             return {
                 "status": "error",
-                "message": "Could not find a suitable backend",
+                "message": "Could not find a suitable operational backend. "
+                "All backends may be offline or under maintenance.",
             }
-        status = backend.status()
 
-        return {
-            "status": "success",
-            "backend_name": backend.name,
-            "num_qubits": getattr(backend, "num_qubits", 0),
-            "pending_jobs": status.pending_jobs,
-            "operational": status.operational,
-            "status_msg": status.status_msg,
-        }
+        try:
+            status = backend.status()
+            return {
+                "status": "success",
+                "backend_name": backend.name,
+                "num_qubits": getattr(backend, "num_qubits", 0),
+                "pending_jobs": status.pending_jobs,
+                "operational": status.operational,
+                "status_msg": status.status_msg,
+            }
+        except Exception as status_err:
+            logger.warning(f"Could not get final status for {backend.name}: {status_err}")
+            return {
+                "status": "success",
+                "backend_name": backend.name,
+                "num_qubits": getattr(backend, "num_qubits", 0),
+                "pending_jobs": 0,
+                "operational": True,
+                "status_msg": "Status refresh failed but backend was operational",
+            }
 
     except Exception as e:
         logger.error(f"Failed to find least busy backend: {e}")
@@ -291,19 +375,29 @@ async def get_backend_properties(backend_name: str) -> dict[str, Any]:
         status = backend.status()
 
         # Get configuration
+        processor_type = None
+        backend_version = None
+        basis_gates: list[str] = []
+        coupling_map: list[list[int]] = []
+        max_shots = 0
+        max_experiments = 0
         try:
             config = backend.configuration()
-            basis_gates = getattr(config, "basis_gates", [])
-            coupling_map = getattr(config, "coupling_map", [])
+            basis_gates = getattr(config, "basis_gates", []) or []
+            coupling_map = getattr(config, "coupling_map", []) or []
             max_shots = getattr(config, "max_shots", 0)
             max_experiments = getattr(config, "max_experiments", 0)
+            backend_version = getattr(config, "backend_version", None)
+            processor_type = getattr(config, "processor_type", None)
+            # processor_type may be a dict with 'family' and 'revision' keys
+            if isinstance(processor_type, dict):
+                family = processor_type.get("family", "")
+                revision = processor_type.get("revision", "")
+                processor_type = f"{family} r{revision}" if revision else family
         except Exception:
-            basis_gates = []
-            coupling_map = []
-            max_shots = 0
-            max_experiments = 0
+            pass  # nosec B110 - Intentionally ignoring config errors; defaults are acceptable
 
-        properties = {
+        return {
             "status": "success",
             "backend_name": backend.name,
             "num_qubits": getattr(backend, "num_qubits", 0),
@@ -311,19 +405,204 @@ async def get_backend_properties(backend_name: str) -> dict[str, Any]:
             "operational": status.operational,
             "pending_jobs": status.pending_jobs,
             "status_msg": status.status_msg,
+            "processor_type": processor_type,
+            "backend_version": backend_version,
             "basis_gates": basis_gates,
             "coupling_map": coupling_map,
             "max_shots": max_shots,
             "max_experiments": max_experiments,
         }
 
-        return properties
-
     except Exception as e:
         logger.error(f"Failed to get backend properties: {e}")
         return {
             "status": "error",
             "message": f"Failed to get backend properties: {e!s}",
+        }
+
+
+def _get_qubit_calibration_data(
+    properties: Any, qubit: int, faulty_qubits: list[int]
+) -> dict[str, Any]:
+    """Extract calibration data for a single qubit."""
+    qubit_info: dict[str, Any] = {
+        "qubit": qubit,
+        "t1_us": None,
+        "t2_us": None,
+        "frequency_ghz": None,
+        "readout_error": None,
+        "prob_meas0_prep1": None,
+        "prob_meas1_prep0": None,
+        "operational": qubit not in faulty_qubits,
+    }
+
+    # Get T1 time (in microseconds)
+    with contextlib.suppress(Exception):
+        t1 = properties.t1(qubit)
+        if t1 is not None:
+            qubit_info["t1_us"] = round(t1 * 1e6, 2) if t1 < 1 else round(t1, 2)
+
+    # Get T2 time (in microseconds)
+    with contextlib.suppress(Exception):
+        t2 = properties.t2(qubit)
+        if t2 is not None:
+            qubit_info["t2_us"] = round(t2 * 1e6, 2) if t2 < 1 else round(t2, 2)
+
+    # Get qubit frequency (in GHz)
+    with contextlib.suppress(Exception):
+        freq = properties.frequency(qubit)
+        if freq is not None:
+            qubit_info["frequency_ghz"] = round(freq / 1e9, 6)
+
+    # Get readout error
+    with contextlib.suppress(Exception):
+        readout_err = properties.readout_error(qubit)
+        if readout_err is not None:
+            qubit_info["readout_error"] = round(readout_err, 6)
+
+    # Get measurement preparation errors if available
+    with contextlib.suppress(Exception):
+        prob_meas0_prep1 = properties.prob_meas0_prep1(qubit)
+        if prob_meas0_prep1 is not None:
+            qubit_info["prob_meas0_prep1"] = round(prob_meas0_prep1, 6)
+
+    with contextlib.suppress(Exception):
+        prob_meas1_prep0 = properties.prob_meas1_prep0(qubit)
+        if prob_meas1_prep0 is not None:
+            qubit_info["prob_meas1_prep0"] = round(prob_meas1_prep0, 6)
+
+    return qubit_info
+
+
+def _get_gate_errors(
+    properties: Any, qubit_indices: list[int], coupling_map: list[list[int]]
+) -> list[dict[str, Any]]:
+    """Extract gate error data for common gates."""
+    gate_errors: list[dict[str, Any]] = []
+    single_qubit_gates = ["x", "sx", "rz"]
+    two_qubit_gates = ["cx", "ecr", "cz"]
+
+    # Single-qubit gates
+    for gate in single_qubit_gates:
+        for qubit in qubit_indices[:5]:
+            with contextlib.suppress(Exception):
+                error = properties.gate_error(gate, [qubit])
+                if error is not None:
+                    gate_errors.append({"gate": gate, "qubits": [qubit], "error": round(error, 6)})
+
+    # Two-qubit gates
+    for gate in two_qubit_gates:
+        for edge in coupling_map[:5]:
+            with contextlib.suppress(Exception):
+                error = properties.gate_error(gate, edge)
+                if error is not None:
+                    gate_errors.append({"gate": gate, "qubits": edge, "error": round(error, 6)})
+
+    return gate_errors
+
+
+@with_sync
+async def get_backend_calibration(
+    backend_name: str, qubit_indices: list[int] | None = None
+) -> dict[str, Any]:
+    """
+    Get calibration data for a specific backend including T1, T2, and error rates.
+
+    Args:
+        backend_name: Name of the backend
+        qubit_indices: Optional list of qubit indices to get data for.
+                      If None, returns data for all qubits (limited to first 10 for brevity).
+
+    Returns:
+        Calibration data including T1, T2 times and error rates
+    """
+    global service
+
+    try:
+        if service is None:
+            service = initialize_service()
+
+        backend = service.backend(backend_name)
+        num_qubits = getattr(backend, "num_qubits", 0)
+
+        # Get coupling map from configuration (needed for gate errors)
+        coupling_map: list[list[int]] = []
+        with contextlib.suppress(Exception):
+            config = backend.configuration()
+            coupling_map = getattr(config, "coupling_map", []) or []
+
+        # Get backend properties (calibration data)
+        try:
+            properties = backend.properties()
+        except Exception as e:
+            logger.warning(f"Could not get properties for {backend_name}: {e}")
+            return {
+                "status": "error",
+                "message": f"Calibration data not available for {backend_name}. "
+                "This may be a simulator or the backend doesn't provide calibration data.",
+            }
+
+        if properties is None:
+            return {
+                "status": "error",
+                "message": f"No calibration data available for {backend_name}. "
+                "This is likely a simulator backend.",
+            }
+
+        # Get faulty qubits and gates (important for avoiding failed jobs)
+        faulty_qubits: list[int] = []
+        faulty_gates: list[dict[str, Any]] = []
+        with contextlib.suppress(Exception):
+            faulty_qubits = list(properties.faulty_qubits())
+
+        with contextlib.suppress(Exception):
+            faulty_gates_raw = properties.faulty_gates()
+            for gate in faulty_gates_raw:
+                with contextlib.suppress(Exception):
+                    faulty_gates.append({"gate": gate.gate, "qubits": list(gate.qubits)})
+
+        # Determine which qubits to report on
+        if qubit_indices is None:
+            qubit_indices = list(range(min(10, num_qubits)))
+        else:
+            qubit_indices = [q for q in qubit_indices if 0 <= q < num_qubits]
+
+        # Collect qubit calibration data
+        qubit_data: list[dict[str, Any]] = []
+        for qubit in qubit_indices:
+            try:
+                qubit_data.append(_get_qubit_calibration_data(properties, qubit, faulty_qubits))
+            except Exception as qe:
+                logger.warning(f"Failed to get calibration for qubit {qubit}: {qe}")
+                qubit_data.append({"qubit": qubit, "error": str(qe)})
+
+        # Collect gate error data
+        gate_errors = _get_gate_errors(properties, qubit_indices, coupling_map)
+
+        # Get last calibration time if available
+        last_update = None
+        with contextlib.suppress(Exception):
+            last_update = str(properties.last_update_date)
+
+        return {
+            "status": "success",
+            "backend_name": backend_name,
+            "num_qubits": num_qubits,
+            "last_calibration": last_update,
+            "faulty_qubits": faulty_qubits,
+            "faulty_gates": faulty_gates,
+            "qubit_calibration": qubit_data,
+            "gate_errors": gate_errors,
+            "note": "T1/T2 in microseconds, frequency in GHz, errors are probabilities (0-1). "
+            f"Showing data for qubits {qubit_indices}. "
+            "Check faulty_qubits/faulty_gates before submitting jobs.",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get backend calibration: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to get backend calibration: {e!s}",
         }
 
 
