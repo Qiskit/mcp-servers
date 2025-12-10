@@ -32,6 +32,7 @@ from fastmcp import FastMCP
 
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     cancel_job,
+    get_backend_calibration,
     get_backend_properties,
     get_job_status,
     get_service_status,
@@ -77,8 +78,57 @@ async def least_busy_backend_tool() -> dict[str, Any]:
 
 @mcp.tool()
 async def get_backend_properties_tool(backend_name: str) -> dict[str, Any]:
-    """Get detailed properties of a specific backend."""
+    """Get detailed properties of a specific backend.
+
+    Args:
+        backend_name: Name of the backend (e.g., 'ibm_brisbane')
+
+    Returns:
+        Backend properties including:
+        - num_qubits: Number of qubits on the backend
+        - simulator: Whether this is a simulator backend
+        - operational: Current operational status
+        - pending_jobs: Number of jobs in the queue
+        - processor_type: Processor family (e.g., 'Eagle r3', 'Heron')
+        - backend_version: Backend software version
+        - basis_gates: Native gates supported (e.g., ['cx', 'id', 'rz', 'sx', 'x'])
+        - coupling_map: Qubit connectivity as list of [control, target] pairs
+        - max_shots: Maximum shots per circuit execution
+        - max_experiments: Maximum circuits per job
+
+    Note:
+        For time-varying calibration data (T1, T2, gate errors, faulty qubits),
+        use get_backend_calibration_tool instead.
+    """
     return await get_backend_properties(backend_name)
+
+
+@mcp.tool()
+async def get_backend_calibration_tool(
+    backend_name: str, qubit_indices: list[int] | None = None
+) -> dict[str, Any]:
+    """Get calibration data for a backend including T1, T2 times and error rates.
+
+    Args:
+        backend_name: Name of the backend (e.g., 'ibm_brisbane')
+        qubit_indices: Optional list of specific qubit indices to get data for.
+                      If not provided, returns data for the first 10 qubits.
+
+    Returns:
+        Calibration data including:
+        - T1 and T2 coherence times (in microseconds)
+        - Qubit frequency (in GHz)
+        - Readout errors for each qubit
+        - Gate errors for common gates (x, sx, cx, etc.)
+        - faulty_qubits: List of non-operational qubit indices
+        - faulty_gates: List of non-operational gates with affected qubits
+        - Last calibration timestamp
+
+    Note:
+        For static backend info (processor_type, backend_version, quantum_volume),
+        use get_backend_properties_tool instead.
+    """
+    return await get_backend_calibration(backend_name, qubit_indices)
 
 
 @mcp.tool()
