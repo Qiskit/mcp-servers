@@ -53,7 +53,9 @@ def least_busy(backends: list[Any]) -> Any | None:
                 if status.operational:
                     operational_backends.append((b, status.pending_jobs))
         except Exception as e:
-            logger.warning(f"Skipping backend {getattr(b, 'name', 'unknown')} in least_busy: {e}")
+            logger.warning(
+                f"Skipping backend {getattr(b, 'name', 'unknown')} in least_busy: {e}"
+            )
             continue
 
     if not operational_backends:
@@ -172,7 +174,9 @@ def initialize_service(
             # Initialize service with the new token
             try:
                 service = _create_runtime_service(channel, instance)
-                logger.info(f"Successfully initialized IBM Runtime service on channel: {channel}")
+                logger.info(
+                    f"Successfully initialized IBM Runtime service on channel: {channel}"
+                )
                 return service
             except Exception as e:
                 logger.error(f"Failed to initialize IBM Runtime service: {e}")
@@ -270,7 +274,9 @@ async def list_backends() -> dict[str, Any]:
                     "status_msg": status.status_msg,
                 }
             except Exception as status_err:
-                logger.warning(f"Failed to get status for backend {backend_name}: {status_err}")
+                logger.warning(
+                    f"Failed to get status for backend {backend_name}: {status_err}"
+                )
                 backend_info = {
                     "name": backend_name,
                     "num_qubits": num_qubits,
@@ -336,7 +342,9 @@ async def least_busy_backend() -> dict[str, Any]:
                 "status_msg": status.status_msg,
             }
         except Exception as status_err:
-            logger.warning(f"Could not get final status for {backend.name}: {status_err}")
+            logger.warning(
+                f"Could not get final status for {backend.name}: {status_err}"
+            )
             return {
                 "status": "success",
                 "backend_name": backend.name,
@@ -488,7 +496,9 @@ def _get_gate_errors(
             with contextlib.suppress(Exception):
                 error = properties.gate_error(gate, [qubit])
                 if error is not None:
-                    gate_errors.append({"gate": gate, "qubits": [qubit], "error": round(error, 6)})
+                    gate_errors.append(
+                        {"gate": gate, "qubits": [qubit], "error": round(error, 6)}
+                    )
 
     # Two-qubit gates
     for gate in two_qubit_gates:
@@ -496,7 +506,9 @@ def _get_gate_errors(
             with contextlib.suppress(Exception):
                 error = properties.gate_error(gate, edge)
                 if error is not None:
-                    gate_errors.append({"gate": gate, "qubits": edge, "error": round(error, 6)})
+                    gate_errors.append(
+                        {"gate": gate, "qubits": edge, "error": round(error, 6)}
+                    )
 
     return gate_errors
 
@@ -559,7 +571,9 @@ async def get_backend_calibration(
             faulty_gates_raw = properties.faulty_gates()
             for gate in faulty_gates_raw:
                 with contextlib.suppress(Exception):
-                    faulty_gates.append({"gate": gate.gate, "qubits": list(gate.qubits)})
+                    faulty_gates.append(
+                        {"gate": gate.gate, "qubits": list(gate.qubits)}
+                    )
 
         # Determine which qubits to report on
         if qubit_indices is None:
@@ -571,7 +585,9 @@ async def get_backend_calibration(
         qubit_data: list[dict[str, Any]] = []
         for qubit in qubit_indices:
             try:
-                qubit_data.append(_get_qubit_calibration_data(properties, qubit, faulty_qubits))
+                qubit_data.append(
+                    _get_qubit_calibration_data(properties, qubit, faulty_qubits)
+                )
             except Exception as qe:
                 logger.warning(f"Failed to get calibration for qubit {qubit}: {qe}")
                 qubit_data.append({"qubit": qubit, "error": str(qe)})
@@ -634,7 +650,9 @@ async def list_my_jobs(limit: int = 10) -> dict[str, Any]:
                     "creation_date": getattr(job, "creation_date", "Unknown"),
                     "backend": job.backend().name if job.backend() else "Unknown",
                     "tags": getattr(job, "tags", []),
-                    "error_message": job.error_message() if hasattr(job, "error_message") else None,
+                    "error_message": (
+                        job.error_message() if hasattr(job, "error_message") else None
+                    ),
                 }
                 job_list.append(job_info)
             except Exception as je:
@@ -677,7 +695,9 @@ async def get_job_status(job_id: str) -> dict[str, Any]:
             "creation_date": getattr(job, "creation_date", "Unknown"),
             "backend": job.backend().name if job.backend() else "Unknown",
             "tags": getattr(job, "tags", []),
-            "error_message": job.error_message() if hasattr(job, "error_message") else None,
+            "error_message": (
+                job.error_message() if hasattr(job, "error_message") else None
+            ),
         }
 
         return job_info
@@ -754,38 +774,66 @@ async def get_service_status() -> str:
 
 
 @with_sync
-async def delete_saved_account(account_name: str = "") -> str:
-    """Delete a saved account.
+async def delete_saved_account(account_name: str = "") -> dict[str, Any]:
+    """
+    Delete a saved IBM Quantum account from disk.
+
+    **WARNING: DESTRUCTIVE OPERATION**
+    This permanently removes saved credentials on ~/.qiskit/qiskit-ibm.json.
+    The operation CANNOT be undone. Deleted credentials must be re-entered to restore access.
+
     Args:
-        account_name: Name of the saved account to delete.
+        account_name: Name of the saved account to delete. If empty string (default),
+                     deletes the default account. Account names are typically in the
+                     format 'ibm_quantum_platform' or custom names set during save.
 
     Returns:
-    Information about if an account was deleted.
+        Dictionary containing deletion status:
+        - On success: {"status": "success", "deleted": True, "message": "Account successfully deleted"}
+        - On failure: {"status": "error", "deleted": False, "error": "Account name not found or could not be deleted"}
+        - On error: {"status": "error", "deleted": False, "error": error_message}
+
     """
     global service
 
     try:
-        if service == "":
+        if service is None:
             service = initialize_service()
         is_deleted = service.delete_account(name=account_name)
 
         if is_deleted:
-            delete_info = {"deleted": True}
-            return f"Account successfully deleted: {delete_info}"
+            return {
+                "status": "success",
+                "deleted": True,
+                "message": "Account successfully deleted",
+            }
         else:
-            return f"Failed to delete the account {account_name}, please validate the account name exists."
+            return {
+                "status": "error",
+                "deleted": False,
+                "error": "Account name not found or could not be deleted",
+            }
 
     except Exception as e:
         logger.error(f"Failed to delete account: {e}")
-        delete_info = {"deleted": False, "error": str(e)}
-        return f"Error deleting account: {delete_info}"
+        return {"status": "error", "deleted": False, "error": str(e)}
 
 
 @with_sync
-async def list_saved_account() -> str:
-    """List the accounts saved on disk.
+async def list_saved_account() -> dict[str, Any]:
+    """
+    List all IBM Quantum accounts saved on disk.
+
+    Retrieves account information from the local configuration file without requiring authentication.
+    Useful for checking which accounts are available before initializing
+    the service.
+
     Returns:
-        List of all saved accounts.
+        Dictionary containing account list status:
+        - On success with accounts: {"status": "success", "accounts": [list of account dicts]}
+          Each account dict contains: name, channel, and other metadata
+        - On success with no accounts: {"status": "success", "accounts": "No accounts found"}
+        - On error: {"status": "error", "error": error_message}
     """
     global service
 
@@ -794,89 +842,149 @@ async def list_saved_account() -> str:
             service = initialize_service()
         accounts_list = service.saved_accounts()
         if len(accounts_list) > 0:
-            return f"Account list: {accounts_list}"
+            return {"status": "success", "accounts": accounts_list}
         else:
-            return "No accounts found"
+            return {"status": "success", "accounts": "No accounts found"}
     except Exception as e:
         logger.error(f"Failed to collect accounts: {e}")
-        collect_info = {"collect": False, "error": str(e)}
-        return f"Error collecting accounts: {collect_info}"
+        return {"status": "error", "error": str(e)}
 
 
 @with_sync
-async def active_account_info() -> str:
+async def active_account_info() -> dict[str, Any]:
     """
-    Return the IBM Quantum account currently in use for the session.
-        Returns:
-            A dictionary with information about the account currently in the session.
+    Get information about the IBM Quantum account currently active in this session.
+
+    Returns details about the account being used by the current QiskitRuntimeService
+    instance, including channel, instance, and authentication status. This is the
+    account that will be used for all quantum operations (backend access, job submission).
+
+    Returns:
+        Dictionary containing active account information:
+        - On success: {"status": "success", "account_info": account_info}
+        account_info including:
+          * "channel": Service channel (e.g., 'ibm_quantum')
+          * "url"
+          * "token"
+          * "verify"
+          * "private_endpoint"
+        - On error: {"status": "error" "error": error_message}
     """
     global service
 
     try:
         if service is None:
             service = initialize_service()
-        active_account_info = service.active_account()
-        return f"Active account info: {active_account_info}"
+        account_info = service.active_account()
+        account_data = {"status": "success", "account_info": account_info}
+        return account_data
     except Exception as e:
         logger.error(f"Failed to collect active account: {e}")
-        active_account_info = {"collect": False, "error": str(e)}
-        return f"Error collecting active account: {active_account_info}"
+        return {"status": "error", "error": str(e)}
 
 
-async def active_instance_info() -> str:
-    """Return the crn of the current active instance."""
+@with_sync
+async def active_instance_info() -> dict[str, Any]:
+    """
+    Get the Cloud Resource Name (CRN) of the currently active IBM Quantum instance.
+
+    Returns the instance identifier being used for the current session. The instance
+    determines which quantum backends and resources are accessible. This is particularly
+    important for users with access to multiple instances (e.g., different organizations
+    or service plans).
+
+    Returns:
+        String containing the instance CRN (Cloud Resource Name), or error dict:
+        - On success: Instance CRN string (e.g., "crn:v1:bluemix:public:quantum-computing:...")
+        - On error: {"status": "error" "error": error_message}
+    """
     global service
 
     try:
         if service is None:
             service = initialize_service()
-        active_instance_info = service.active_instance()
-        return f"Active instance crn: {active_instance_info}"
+        intance_details = {
+            "status": "success",
+            "instance_crn": service.active_instance(),
+        }
+        return intance_details
     except Exception as e:
         logger.error(f"Failed to collect instance crn: {e}")
-        active_instance_info = {"collect": False, "error": str(e)}
-        return f"Error collecting active instance crn: {active_instance_info}"
+        return {"status": "error", "error": str(e)}
 
 
 @with_sync
-async def available_instances() -> str:
-    """Return a list that contains a series of dictionaries with the
-        following instance identifiers per instance: "crn", "plan", "name".
+async def available_instances() -> dict[str, Any]:
+    """
+    List all IBM Quantum instances available to the active account.
+
+    Retrieves information about all instances (organizations, projects, or service plans)
+    that the authenticated user has access to. Each instance provides access to different
+    quantum backends and may have different quotas and permissions.
 
     Returns:
-        Instances available for the active account.
+        Dictionary containing instance list or error:
+        - On success: {"status": "success", "instances": [list of instance dicts]}
+          Each instance dict contains:
+          * "crn": Cloud Resource Name (unique instance identifier)
+          * "plan": Service plan type (e.g., "open", "premium")
+          * "name": Human-readable instance name
+          * "tags"
+          * "pricing_type"
+        - On error: {"status": "error", "error": error_message}
     """
     global service
 
     try:
         if service is None:
             service = initialize_service()
-        available_instances_info = service.instances()
-        return f"Available instances for the active account: {available_instances_info}"
+        instances = service.instances()
+        instance_data = {
+            "status": "success",
+            "instances": list(instances),
+            "total_instances": len(instances),
+        }
+        return instance_data
     except Exception as e:
-        logger.error(f"Failed to collect available instances for the active account: {e}")
-        available_instances_info = {"collect": False, "error": str(e)}
-        return f"Error collecting available instances for the active account: {available_instances_info}"
+        logger.error(
+            f"Failed to collect available instances for the active account: {e}"
+        )
+        return {"status": "error", "error": str(e)}
 
 
 @with_sync
-async def usage_info() -> str:
-    """Return usage information for the current active instance.
+async def usage_info() -> dict[str, Any]:
+    """
+    Get usage information and statistics for the currently active IBM Quantum instance.
+
+    Retrieves detailed usage metrics including job counts, quantum runtime consumption,
+    and quota information for the active instance. This helps track resource utilization
+    and monitor remaining quotas.
 
     Returns:
-        Instance usage details.
+        Dictionary containing usage statistics, or error dict:
+        - On success:  {"status": "success" "usage": usage_info}
+        usage_info with fields such as:
+          * instance_id
+          * plan_id
+          * usage_consumed_seconds
+          * usage_period
+          * usage_limit_seconds
+          * usage_limit_reached
+          * usage_remaining_seconds
+        - On error: {"status": "error" "error": error_message}
     """
     global service
 
     try:
         if service is None:
             service = initialize_service()
-        usage_info = service.usage()
-        return f"Usage information: {usage_info}"
+        usage = service.usage()
+        usage_info = {"status": "success", "usage": usage}
+        return usage_info
     except Exception as e:
         logger.error(f"Failed to collect usage information: {e}")
-        usage_info = {"collect": False, "error": str(e)}
-        return f"Error collecting usage information: {usage_info}"
+        return {"status": "error", "error": str(e)}
 
 
 # Assisted by watsonx Code Assistant
