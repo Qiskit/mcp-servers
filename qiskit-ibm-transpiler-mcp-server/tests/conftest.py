@@ -1,10 +1,21 @@
+# This code is part of Qiskit.
+#
+# (C) Copyright IBM 2025.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 """Test configuration and fixtures for Qiskit IBM Transpiler MCP Server tests."""
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock, create_autospec
-from qiskit_ibm_runtime import QiskitRuntimeService
 import os
+from unittest.mock import AsyncMock, MagicMock, create_autospec
 
+import pytest
+from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_transpiler_mcp_server.qiskit_runtime_service_provider import (
     QiskitRuntimeServiceProvider,
 )
@@ -20,6 +31,37 @@ def mock_circuit_qasm():
 def mock_backend():
     """Mock backend name"""
     return "fake_backend"
+
+
+@pytest.fixture
+def ai_synthesis_fixture(request):
+    """Retrieve the specific fixture given the input request. Useful in parametrized tests"""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def mock_ai_synthesis_success():
+    """Successful ai_synthesis_pass_class in run_synthesis"""
+    mock_instance = MagicMock()
+    mock_class = MagicMock(return_value=mock_instance)
+    return mock_class
+
+
+@pytest.fixture
+def mock_ai_synthesis_failure():
+    """Failed ai_synthesis_pass_class in run_synthesis"""
+
+    mock_class = MagicMock(side_effect=Exception("AI Synthesis failed"))
+    mock_instance = MagicMock()
+    mock_class.return_value = mock_instance
+
+    return mock_class
+
+
+@pytest.fixture
+def backend_name():
+    """Set real backend name"""
+    return os.getenv("TEST_BACKEND_NAME", "ibm_torino")
 
 
 @pytest.fixture
