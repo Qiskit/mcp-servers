@@ -1,25 +1,37 @@
+# This code is part of Qiskit.
+#
+# (C) Copyright IBM 2025.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
+import pytest
 from qiskit_ibm_transpiler_mcp_server.qta import (
-    ai_routing,
     ai_clifford_synthesis,
     ai_linear_function_synthesis,
-    ai_permutation_synthesis,
     ai_pauli_network_synthesis,
+    ai_permutation_synthesis,
+    ai_routing,
 )
+
 from tests.utils.helpers import calculate_2q_count_and_depth_improvement
-import pytest
 
 
 class TestAIRoutingSync:
     """Test AI Routing sync method"""
 
     @pytest.mark.integration
-    def test_ai_routing_sync_success(self):
+    def test_ai_routing_sync_success(self, backend_name):
         """
         Successful test AI routing sync tool.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
+
         result = ai_routing.sync(
             circuit_qasm=qasm_str,
             backend_name=backend_name,
@@ -33,7 +45,7 @@ class TestAIRoutingSync:
         """
         Failed test AI routing sync tool. Here we simulate wrong backend name.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
         backend_name = "ibm_fake"
 
@@ -45,15 +57,12 @@ class TestAIRoutingSync:
         assert "Failed to find backend ibm_fake" in result["message"]
 
     @pytest.mark.integration
-    def test_ai_routing_sync_failure_wrong_qasm_str(
-        self,
-    ):
+    def test_ai_routing_sync_failure_wrong_qasm_str(self, backend_name):
         """
         Failed test AI routing sync tool. Here we simulate wrong input QASM string.
         """
-        with open("tests/qasm/wrong_qasm_1", "r") as f:
+        with open("tests/qasm/wrong_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_routing.sync(
             circuit_qasm=qasm_str,
@@ -66,13 +75,12 @@ class TestAICliffordSync:
     """Test AI Clifford synthesis sync method"""
 
     @pytest.mark.integration
-    def test_ai_clifford_sync_success(self):
+    def test_ai_clifford_sync_success(self, backend_name):
         """
         Successful test AI Clifford synthesis sync tool.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_clifford_synthesis.sync(
             circuit_qasm=qasm_str,
@@ -94,7 +102,7 @@ class TestAICliffordSync:
         """
         Failed test AI Clifford synthesis sync tool. Here we simulate wrong backend name.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
         backend_name = "ibm_fake"
 
@@ -106,13 +114,12 @@ class TestAICliffordSync:
         assert "Failed to find backend ibm_fake" in result["message"]
 
     @pytest.mark.integration
-    def test_ai_clifford_sync_failure_wrong_qasm(self):
+    def test_ai_clifford_sync_failure_wrong_qasm(self, backend_name):
         """
         Failed test AI Clifford synthesis sync tool. Here we simulate wrong qasm string
         """
-        with open("tests/qasm/wrong_qasm_1", "r") as f:
+        with open("tests/qasm/wrong_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_clifford_synthesis.sync(
             circuit_qasm=qasm_str,
@@ -125,13 +132,12 @@ class TestAILinearFunctionSync:
     """Test AI Linear Function synthesis sync tool"""
 
     @pytest.mark.integration
-    def test_ai_linear_function_sync_success(self):
+    def test_ai_linear_function_sync_success(self, backend_name):
         """
         Successful test AI Linear Function synthesis sync tool.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_linear_function_synthesis.sync(
             circuit_qasm=qasm_str,
@@ -153,7 +159,7 @@ class TestAILinearFunctionSync:
         """
         Failed test AI Linear Function synthesis sync tool. Here we simulate wrong backend name.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
         backend_name = "ibm_fake"
 
@@ -165,13 +171,12 @@ class TestAILinearFunctionSync:
         assert "Failed to find backend ibm_fake" in result["message"]
 
     @pytest.mark.integration
-    def test_ai_linear_function_sync_failure_wrong_qasm(self):
+    def test_ai_linear_function_sync_failure_wrong_qasm(self, backend_name):
         """
         Failed test AI Linear Function synthesis sync tool. Here we simulate wrong qasm string
         """
-        with open("tests/qasm/wrong_qasm_1", "r") as f:
+        with open("tests/qasm/wrong_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_linear_function_synthesis.sync(
             circuit_qasm=qasm_str,
@@ -184,13 +189,12 @@ class TestAIPermutationSync:
     """Test AI Permutation synthesis sync tool"""
 
     @pytest.mark.integration
-    def test_ai_permutation_sync_success(self):
+    def test_ai_permutation_sync_success(self, backend_name):
         """
         Successful test AI Permutation synthesis sync tool.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_permutation_synthesis.sync(
             circuit_qasm=qasm_str,
@@ -212,7 +216,7 @@ class TestAIPermutationSync:
         """
         Failed test AI Permutation synthesis sync tool. Here we simulate wrong backend name.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
         backend_name = "ibm_fake"
 
@@ -224,13 +228,12 @@ class TestAIPermutationSync:
         assert "Failed to find backend ibm_fake" in result["message"]
 
     @pytest.mark.integration
-    def test_ai_permutation_sync_failure_wrong_qasm(self):
+    def test_ai_permutation_sync_failure_wrong_qasm(self, backend_name):
         """
         Failed test AI Permutation synthesis sync tool. Here we simulate wrong qasm string
         """
-        with open("tests/qasm/wrong_qasm_1", "r") as f:
+        with open("tests/qasm/wrong_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_permutation_synthesis.sync(
             circuit_qasm=qasm_str,
@@ -243,13 +246,12 @@ class TestAIPauliNetworkSync:
     """Test AI Pauli Network synthesis sync tool"""
 
     @pytest.mark.integration
-    def test_ai_pauli_network_sync_success(self):
+    def test_ai_pauli_network_sync_success(self, backend_name):
         """
         Successful test AI Pauli Network synthesis sync tool.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_pauli_network_synthesis.sync(
             circuit_qasm=qasm_str,
@@ -271,7 +273,7 @@ class TestAIPauliNetworkSync:
         """
         Failed test AI Pauli Network synthesis sync tool. Here we simulate wrong backend name.
         """
-        with open("tests/qasm/correct_qasm_1", "r") as f:
+        with open("tests/qasm/correct_qasm_1") as f:
             qasm_str = f.read()
         backend_name = "ibm_fake"
 
@@ -283,13 +285,12 @@ class TestAIPauliNetworkSync:
         assert "Failed to find backend ibm_fake" in result["message"]
 
     @pytest.mark.integration
-    def test_ai_pauli_network_sync_failure_wrong_qasm(self):
+    def test_ai_pauli_network_sync_failure_wrong_qasm(self, backend_name):
         """
         Failed test AI Pauli Network synthesis sync tool. Here we simulate wrong qasm string
         """
-        with open("tests/qasm/wrong_qasm_1", "r") as f:
+        with open("tests/qasm/wrong_qasm_1") as f:
             qasm_str = f.read()
-        backend_name = "ibm_torino"
 
         result = ai_pauli_network_synthesis.sync(
             circuit_qasm=qasm_str,
