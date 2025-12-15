@@ -135,15 +135,16 @@ def _circuit_to_dict(circuit: QuantumCircuit) -> dict[str, Any]:
     depth = circuit.depth()
 
     # Get QASM representation with explicit error tracking
+    # Try QASM 3.0 first (preserves more information), fall back to QASM 2.0
     qasm_str: str | None = None
     qasm_error: str | None = None
 
     try:
-        qasm_str = qasm2.dumps(circuit)
+        qasm_str = qasm3.dumps(circuit)
     except Exception as e:
-        logger.debug(f"QASM 2.0 export failed: {e}, trying QASM 3.0")
+        logger.debug(f"QASM 3.0 export failed: {e}, trying QASM 2.0")
         try:
-            qasm_str = qasm3.dumps(circuit)
+            qasm_str = qasm2.dumps(circuit)
         except Exception as e2:
             qasm_error = f"Circuit cannot be exported to QASM (may contain unsupported gates): {e2}"
             logger.debug(qasm_error)
