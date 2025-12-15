@@ -814,7 +814,7 @@ async def list_saved_account() -> dict[str, Any]:
         Dictionary containing account list status:
         - On success with accounts: {"status": "success", "accounts": [list of account dicts]}
           Each account dict contains: name, channel, and other metadata
-        - On success with no accounts: {"status": "success", "accounts": "No accounts found"}
+        - On success with no accounts: {"status": "success", "accounts": [], "message": "No accounts found"}
         - On error: {"status": "error", "error": error_message}
     """
     global service
@@ -826,7 +826,7 @@ async def list_saved_account() -> dict[str, Any]:
         if len(accounts_list) > 0:
             return {"status": "success", "accounts": accounts_list}
         else:
-            return {"status": "success", "accounts": "No accounts found"}
+            return {"status": "success", "accounts": [], "message": "No accounts found"}
     except Exception as e:
         logger.error(f"Failed to collect accounts: {e}")
         return {"status": "error", "error": str(e)}
@@ -850,7 +850,7 @@ async def active_account_info() -> dict[str, Any]:
           * "token"
           * "verify"
           * "private_endpoint"
-        - On error: {"status": "error" "error": error_message}
+        - On error: {"status": "error", "error": error_message}
     """
     global service
 
@@ -878,18 +878,18 @@ async def active_instance_info() -> dict[str, Any]:
     Returns:
         String containing the instance CRN (Cloud Resource Name), or error dict:
         - On success: Instance CRN string (e.g., "crn:v1:bluemix:public:quantum-computing:...")
-        - On error: {"status": "error" "error": error_message}
+        - On error: {"status": "error", "error": error_message}
     """
     global service
 
     try:
         if service is None:
             service = initialize_service()
-        intance_details = {
+        instance_details = {
             "status": "success",
             "instance_crn": service.active_instance(),
         }
-        return intance_details
+        return instance_details
     except Exception as e:
         logger.error(f"Failed to collect instance crn: {e}")
         return {"status": "error", "error": str(e)}
@@ -952,7 +952,7 @@ async def usage_info() -> dict[str, Any]:
           * usage_limit_seconds
           * usage_limit_reached
           * usage_remaining_seconds
-        - On error: {"status": "error" "error": error_message}
+        - On error: {"status": "error", "error": error_message}
     """
     global service
 
@@ -960,8 +960,8 @@ async def usage_info() -> dict[str, Any]:
         if service is None:
             service = initialize_service()
         usage = service.usage()
-        usage_info = {"status": "success", "usage": usage}
-        return usage_info
+        usage_data = {"status": "success", "usage": usage}
+        return usage_data
     except Exception as e:
         logger.error(f"Failed to collect usage information: {e}")
         return {"status": "error", "error": str(e)}
