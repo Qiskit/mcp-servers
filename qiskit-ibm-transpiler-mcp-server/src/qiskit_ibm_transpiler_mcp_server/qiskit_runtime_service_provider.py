@@ -1,8 +1,20 @@
-from qiskit_ibm_runtime import QiskitRuntimeService  # type: ignore[import-untyped]
-from typing import Optional
-import threading
-
+# This code is part of Qiskit.
+#
+# (C) Copyright IBM 2025.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 import logging
+import threading
+from typing import Any, Optional
+
+from qiskit_ibm_runtime import QiskitRuntimeService
+
 
 logger = logging.getLogger(__name__)
 
@@ -15,34 +27,40 @@ class QiskitRuntimeServiceProvider:
     _instance: Optional["QiskitRuntimeServiceProvider"] = None
     _lock = threading.Lock()
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(
+        cls: type["QiskitRuntimeServiceProvider"], *args: Any, **kwargs: Any
+    ) -> "QiskitRuntimeServiceProvider":
         if cls._instance is None:
             with cls._lock:
-                if (
-                    cls._instance is None
-                ):  # double check to ensure multiple threads not enter in
+                if cls._instance is None:  # double check to ensure multiple threads not enter in
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not hasattr(self, "_service"):
-            self._service: Optional[QiskitRuntimeService] = None
+            self._service: QiskitRuntimeService | None = None
             self._service_lock = threading.Lock()  # lock for lazy init
+            self._cached_token: str | None = None
+            self._cached_channel: str = "ibm_quantum_platform"
 
     def get(
-        self, token: Optional[str] = None, channel: str = "ibm_quantum_platform"
+        self, token: str | None = None, channel: str = "ibm_quantum_platform"
     ) -> QiskitRuntimeService:
         """Lazy initialization for QiskitRuntimeService"""
-        if self._service is not None:
-            return self._service
         with self._service_lock:
-            if self._service is None:
+            if (
+                self._service is None
+                or token != self._cached_token
+                or channel != self._cached_channel
+            ):
                 self._service = self._initialize_service(token=token, channel=channel)
+                self._cached_token = token
+                self._cached_channel = channel
         return self._service
 
     @staticmethod
     def _initialize_service(
-        token: Optional[str] = None, channel: str = "ibm_quantum_platform"
+        token: str | None = None, channel: str = "ibm_quantum_platform"
     ) -> QiskitRuntimeService:
         """
         Initialize the Qiskit IBM Runtime service.
@@ -54,51 +72,27 @@ class QiskitRuntimeServiceProvider:
         Returns:
             QiskitRuntimeService: Initialized service instance
         """
+        if not token or not token.strip():
+            try:
+                service = QiskitRuntimeService(channel=channel)
+                logger.info("Initialized IBM Runtime service from saved credentials")
+                return service
+            except Exception as e:
+                raise ValueError(
+                    "No IBM Quantum token provided and no saved credentials available"
+                ) from e
+
+        # If a token is provided, validate it's not a placeholder before saving
+        token = token.strip()
+        if token in ["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HERE", "xxx"]:
+            raise ValueError(f"Invalid token: '{token}' appears to be a placeholder value")
+
+        # Save account and initialize it with the provided token
         try:
-            # First, try to initialize from saved credentials (unless a new token is explicitly provided)
-            if not token:
-                try:
-                    service = QiskitRuntimeService(channel=channel)
-                    logger.info(
-                        f"Successfully initialized IBM Runtime service from saved credentials on channel: {channel}"
-                    )
-                    return service
-                except Exception as e:
-                    logger.info(f"No saved credentials found or invalid: {e}")
-                    raise ValueError(
-                        "No IBM Quantum token provided and no saved credentials available"
-                    ) from e
-
-            # If a token is provided, validate it's not a placeholder before saving
-            if token and token.strip():
-                # Check for common placeholder patterns
-                if token.strip() in ["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HERE", "xxx"]:
-                    raise ValueError(
-                        f"Invalid token: '{token.strip()}' appears to be a placeholder value"
-                    )
-
-                # Save account with provided token
-                try:
-                    QiskitRuntimeService.save_account(
-                        channel=channel, token=token.strip(), overwrite=True
-                    )
-                    logger.info(f"Saved IBM Quantum account for channel: {channel}")
-                except Exception as e:
-                    logger.error(f"Failed to save account: {e}")
-                    raise ValueError("Invalid token or channel") from e
-
-                # Initialize service with the new token
-                try:
-                    service = QiskitRuntimeService(channel=channel)
-                    logger.info(
-                        f"Successfully initialized IBM Runtime service on channel: {channel}"
-                    )
-                    return service
-                except Exception as e:
-                    logger.error(f"Failed to initialize IBM Runtime service: {e}")
-                    raise
-
+            QiskitRuntimeService.save_account(channel=channel, token=token, overwrite=True)
+            service = QiskitRuntimeService(channel=channel)
+            logger.info("Successfully initialized IBM Runtime service using provided token")
+            return service
         except Exception as e:
-            if not isinstance(e, ValueError):
-                logger.error(f"Failed to initialize IBM Runtime service: {e}")
+            logger.error(f"Failed to initialize IBM Runtime service: {e}")
             raise
