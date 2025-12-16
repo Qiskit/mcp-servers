@@ -12,40 +12,50 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Install uv
       uses: astral-sh/setup-uv@v3
       with:
         version: "latest"
         enable-cache: true
-    
+
     - name: Set up Python
       run: uv python install 3.12
-    
+
     - name: Install dependencies
       run: |
         cd qiskit-code-assistant-mcp-server && uv sync --group dev
         cd ../qiskit-ibm-runtime-mcp-server && uv sync --group dev
-    
+        cd ../qiskit-ibm-transpiler-mcp-server && uv sync --group dev
+        cd ../qiskit-mcp-server && uv sync --group dev
+
     - name: Run ruff linting
       run: |
         cd qiskit-code-assistant-mcp-server && uv run ruff check src tests
         cd ../qiskit-ibm-runtime-mcp-server && uv run ruff check src tests
-    
+        cd ../qiskit-ibm-transpiler-mcp-server && uv run ruff check src tests
+        cd ../qiskit-mcp-server && uv run ruff check src tests
+
     - name: Run ruff formatting check
       run: |
         cd qiskit-code-assistant-mcp-server && uv run ruff format --check src tests
         cd ../qiskit-ibm-runtime-mcp-server && uv run ruff format --check src tests
-    
+        cd ../qiskit-ibm-transpiler-mcp-server && uv run ruff format --check src tests
+        cd ../qiskit-mcp-server && uv run ruff format --check src tests
+
     - name: Run type checking
       run: |
         cd qiskit-code-assistant-mcp-server && uv run mypy src
         cd ../qiskit-ibm-runtime-mcp-server && uv run mypy src
-    
+        cd ../qiskit-ibm-transpiler-mcp-server && uv run mypy src
+        cd ../qiskit-mcp-server && uv run mypy src
+
     - name: Run security checks
       run: |
         cd qiskit-code-assistant-mcp-server && uv run bandit -c pyproject.toml -r src
         cd ../qiskit-ibm-runtime-mcp-server && uv run bandit -c pyproject.toml -r src
+        cd ../qiskit-ibm-transpiler-mcp-server && uv run bandit -c pyproject.toml -r src
+        cd ../qiskit-mcp-server && uv run bandit -c pyproject.toml -r src
 
   test-code-assistant:
     runs-on: ubuntu-latest
@@ -53,31 +63,31 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Install uv
       uses: astral-sh/setup-uv@v3
       with:
         version: "latest"
         enable-cache: true
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
-    
+
     - name: Install dependencies for Code Assistant server
       working-directory: ./qiskit-code-assistant-mcp-server
       run: |
         uv sync --group dev --group test
-    
+
     - name: Run tests for Code Assistant server
       working-directory: ./qiskit-code-assistant-mcp-server
       env:
           QISKIT_IBM_TOKEN: ${{ secrets.QISKIT_IBM_TOKEN }}
       run: |
         uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
-    
+
     - name: Upload coverage for Code Assistant server
       uses: codecov/codecov-action@v3
       with:
@@ -91,34 +101,108 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Install uv
       uses: astral-sh/setup-uv@v3
       with:
         version: "latest"
         enable-cache: true
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       run: uv python install ${{ matrix.python-version }}
-    
+
     - name: Install dependencies for Runtime server
       working-directory: ./qiskit-ibm-runtime-mcp-server
       run: |
         uv sync --group dev --group test
-    
+
     - name: Run tests for Runtime server
       working-directory: ./qiskit-ibm-runtime-mcp-server
       env:
           QISKIT_IBM_TOKEN: ${{ secrets.QISKIT_IBM_TOKEN }}
       run: |
         uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
-    
+
     - name: Upload coverage for Runtime server
       uses: codecov/codecov-action@v3
       with:
         file: ./qiskit-ibm-runtime-mcp-server/coverage.xml
         flags: runtime
         name: runtime-coverage
+
+  test-transpiler:
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+        enable-cache: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Install dependencies for Transpiler server
+      working-directory: ./qiskit-ibm-transpiler-mcp-server
+      run: |
+        uv sync --group dev --group test
+
+    - name: Run tests for Transpiler server
+      working-directory: ./qiskit-ibm-transpiler-mcp-server
+      env:
+          QISKIT_IBM_TOKEN: ${{ secrets.QISKIT_IBM_TOKEN }}
+      run: |
+        uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage for Transpiler server
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./qiskit-ibm-transpiler-mcp-server/coverage.xml
+        flags: transpiler
+        name: transpiler-coverage
+
+  test-qiskit:
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+        enable-cache: true
+
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Install dependencies for Qiskit server
+      working-directory: ./qiskit-mcp-server
+      run: |
+        uv sync --group dev --group test
+
+    - name: Run tests for Qiskit server
+      working-directory: ./qiskit-mcp-server
+      run: |
+        uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage for Qiskit server
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./qiskit-mcp-server/coverage.xml
+        flags: qiskit
+        name: qiskit-coverage

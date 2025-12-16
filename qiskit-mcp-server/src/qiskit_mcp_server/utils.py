@@ -9,7 +9,8 @@
 # Any modifications or derivative works of this code must retain this
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
-"""Async utility functions for MCP servers.
+
+"""Utility functions for the Qiskit MCP server.
 
 This module provides the `with_sync` decorator for creating dual async/sync APIs.
 
@@ -18,17 +19,13 @@ Synchronous Execution
 All async functions decorated with `@with_sync` can be called synchronously
 via the `.sync` attribute:
 
-    from qiskit_mcp_server import with_sync
-
-    @with_sync
-    async def my_async_function(arg: str) -> dict:
-        ...
+    from qiskit_mcp_server.transpiler import transpile_circuit
 
     # Async usage (in async context)
-    result = await my_async_function("hello")
+    result = await transpile_circuit(qasm_str, optimization_level=2)
 
     # Sync usage (in sync context, Jupyter notebooks, DSPy, etc.)
-    result = my_async_function.sync("hello")
+    result = transpile_circuit.sync(qasm_str, optimization_level=2)
 
 The sync wrapper handles event loop management automatically, including
 nested event loops in Jupyter notebooks (via nest_asyncio).
@@ -76,12 +73,9 @@ def _run_async(coro: Coroutine[Any, Any, T]) -> T:
 def with_sync(func: F) -> F:
     """Decorator that adds a `.sync` attribute to async functions for synchronous execution.
 
-    This decorator allows async functions to be called synchronously via the `.sync`
-    attribute. The sync wrapper handles event loop management automatically.
-
     Usage:
         @with_sync
-        async def my_async_function(arg: str) -> dict[str, Any]:
+        async def my_async_function(arg: str) -> Dict[str, Any]:
             ...
 
         # Async call
@@ -89,12 +83,6 @@ def with_sync(func: F) -> F:
 
         # Sync call
         result = my_async_function.sync("hello")
-
-    Args:
-        func: The async function to decorate.
-
-    Returns:
-        The decorated function with a `.sync` attribute for synchronous execution.
     """
 
     @wraps(func)

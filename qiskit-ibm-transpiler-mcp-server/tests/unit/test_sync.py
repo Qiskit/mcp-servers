@@ -67,7 +67,7 @@ class TestAIRoutingSync:
             "circuit_format": "qasm3",
         }
         mocker_run_sync = mocker.patch(
-            "qiskit_mcp_server.async_utils._run_async",
+            "qiskit_mcp_server.utils._run_async",
             return_value=mock_response,
         )
         result = ai_routing.sync(
@@ -165,7 +165,7 @@ class TestAICliffordSync:
             "circuit_format": "qasm3",
         }
         mocker_run_sync = mocker.patch(
-            "qiskit_mcp_server.async_utils._run_async",
+            "qiskit_mcp_server.utils._run_async",
             return_value=mock_response,
         )
         result = ai_clifford_synthesis.sync(
@@ -263,7 +263,7 @@ class TestAILinearFunctionSync:
             "circuit_format": "qasm3",
         }
         mocker_run_sync = mocker.patch(
-            "qiskit_mcp_server.async_utils._run_async",
+            "qiskit_mcp_server.utils._run_async",
             return_value=mock_response,
         )
         result = ai_linear_function_synthesis.sync(
@@ -361,7 +361,7 @@ class TestAIPermutationSync:
             "circuit_format": "qasm3",
         }
         mocker_run_sync = mocker.patch(
-            "qiskit_mcp_server.async_utils._run_async",
+            "qiskit_mcp_server.utils._run_async",
             return_value=mock_response,
         )
         result = ai_permutation_synthesis.sync(
@@ -459,7 +459,7 @@ class TestAIPauliNetworkSync:
             "circuit_format": "qasm3",
         }
         mocker_run_sync = mocker.patch(
-            "qiskit_mcp_server.async_utils._run_async",
+            "qiskit_mcp_server.utils._run_async",
             return_value=mock_response,
         )
         result = ai_pauli_network_synthesis.sync(
@@ -555,7 +555,7 @@ class TestSetupIBMQuantumAccountSync:
             "channel": "ibm_quantum_platform",
             "available_backends": 10,
         }
-        run_async_mock = mocker.patch("qiskit_mcp_server.async_utils._run_async")
+        run_async_mock = mocker.patch("qiskit_mcp_server.utils._run_async")
         run_async_mock.return_value = mock_response
         result = setup_ibm_quantum_account.sync("test_token")
         assert result["status"] == "success"
@@ -570,7 +570,7 @@ class TestSetupIBMQuantumAccountSync:
             "available_backends": 5,
         }
 
-        run_async_mock = mocker.patch("qiskit_mcp_server.async_utils._run_async")
+        run_async_mock = mocker.patch("qiskit_mcp_server.utils._run_async")
         run_async_mock.return_value = mock_response
         result = setup_ibm_quantum_account.sync("")
 

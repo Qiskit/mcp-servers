@@ -33,9 +33,7 @@ from qiskit_ibm_transpiler_mcp_server.qiskit_runtime_service_provider import (
 logger = logging.getLogger(__name__)
 
 # Placeholder tokens that should be rejected during validation
-INVALID_PLACEHOLDER_TOKENS = frozenset(
-    ["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HERE", "xxx"]
-)
+INVALID_PLACEHOLDER_TOKENS = frozenset(["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HERE", "xxx"])
 
 # Re-export shared utilities for backwards compatibility
 __all__ = [

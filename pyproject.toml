@@ -106,7 +106,7 @@ source = [
     "qiskit-mcp-server/src",
     "qiskit-code-assistant-mcp-server/src",
     "qiskit-ibm-runtime-mcp-server/src",
-    "qiskit-ibm-transpiler-mcp-server/src"
+    "qiskit-ibm-transpiler-mcp-server/src",
 ]
 omit = [
     "*/tests/*",

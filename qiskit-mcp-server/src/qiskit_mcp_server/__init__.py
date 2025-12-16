@@ -9,13 +9,15 @@
 # Any modifications or derivative works of this code must retain this
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
-"""Shared utilities for Qiskit MCP servers.
+"""Qiskit MCP Server package.
 
-This package provides common utilities used across Qiskit MCP servers,
-including circuit serialization (QPY/QASM3) and async helpers.
+This package provides:
+- MCP server for quantum circuit transpilation
+- Shared utilities for circuit serialization (QPY/QASM3)
+- Async/sync helpers via the `with_sync` decorator
 """
 
-from qiskit_mcp_server.async_utils import with_sync
+from qiskit_mcp_server import server
 from qiskit_mcp_server.circuit_serialization import (
     CircuitFormat,
     dump_circuit,
@@ -25,9 +27,19 @@ from qiskit_mcp_server.circuit_serialization import (
     load_qasm_circuit,
     load_qpy_circuit,
 )
+from qiskit_mcp_server.utils import with_sync
+
+
+def main() -> None:
+    """Main entry point for the package."""
+    server.mcp.run(transport="stdio")
 
 
 __all__ = [
+    # Server
+    "main",
+    "server",
+    # Circuit serialization
     "CircuitFormat",
     "dump_circuit",
     "dump_qasm_circuit",
@@ -35,5 +47,6 @@ __all__ = [
     "load_circuit",
     "load_qasm_circuit",
     "load_qpy_circuit",
+    # Async utilities
     "with_sync",
 ]
