@@ -178,7 +178,7 @@ def mock_dumps_qasm_failure(mocker):
 def mock_dumps_qasm_success(mocker):
     """Successful dump_circuit method - returns QPY format"""
     mock = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.dump_circuit")
-    mock.return_value = "optimized_circuit_qpy"
+    mock.return_value = "circuit_qpy"
     return mock
 
 
@@ -186,7 +186,7 @@ def mock_dumps_qasm_success(mocker):
 def mock_dump_circuit_success(mocker):
     """Successful dump_circuit method - returns QPY format"""
     mock = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.dump_circuit")
-    mock.return_value = "optimized_circuit_qpy"
+    mock.return_value = "circuit_qpy"
     return mock
 
 

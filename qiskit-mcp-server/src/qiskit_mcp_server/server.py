@@ -29,7 +29,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from qiskit_mcp_server.circuit_serialization import CircuitFormat
+from qiskit_mcp_server.circuit_serialization import CircuitFormat, qpy_to_qasm3
 from qiskit_mcp_server.transpiler import (
     analyze_circuit,
     compare_optimization_levels,
@@ -147,6 +147,24 @@ async def compare_optimization_levels_tool(
         Dictionary comparing depth, size, and gate counts across all levels
     """
     return await compare_optimization_levels(circuit, circuit_format=circuit_format)
+
+
+@mcp.tool()
+async def convert_qpy_to_qasm3_tool(
+    circuit_qpy: str,
+) -> dict[str, Any]:
+    """Convert a QPY circuit to human-readable QASM3 format.
+
+    Use this tool to view the contents of a QPY circuit output from other tools
+    (like transpile_circuit) in a human-readable OpenQASM 3.0 format.
+
+    Args:
+        circuit_qpy: Base64-encoded QPY circuit string (from transpile_circuit output)
+
+    Returns:
+        Dictionary with 'status' and 'qasm3' (the human-readable circuit string)
+    """
+    return qpy_to_qasm3(circuit_qpy)
 
 
 # Resources - Static metadata accessible without tool calls

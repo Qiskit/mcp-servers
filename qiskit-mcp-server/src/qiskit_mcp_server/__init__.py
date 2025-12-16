@@ -20,6 +20,7 @@ This package provides:
 from qiskit_mcp_server import server
 from qiskit_mcp_server.circuit_serialization import (
     CircuitFormat,
+    detect_circuit_format,
     dump_circuit,
     dump_qasm_circuit,
     dump_qpy_circuit,
@@ -38,6 +39,7 @@ def main() -> None:
 
 __all__ = [
     "CircuitFormat",
+    "detect_circuit_format",
     "dump_circuit",
     "dump_qasm_circuit",
     "dump_qpy_circuit",

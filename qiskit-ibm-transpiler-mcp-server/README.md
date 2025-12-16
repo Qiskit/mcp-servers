@@ -77,7 +77,7 @@ setup_ibm_quantum_account.sync()
 # 3.1 AI Routing [Optional]
 routed_circuit = ai_routing.sync(circuit=qasm_string, backend_name="backend_name")
 # Response contains QPY format (base64-encoded) for precision when chaining
-routed_qpy_string = routed_circuit['optimized_circuit_qpy']
+routed_qpy_string = routed_circuit['circuit_qpy']
 print(f"Routed circuit (QPY): {routed_qpy_string}")
 
 # 3.2 AI Clifford Synthesis pass (use QPY for chaining)
@@ -86,11 +86,11 @@ clifford_synthesized_circuit = ai_clifford_synthesis.sync(
     backend_name="backend_name",
     circuit_format="qpy"  # Specify QPY input format
 )
-print(f"Clifford synthesized circuit (QPY): {clifford_synthesized_circuit['optimized_circuit_qpy']}")
+print(f"Clifford synthesized circuit (QPY): {clifford_synthesized_circuit['circuit_qpy']}")
 
 # 4. Convert QPY to human-readable QASM3 (optional)
 from qiskit_mcp_server import qpy_to_qasm3
-conversion = qpy_to_qasm3(clifford_synthesized_circuit['optimized_circuit_qpy'])
+conversion = qpy_to_qasm3(clifford_synthesized_circuit['circuit_qpy'])
 if conversion["status"] == "success":
     print(f"Human-readable circuit:\n{conversion['qasm3']}")
 ```
@@ -200,7 +200,7 @@ ai_routing(
 
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
-- `optimized_circuit_qpy`: Base64-encoded QPY format
+- `circuit_qpy`: Base64-encoded QPY format
 
 **Note:** Currently, only the local mode execution is available
 
@@ -224,7 +224,7 @@ ai_clifford_synthesis(
 
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
-- `optimized_circuit_qpy`: Base64-encoded QPY format
+- `circuit_qpy`: Base64-encoded QPY format
 
 **Note:** Currently, only the local mode execution is available
 
@@ -249,7 +249,7 @@ ai_linear_function_synthesis(
 
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
-- `optimized_circuit_qpy`: Base64-encoded QPY format
+- `circuit_qpy`: Base64-encoded QPY format
 
 **Note:** Currently, only the local mode execution is available
 
@@ -274,7 +274,7 @@ ai_permutation_synthesis(
 
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
-- `optimized_circuit_qpy`: Base64-encoded QPY format
+- `circuit_qpy`: Base64-encoded QPY format
 
 **Note:** Currently, only the local mode execution is available
 
@@ -299,7 +299,7 @@ ai_pauli_network_synthesis(
 
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
-- `optimized_circuit_qpy`: Base64-encoded QPY format
+- `circuit_qpy`: Base64-encoded QPY format
 
 **Note:** Currently, only the local mode execution is available
 

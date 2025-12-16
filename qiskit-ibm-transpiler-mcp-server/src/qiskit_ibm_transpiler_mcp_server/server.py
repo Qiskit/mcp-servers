@@ -22,6 +22,7 @@ from qiskit_ibm_transpiler_mcp_server.qta import (
     ai_routing,
 )
 from qiskit_ibm_transpiler_mcp_server.utils import CircuitFormat, setup_ibm_quantum_account
+from qiskit_mcp_server.circuit_serialization import qpy_to_qasm3
 
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ async def ai_routing_tool(
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
 
     Returns:
-        Dict with 'status' and 'optimized_circuit_qpy' (base64-encoded QPY format for precision when chaining).
+        Dict with 'status' and 'circuit_qpy' (base64-encoded QPY format for precision when chaining).
     """
     return await ai_routing(
         circuit=circuit,
@@ -109,7 +110,7 @@ async def ai_linear_function_synthesis_tool(
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
 
     Returns:
-        Dict with 'status' and 'optimized_circuit_qpy' (base64-encoded QPY format for precision when chaining).
+        Dict with 'status' and 'circuit_qpy' (base64-encoded QPY format for precision when chaining).
     """
     return await ai_linear_function_synthesis(
         circuit=circuit,
@@ -138,7 +139,7 @@ async def ai_clifford_synthesis_tool(
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
 
     Returns:
-        Dict with 'status' and 'optimized_circuit_qpy' (base64-encoded QPY format for precision when chaining).
+        Dict with 'status' and 'circuit_qpy' (base64-encoded QPY format for precision when chaining).
     """
     return await ai_clifford_synthesis(
         circuit=circuit,
@@ -167,7 +168,7 @@ async def ai_permutation_synthesis_tool(
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
 
     Returns:
-        Dict with 'status' and 'optimized_circuit_qpy' (base64-encoded QPY format for precision when chaining).
+        Dict with 'status' and 'circuit_qpy' (base64-encoded QPY format for precision when chaining).
     """
     return await ai_permutation_synthesis(
         circuit=circuit,
@@ -196,7 +197,7 @@ async def ai_pauli_network_synthesis_tool(
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
 
     Returns:
-        Dict with 'status' and 'optimized_circuit_qpy' (base64-encoded QPY format for precision when chaining).
+        Dict with 'status' and 'circuit_qpy' (base64-encoded QPY format for precision when chaining).
     """
     return await ai_pauli_network_synthesis(
         circuit=circuit,
@@ -205,6 +206,24 @@ async def ai_pauli_network_synthesis_tool(
         local_mode=local_mode,
         circuit_format=circuit_format,
     )
+
+
+@mcp.tool()
+async def convert_qpy_to_qasm3_tool(
+    circuit_qpy: str,
+) -> dict[str, Any]:
+    """Convert a QPY circuit to human-readable QASM3 format.
+
+    Use this tool to view the contents of a QPY circuit output from other tools
+    (like ai_routing, ai_clifford_synthesis, etc.) in a human-readable OpenQASM 3.0 format.
+
+    Args:
+        circuit_qpy: Base64-encoded QPY circuit string (from circuit_qpy output field)
+
+    Returns:
+        Dict with 'status' and 'qasm3' (the human-readable circuit string).
+    """
+    return qpy_to_qasm3(circuit_qpy)
 
 
 def main() -> None:

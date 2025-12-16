@@ -118,7 +118,7 @@ qpy_circuit = dump_qpy_circuit(qc)
 # Transpile using QPY format
 result = await transpile_circuit(qpy_circuit, circuit_format="qpy")
 # Result includes transpiled circuit in QPY format (for chaining)
-transpiled_qpy = result["transpiled_circuit"]["circuit"]
+transpiled_qpy = result["transpiled_circuit"]["circuit_qpy"]
 
 # Chain to another operation using QPY
 result2 = await transpile_circuit(transpiled_qpy, circuit_format="qpy", optimization_level=3)
@@ -229,7 +229,7 @@ from qiskit_mcp_server.transpiler import transpile_circuit
 
 # Transpile a circuit (returns QPY format)
 result = transpile_circuit.sync(qasm_circuit, optimization_level=2)
-qpy_output = result["transpiled_circuit"]["circuit"]
+qpy_output = result["transpiled_circuit"]["circuit_qpy"]
 
 # Convert to human-readable QASM3
 conversion = qpy_to_qasm3(qpy_output)

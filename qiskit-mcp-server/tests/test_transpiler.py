@@ -149,9 +149,9 @@ class TestTranspileCircuit:
         result = await transpile_circuit(simple_circuit_qasm)
 
         assert result["status"] == "success"
-        # QPY format should be present as 'circuit'
-        assert result["transpiled_circuit"]["circuit"] is not None
-        assert result["original_circuit"]["circuit"] is not None
+        # QPY format should be present as 'circuit_qpy'
+        assert result["transpiled_circuit"]["circuit_qpy"] is not None
+        assert result["original_circuit"]["circuit_qpy"] is not None
 
 
 class TestAnalyzeCircuit:
@@ -364,8 +364,8 @@ class TestCircuitFormat:
 
         assert result["status"] == "success"
         assert result["original_circuit"]["num_qubits"] == 2
-        # QPY format returned as 'circuit'
-        assert result["transpiled_circuit"]["circuit"] is not None
+        # QPY format returned as 'circuit_qpy'
+        assert result["transpiled_circuit"]["circuit_qpy"] is not None
 
     @pytest.mark.asyncio
     async def test_analyze_with_qpy_input(self, simple_circuit_qpy: str) -> None:
@@ -374,7 +374,7 @@ class TestCircuitFormat:
 
         assert result["status"] == "success"
         assert result["circuit_info"]["num_qubits"] == 2
-        assert result["circuit_info"]["circuit"] is not None
+        assert result["circuit_info"]["circuit_qpy"] is not None
 
     @pytest.mark.asyncio
     async def test_compare_levels_with_qpy_input(self, simple_circuit_qpy: str) -> None:
@@ -385,7 +385,7 @@ class TestCircuitFormat:
         for level in range(4):
             assert f"level_{level}" in result["optimization_results"]
         # Original circuit has QPY format
-        assert result["original_circuit"]["circuit"] is not None
+        assert result["original_circuit"]["circuit_qpy"] is not None
 
     @pytest.mark.asyncio
     async def test_qasm2_fallback(self, simple_circuit_qasm: str) -> None:
@@ -401,8 +401,8 @@ class TestCircuitFormat:
         result = transpile_circuit.sync(simple_circuit_qpy, circuit_format="qpy")
 
         assert result["status"] == "success"
-        # QPY format returned as 'circuit'
-        assert result["transpiled_circuit"]["circuit"] is not None
+        # QPY format returned as 'circuit_qpy'
+        assert result["transpiled_circuit"]["circuit_qpy"] is not None
 
     def test_analyze_qpy_sync(self, simple_circuit_qpy: str) -> None:
         """Test synchronous analyze_circuit call with QPY input."""

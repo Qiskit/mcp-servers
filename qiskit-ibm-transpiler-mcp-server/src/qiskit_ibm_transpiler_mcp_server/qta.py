@@ -75,7 +75,7 @@ async def _run_synthesis_pass(
             qpy_str = dump_circuit(ai_optimized_circuit, circuit_format="qpy")
             return {
                 "status": "success",
-                "optimized_circuit_qpy": qpy_str,
+                "circuit_qpy": qpy_str,
             }
         else:
             return {"status": "error", "message": loaded_quantum_circuit["message"]}

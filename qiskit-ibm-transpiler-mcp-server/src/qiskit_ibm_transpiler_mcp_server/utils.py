@@ -17,6 +17,7 @@ from typing import Any
 from qiskit_mcp_server import with_sync
 from qiskit_mcp_server.circuit_serialization import (
     CircuitFormat,
+    detect_circuit_format,
     dump_circuit,
     dump_qasm_circuit,
     dump_qpy_circuit,
@@ -38,6 +39,7 @@ INVALID_PLACEHOLDER_TOKENS = frozenset(["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HER
 # Re-export shared utilities for backwards compatibility
 __all__ = [
     "CircuitFormat",
+    "detect_circuit_format",
     "dump_circuit",
     "dump_qasm_circuit",
     "dump_qpy_circuit",

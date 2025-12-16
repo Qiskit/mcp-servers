@@ -53,7 +53,55 @@ from qiskit.qasm3 import loads as qasm3_loads
 
 logger = logging.getLogger(__name__)
 
-CircuitFormat = Literal["qasm3", "qpy"]
+CircuitFormat = Literal["qasm3", "qpy", "auto"]
+
+# QPY magic number (first 6 bytes after base64 decoding)
+# QPY files start with "QISKIT" in ASCII
+QPY_MAGIC = b"QISKIT"
+
+
+def detect_circuit_format(circuit_data: str) -> CircuitFormat:
+    """Detect whether circuit data is QASM3 or QPY format.
+
+    This function examines the circuit data to determine its format:
+    - QASM3/QASM2: Text starting with "OPENQASM" or containing typical QASM markers
+    - QPY: Base64-encoded binary data that decodes to QPY magic number
+
+    Args:
+        circuit_data: The circuit data string to analyze.
+
+    Returns:
+        "qasm3" if the data appears to be QASM (including QASM2),
+        "qpy" if the data appears to be base64-encoded QPY.
+
+    Example:
+        >>> format_type = detect_circuit_format('OPENQASM 3.0; ...')
+        >>> format_type
+        'qasm3'
+    """
+    # Strip whitespace for detection
+    stripped = circuit_data.strip()
+
+    # Check for QASM indicators (both QASM2 and QASM3)
+    if stripped.upper().startswith("OPENQASM"):
+        return "qasm3"
+
+    # Check for other common QASM indicators
+    if any(marker in stripped for marker in ["qubit", "qreg", "include"]):
+        return "qasm3"
+
+    # Try to decode as base64 and check for QPY magic
+    try:
+        decoded = base64.b64decode(stripped)
+        if decoded.startswith(QPY_MAGIC):
+            return "qpy"
+    except Exception:
+        # Not valid base64, likely QASM
+        pass
+
+    # Default to QASM3 if we can't determine
+    logger.debug("Could not definitively detect format, defaulting to qasm3")
+    return "qasm3"
 
 
 def load_qasm_circuit(qasm_string: str) -> dict[str, Any]:
@@ -158,7 +206,7 @@ def dump_qpy_circuit(circuit: QuantumCircuit) -> str:
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-def load_circuit(circuit_data: str, circuit_format: CircuitFormat = "qasm3") -> dict[str, Any]:
+def load_circuit(circuit_data: str, circuit_format: CircuitFormat = "auto") -> dict[str, Any]:
     """Load a quantum circuit from either QASM3 or QPY format.
 
     This is a unified interface for loading circuits in different formats.
@@ -166,24 +214,42 @@ def load_circuit(circuit_data: str, circuit_format: CircuitFormat = "qasm3") -> 
     Args:
         circuit_data: The circuit data as a string. For QASM3, this is the
             OpenQASM 3.0 text. For QPY, this is a base64-encoded binary string.
-        circuit_format: The format of the input data. Either "qasm3" (default)
-            or "qpy".
+        circuit_format: The format of the input data. Options:
+            - "auto" (default): Automatically detect format from the data
+            - "qasm3": Treat as QASM3 (also accepts QASM2 as fallback)
+            - "qpy": Treat as base64-encoded QPY binary
 
     Returns:
         A dictionary with:
         - status: "success" or "error"
         - circuit: The loaded QuantumCircuit (if successful)
         - message: Error message (if failed)
+        - detected_format: The format that was used (when auto-detecting)
 
     Example:
-        >>> # Load QASM3
+        >>> # Auto-detect format (recommended)
+        >>> result = load_circuit(circuit_string)
+        >>> # Explicit QASM3
         >>> result = load_circuit(qasm_string, circuit_format="qasm3")
-        >>> # Load QPY
+        >>> # Explicit QPY
         >>> result = load_circuit(qpy_b64_string, circuit_format="qpy")
     """
-    if circuit_format == "qpy":
-        return load_qpy_circuit(circuit_data)
-    return load_qasm_circuit(circuit_data)
+    # Auto-detect format if not specified
+    actual_format = circuit_format
+    if circuit_format == "auto":
+        actual_format = detect_circuit_format(circuit_data)
+        logger.debug(f"Auto-detected circuit format: {actual_format}")
+
+    if actual_format == "qpy":
+        result = load_qpy_circuit(circuit_data)
+    else:
+        result = load_qasm_circuit(circuit_data)
+
+    # Add detected format to result for transparency
+    if circuit_format == "auto" and result["status"] == "success":
+        result["detected_format"] = actual_format
+
+    return result
 
 
 def dump_circuit(circuit: QuantumCircuit, circuit_format: CircuitFormat = "qasm3") -> str:

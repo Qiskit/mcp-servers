@@ -14,6 +14,7 @@
 import pytest
 from qiskit import QuantumCircuit
 from qiskit_mcp_server.circuit_serialization import (
+    detect_circuit_format,
     dump_circuit,
     dump_qasm_circuit,
     dump_qpy_circuit,
@@ -302,3 +303,95 @@ class TestQpyToQasm3:
         loaded_circuit = load_result["circuit"]
         assert loaded_circuit.num_qubits == simple_circuit.num_qubits
         assert loaded_circuit.depth() == simple_circuit.depth()
+
+
+class TestDetectCircuitFormat:
+    """Tests for auto-detection of circuit format."""
+
+    def test_detect_qasm3_with_openqasm_header(self, valid_qasm3):
+        """Test detection of QASM3 format from OPENQASM header."""
+        detected = detect_circuit_format(valid_qasm3)
+        assert detected == "qasm3"
+
+    def test_detect_qasm3_uppercase(self):
+        """Test detection works with uppercase OPENQASM."""
+        qasm = "OPENQASM 3.0; qubit q;"
+        detected = detect_circuit_format(qasm)
+        assert detected == "qasm3"
+
+    def test_detect_qasm3_lowercase(self):
+        """Test detection works with lowercase openqasm."""
+        qasm = "openqasm 3.0; qubit q;"
+        detected = detect_circuit_format(qasm)
+        assert detected == "qasm3"
+
+    def test_detect_qasm_with_qubit_keyword(self):
+        """Test detection of QASM from qubit keyword."""
+        qasm = "qubit[2] q; h q[0];"
+        detected = detect_circuit_format(qasm)
+        assert detected == "qasm3"
+
+    def test_detect_qasm_with_qreg_keyword(self):
+        """Test detection of QASM from qreg keyword (QASM2 style)."""
+        qasm = "qreg q[2]; creg c[2];"
+        detected = detect_circuit_format(qasm)
+        assert detected == "qasm3"
+
+    def test_detect_qpy_format(self, simple_circuit):
+        """Test detection of QPY format from base64-encoded data."""
+        qpy_str = dump_qpy_circuit(simple_circuit)
+        detected = detect_circuit_format(qpy_str)
+        assert detected == "qpy"
+
+    def test_detect_with_whitespace(self, valid_qasm3):
+        """Test detection handles leading/trailing whitespace."""
+        qasm_with_whitespace = f"  \n  {valid_qasm3}  \n  "
+        detected = detect_circuit_format(qasm_with_whitespace)
+        assert detected == "qasm3"
+
+
+class TestAutoDetectionLoadCircuit:
+    """Tests for load_circuit with auto-detection."""
+
+    def test_load_circuit_auto_detect_qasm3(self, valid_qasm3):
+        """Test load_circuit auto-detects QASM3 format."""
+        result = load_circuit(valid_qasm3)  # No circuit_format specified
+
+        assert result["status"] == "success"
+        assert result.get("detected_format") == "qasm3"
+        assert isinstance(result["circuit"], QuantumCircuit)
+
+    def test_load_circuit_auto_detect_qpy(self, simple_circuit):
+        """Test load_circuit auto-detects QPY format."""
+        qpy_str = dump_qpy_circuit(simple_circuit)
+        result = load_circuit(qpy_str)  # No circuit_format specified
+
+        assert result["status"] == "success"
+        assert result.get("detected_format") == "qpy"
+        assert isinstance(result["circuit"], QuantumCircuit)
+
+    def test_load_circuit_explicit_auto(self, valid_qasm3):
+        """Test load_circuit with explicit 'auto' format."""
+        result = load_circuit(valid_qasm3, circuit_format="auto")
+
+        assert result["status"] == "success"
+        assert result.get("detected_format") == "qasm3"
+
+    def test_load_circuit_explicit_format_no_detected_field(self, valid_qasm3):
+        """Test that explicit format doesn't add detected_format field."""
+        result = load_circuit(valid_qasm3, circuit_format="qasm3")
+
+        assert result["status"] == "success"
+        # detected_format should not be present when format is explicit
+        assert "detected_format" not in result
+
+    def test_auto_detect_preserves_circuit_data(self, simple_circuit):
+        """Test that auto-detection correctly loads circuit data."""
+        # Test with QPY
+        qpy_str = dump_qpy_circuit(simple_circuit)
+        result = load_circuit(qpy_str)
+
+        assert result["status"] == "success"
+        loaded = result["circuit"]
+        assert loaded.num_qubits == simple_circuit.num_qubits
+        assert loaded.depth() == simple_circuit.depth()

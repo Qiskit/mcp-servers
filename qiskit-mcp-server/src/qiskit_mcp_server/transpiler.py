@@ -151,7 +151,7 @@ def _circuit_to_dict(circuit: QuantumCircuit) -> dict[str, Any]:
         "width": circuit.width(),
         "operation_counts": op_counts,
         "total_operations": sum(op_counts.values()),
-        "circuit": qpy_str,  # QPY format (use for chaining tools/servers)
+        "circuit_qpy": qpy_str,  # QPY format (use for chaining tools/servers)
     }
 
 
