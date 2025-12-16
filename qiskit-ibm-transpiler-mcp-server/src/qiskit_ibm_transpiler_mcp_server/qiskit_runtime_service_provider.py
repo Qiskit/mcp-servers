@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from qiskit_ibm_runtime import QiskitRuntimeService
 
+
 # Placeholder tokens that should be rejected during validation
 INVALID_PLACEHOLDER_TOKENS = frozenset(
     ["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HERE", "xxx"]

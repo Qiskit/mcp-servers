@@ -39,6 +39,7 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any, TypeVar
 
+
 # Apply nest_asyncio to allow running async code in environments with existing event loops
 try:
     import nest_asyncio

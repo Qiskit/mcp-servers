@@ -47,7 +47,9 @@ import logging
 from typing import Any, Literal
 
 from qiskit import QuantumCircuit, qpy
-from qiskit.qasm3 import dumps as qasm3_dumps, loads as qasm3_loads
+from qiskit.qasm3 import dumps as qasm3_dumps
+from qiskit.qasm3 import loads as qasm3_loads
+
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +131,7 @@ def dump_qasm_circuit(circuit: QuantumCircuit) -> str:
         >>> qc.cx(0, 1)
         >>> qasm_str = dump_qasm_circuit(qc)
     """
-    return qasm3_dumps(circuit)
+    return str(qasm3_dumps(circuit))
 
 
 def dump_qpy_circuit(circuit: QuantumCircuit) -> str:

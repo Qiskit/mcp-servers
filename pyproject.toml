@@ -85,6 +85,7 @@ testpaths = ["qiskit-mcp-server/tests", "qiskit-code-assistant-mcp-server/tests"
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+pythonpath = ["qiskit-mcp-server/src"]
 addopts = [
     "-v",
     "--tb=short",

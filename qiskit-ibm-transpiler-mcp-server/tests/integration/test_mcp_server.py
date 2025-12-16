@@ -9,6 +9,7 @@
 # Any modifications or derivative works of this code must retain this
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,6 +18,9 @@ from qiskit_ibm_transpiler_mcp_server.qiskit_runtime_service_provider import (
 )
 from qiskit_ibm_transpiler_mcp_server.server import mcp
 from qiskit_ibm_transpiler_mcp_server.utils import setup_ibm_quantum_account
+
+# Get the path to the tests directory
+TESTS_DIR = Path(__file__).parent.parent
 
 
 class TestMCPServerIntegration:
@@ -109,7 +113,7 @@ class TestEndToEndScenarios:
         from qiskit_ibm_transpiler_mcp_server.utils import setup_ibm_quantum_account
 
         # 1. Load valid QASM 3.0 quantum circuit
-        with open("tests/qasm/correct_qasm_1") as f:
+        with open(TESTS_DIR / "qasm" / "correct_qasm_1") as f:
             qasm_string = f.read()
 
         # 2. Setup account
@@ -117,14 +121,14 @@ class TestEndToEndScenarios:
         assert setup_result["status"] == "success"
 
         # 3. AI Routing
-        ai_routing_result = await ai_routing(circuit_qasm=qasm_string, backend_name="ibm_fez")
+        ai_routing_result = await ai_routing(circuit=qasm_string, backend_name="ibm_fez")
         assert ai_routing_result["status"] == "success"
-        assert isinstance(ai_routing_result["optimized_circuit_qasm"], str)
+        assert isinstance(ai_routing_result["optimized_circuit"], str)
 
         # 4. AI Clifford synthesis
-        routed_qasm_circuit = ai_routing_result["optimized_circuit_qasm"]
+        routed_qasm_circuit = ai_routing_result["optimized_circuit"]
         ai_clifford_synthesis_result = await ai_clifford_synthesis(
-            circuit_qasm=routed_qasm_circuit, backend_name="ibm_fez"
+            circuit=routed_qasm_circuit, backend_name="ibm_fez"
         )
         assert ai_clifford_synthesis_result["status"] == "success"
-        assert isinstance(ai_clifford_synthesis_result["optimized_circuit_qasm"], str)
+        assert isinstance(ai_clifford_synthesis_result["optimized_circuit"], str)
