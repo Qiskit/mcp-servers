@@ -16,7 +16,7 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any, TypeVar
 
-from qiskit.qasm3 import loads  # type: ignore[import-untyped]
+from qiskit.qasm3 import loads
 
 from qiskit_ibm_transpiler_mcp_server.qiskit_runtime_service_provider import (
     QiskitRuntimeServiceProvider,
