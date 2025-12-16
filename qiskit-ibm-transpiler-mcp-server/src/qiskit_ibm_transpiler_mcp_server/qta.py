@@ -80,8 +80,8 @@ async def _run_synthesis_pass(
 async def ai_routing(
     circuit_qasm: str,
     backend_name: str,
-    optimization_level: int = 1,
-    layout_mode: str = "optimize",
+    optimization_level: Literal[1, 2, 3] = 1,
+    layout_mode: Literal["keep", "improve", "optimize"] = "optimize",
     optimization_preferences: Literal["n_cnots", "n_gates", "cnot_layers", "layers", "noise"]
     | list[Literal["n_cnots", "n_gates", "cnot_layers", "layers", "noise"]]
     | None = None,
@@ -102,6 +102,21 @@ async def ai_routing(
         optimization_preferences: indicates what you want to reduce through optimization: number of cnot gates (n_cnots), number of gates (n_gates), number of cnots layers (cnot_layers), number of layers (layers), and/or noise (noise)
         local_mode: determines where the AIRouting pass runs. If False, AIRouting runs remotely through the Qiskit Transpiler Service. If True, the package tries to run the pass in your local environment with a fallback to cloud mode if the required dependencies are not found
     """
+    # Validate optimization_level
+    if optimization_level not in (1, 2, 3):
+        return {
+            "status": "error",
+            "message": f"optimization_level must be 1, 2, or 3, got {optimization_level}",
+        }
+
+    # Validate layout_mode
+    valid_layout_modes = ("keep", "improve", "optimize")
+    if layout_mode not in valid_layout_modes:
+        return {
+            "status": "error",
+            "message": f"layout_mode must be one of {valid_layout_modes}, got '{layout_mode}'",
+        }
+
     ai_routing_pass_kwargs = {
         "optimization_level": optimization_level,
         "layout_mode": layout_mode,

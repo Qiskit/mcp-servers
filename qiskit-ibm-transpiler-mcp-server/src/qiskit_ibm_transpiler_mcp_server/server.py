@@ -54,8 +54,8 @@ async def setup_ibm_quantum_account_tool(
 async def ai_routing_tool(
     circuit_qasm: str,
     backend_name: str,
-    optimization_level: int = 1,
-    layout_mode: str = "optimize",
+    optimization_level: Literal[1, 2, 3] = 1,
+    layout_mode: Literal["keep", "improve", "optimize"] = "optimize",
     optimization_preferences: Literal["n_cnots", "n_gates", "cnot_layers", "layers", "noise"]
     | list[Literal["n_cnots", "n_gates", "cnot_layers", "layers", "noise"]]
     | None = None,
