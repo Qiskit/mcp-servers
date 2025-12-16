@@ -16,7 +16,7 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any, TypeVar
 
-from qiskit.qasm3 import loads  # type: ignore[import-untyped]
+from qiskit.qasm3 import loads
 
 from qiskit_ibm_transpiler_mcp_server.qiskit_runtime_service_provider import (
     QiskitRuntimeServiceProvider,
@@ -26,9 +26,7 @@ from qiskit_ibm_transpiler_mcp_server.qiskit_runtime_service_provider import (
 logger = logging.getLogger(__name__)
 
 # Placeholder tokens that should be rejected during validation
-INVALID_PLACEHOLDER_TOKENS = frozenset(
-    ["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HERE", "xxx"]
-)
+INVALID_PLACEHOLDER_TOKENS = frozenset(["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HERE", "xxx"])
 
 # Apply nest_asyncio to allow running async code in environments with existing event loops
 try:

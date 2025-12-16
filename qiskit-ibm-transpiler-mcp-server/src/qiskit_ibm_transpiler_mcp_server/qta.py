@@ -12,10 +12,10 @@
 import logging
 from typing import Any, Literal
 
-from qiskit.qasm3 import dumps  # type: ignore[import-untyped]
-from qiskit.transpiler import PassManager  # type: ignore[import-untyped]
-from qiskit_ibm_transpiler.ai.routing import AIRouting  # type: ignore[import-untyped]
-from qiskit_ibm_transpiler.ai.synthesis import (  # type: ignore[import-untyped]
+from qiskit.qasm3 import dumps
+from qiskit.transpiler import PassManager
+from qiskit_ibm_transpiler.ai.routing import AIRouting
+from qiskit_ibm_transpiler.ai.synthesis import (
     AICliffordSynthesis,
     AILinearFunctionSynthesis,
     AIPauliNetworkSynthesis,

@@ -191,6 +191,9 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# Bandit security reports
+bandit_report.json
+
 # PyPI configuration file
 .pypirc
 
