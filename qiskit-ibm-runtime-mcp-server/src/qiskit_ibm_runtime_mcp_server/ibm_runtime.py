@@ -943,7 +943,7 @@ async def usage_info() -> dict[str, Any]:
 
     Returns:
         Dictionary containing usage statistics, or error dict:
-        - On success:  {"status": "success" "usage": usage_info}
+        - On success:  {"status": "success", "usage": usage_info}
         usage_info with fields such as:
           * instance_id
           * plan_id
