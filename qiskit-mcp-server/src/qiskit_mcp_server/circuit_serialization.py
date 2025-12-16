@@ -42,6 +42,7 @@ Example:
 """
 
 import base64
+import binascii
 import io
 import logging
 from typing import Any, Literal
@@ -95,9 +96,9 @@ def detect_circuit_format(circuit_data: str) -> CircuitFormat:
         decoded = base64.b64decode(stripped)
         if decoded.startswith(QPY_MAGIC):
             return "qpy"
-    except Exception:
-        # Not valid base64, likely QASM
-        pass
+    except (ValueError, binascii.Error):
+        # Not valid base64, likely QASM - this is expected for QASM input
+        logger.debug("Input is not valid base64, treating as QASM")
 
     # Default to QASM3 if we can't determine
     logger.debug("Could not definitively detect format, defaulting to qasm3")
