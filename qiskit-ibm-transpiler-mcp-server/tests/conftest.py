@@ -127,7 +127,25 @@ def ai_pauli_networks_synthesis_fixture(request):
 
 
 @pytest.fixture
-def mock_load_qasm_circuit_success(mocker):
+def mock_get_circuit_metrics(mocker):
+    """Mock _get_circuit_metrics to return consistent metrics for testing"""
+    mock = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta._get_circuit_metrics")
+    call_count = {"count": 0}
+
+    def metrics_side_effect(circuit):
+        """Return different metrics for original vs optimized calls"""
+        call_count["count"] += 1
+        if call_count["count"] % 2 == 1:  # Odd calls = original circuit
+            return {"num_qubits": 2, "depth": 10, "size": 15, "two_qubit_gates": 5}
+        else:  # Even calls = optimized circuit
+            return {"num_qubits": 2, "depth": 7, "size": 12, "two_qubit_gates": 3}
+
+    mock.side_effect = metrics_side_effect
+    return mock
+
+
+@pytest.fixture
+def mock_load_qasm_circuit_success(mocker, mock_get_circuit_metrics):
     """Successful loading of QuantumCircuit object from QASM3.0 string (legacy fixture)"""
     mock = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.load_circuit")
     mock.return_value = {"status": "success", "circuit": "input_circuit"}

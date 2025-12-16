@@ -201,6 +201,9 @@ ai_routing(
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
 - `circuit_qpy`: Base64-encoded QPY format
+- `original_circuit`: Metrics for the input circuit (num_qubits, depth, size, two_qubit_gates)
+- `optimized_circuit`: Metrics for the optimized circuit (num_qubits, depth, size, two_qubit_gates)
+- `improvements`: Calculated improvements (depth_reduction, two_qubit_gate_reduction)
 
 **Note:** Currently, only the local mode execution is available
 
@@ -225,6 +228,9 @@ ai_clifford_synthesis(
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
 - `circuit_qpy`: Base64-encoded QPY format
+- `original_circuit`: Metrics for the input circuit (num_qubits, depth, size, two_qubit_gates)
+- `optimized_circuit`: Metrics for the optimized circuit (num_qubits, depth, size, two_qubit_gates)
+- `improvements`: Calculated improvements (depth_reduction, two_qubit_gate_reduction)
 
 **Note:** Currently, only the local mode execution is available
 
@@ -250,6 +256,9 @@ ai_linear_function_synthesis(
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
 - `circuit_qpy`: Base64-encoded QPY format
+- `original_circuit`: Metrics for the input circuit (num_qubits, depth, size, two_qubit_gates)
+- `optimized_circuit`: Metrics for the optimized circuit (num_qubits, depth, size, two_qubit_gates)
+- `improvements`: Calculated improvements (depth_reduction, two_qubit_gate_reduction)
 
 **Note:** Currently, only the local mode execution is available
 
@@ -275,6 +284,9 @@ ai_permutation_synthesis(
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
 - `circuit_qpy`: Base64-encoded QPY format
+- `original_circuit`: Metrics for the input circuit (num_qubits, depth, size, two_qubit_gates)
+- `optimized_circuit`: Metrics for the optimized circuit (num_qubits, depth, size, two_qubit_gates)
+- `improvements`: Calculated improvements (depth_reduction, two_qubit_gate_reduction)
 
 **Note:** Currently, only the local mode execution is available
 
@@ -300,6 +312,9 @@ ai_pauli_network_synthesis(
 **Returns:** Dictionary with:
 - `status`: "success" or "error"
 - `circuit_qpy`: Base64-encoded QPY format
+- `original_circuit`: Metrics for the input circuit (num_qubits, depth, size, two_qubit_gates)
+- `optimized_circuit`: Metrics for the optimized circuit (num_qubits, depth, size, two_qubit_gates)
+- `improvements`: Calculated improvements (depth_reduction, two_qubit_gate_reduction)
 
 **Note:** Currently, only the local mode execution is available
 

@@ -12,6 +12,7 @@
 import logging
 from typing import Any, Literal
 
+from qiskit import QuantumCircuit
 from qiskit.transpiler import PassManager
 from qiskit_ibm_transpiler.ai.routing import AIRouting
 from qiskit_ibm_transpiler.ai.synthesis import (
@@ -31,6 +32,29 @@ from qiskit_ibm_transpiler_mcp_server.utils import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _get_circuit_metrics(circuit: QuantumCircuit) -> dict[str, Any]:
+    """Extract metrics from a quantum circuit for reporting.
+
+    Args:
+        circuit: The quantum circuit to analyze.
+
+    Returns:
+        Dictionary with circuit metrics useful for LLM reporting.
+    """
+    # Count two-qubit gates (important for quantum error rates)
+    two_qubit_gate_count = 0
+    for instruction in circuit.data:
+        if len(instruction.qubits) == 2:
+            two_qubit_gate_count += 1
+
+    return {
+        "num_qubits": circuit.num_qubits,
+        "depth": circuit.depth(),
+        "size": circuit.size(),
+        "two_qubit_gates": two_qubit_gate_count,
+    }
 
 
 async def _run_synthesis_pass(
@@ -70,12 +94,30 @@ async def _run_synthesis_pass(
         )
         loaded_quantum_circuit = load_circuit(circuit, circuit_format=circuit_format)
         if loaded_quantum_circuit["status"] == "success":
-            ai_optimized_circuit = ai_synthesis_pass.run(loaded_quantum_circuit["circuit"])
+            original_circuit = loaded_quantum_circuit["circuit"]
+            original_metrics = _get_circuit_metrics(original_circuit)
+
+            ai_optimized_circuit = ai_synthesis_pass.run(original_circuit)
+            optimized_metrics = _get_circuit_metrics(ai_optimized_circuit)
+
             # Return QPY format (source of truth for precision and chaining)
             qpy_str = dump_circuit(ai_optimized_circuit, circuit_format="qpy")
+
+            # Calculate improvements (positive = reduction/improvement)
+            depth_reduction = original_metrics["depth"] - optimized_metrics["depth"]
+            two_qubit_reduction = (
+                original_metrics["two_qubit_gates"] - optimized_metrics["two_qubit_gates"]
+            )
+
             return {
                 "status": "success",
                 "circuit_qpy": qpy_str,
+                "original_circuit": original_metrics,
+                "optimized_circuit": optimized_metrics,
+                "improvements": {
+                    "depth_reduction": depth_reduction,
+                    "two_qubit_gate_reduction": two_qubit_reduction,
+                },
             }
         else:
             return {"status": "error", "message": loaded_quantum_circuit["message"]}

@@ -12,7 +12,9 @@
 """Unit tests for IBM Qiskit Transpiler MCP Server functions."""
 
 import pytest
+from qiskit import QuantumCircuit
 from qiskit_ibm_transpiler_mcp_server.qta import (
+    _get_circuit_metrics,
     _run_synthesis_pass,
     ai_clifford_synthesis,
     ai_linear_function_synthesis,
@@ -20,6 +22,60 @@ from qiskit_ibm_transpiler_mcp_server.qta import (
     ai_permutation_synthesis,
     ai_routing,
 )
+
+
+class TestGetCircuitMetrics:
+    """Test _get_circuit_metrics helper function."""
+
+    def test_simple_circuit_metrics(self):
+        """Test metrics extraction from a simple circuit."""
+        qc = QuantumCircuit(2)
+        qc.h(0)
+        qc.cx(0, 1)
+
+        metrics = _get_circuit_metrics(qc)
+
+        assert metrics["num_qubits"] == 2
+        assert metrics["depth"] == 2
+        assert metrics["size"] == 2
+        assert metrics["two_qubit_gates"] == 1
+
+    def test_no_two_qubit_gates(self):
+        """Test metrics for circuit with no two-qubit gates."""
+        qc = QuantumCircuit(3)
+        qc.h(0)
+        qc.h(1)
+        qc.h(2)
+
+        metrics = _get_circuit_metrics(qc)
+
+        assert metrics["num_qubits"] == 3
+        assert metrics["depth"] == 1
+        assert metrics["size"] == 3
+        assert metrics["two_qubit_gates"] == 0
+
+    def test_multiple_two_qubit_gates(self):
+        """Test metrics for circuit with multiple two-qubit gates."""
+        qc = QuantumCircuit(3)
+        qc.cx(0, 1)
+        qc.cx(1, 2)
+        qc.cx(0, 2)
+
+        metrics = _get_circuit_metrics(qc)
+
+        assert metrics["num_qubits"] == 3
+        assert metrics["two_qubit_gates"] == 3
+
+    def test_empty_circuit(self):
+        """Test metrics for empty circuit."""
+        qc = QuantumCircuit(2)
+
+        metrics = _get_circuit_metrics(qc)
+
+        assert metrics["num_qubits"] == 2
+        assert metrics["depth"] == 0
+        assert metrics["size"] == 0
+        assert metrics["two_qubit_gates"] == 0
 
 
 class TestRunSynthesis:
@@ -53,6 +109,20 @@ class TestRunSynthesis:
         )
         assert result["status"] == "success"
         assert result["circuit_qpy"] == "circuit_qpy"
+        # Check metrics are present
+        assert "original_circuit" in result
+        assert "optimized_circuit" in result
+        assert "improvements" in result
+        # Check original metrics
+        assert result["original_circuit"]["num_qubits"] == 2
+        assert result["original_circuit"]["depth"] == 10
+        assert result["original_circuit"]["two_qubit_gates"] == 5
+        # Check optimized metrics
+        assert result["optimized_circuit"]["depth"] == 7
+        assert result["optimized_circuit"]["two_qubit_gates"] == 3
+        # Check improvements
+        assert result["improvements"]["depth_reduction"] == 3
+        assert result["improvements"]["two_qubit_gate_reduction"] == 2
         mock_get_backend_service_success.assert_awaited_once_with(backend_name=mock_backend)
         mock_load_qasm_circuit_success.assert_called_once_with("dummy_circuit_qasm", circuit_format="qasm3")
         mock_ai_synthesis_success.assert_called_once_with(
@@ -169,6 +239,9 @@ class TestAIRouting:
         )
         assert result["status"] == "success"
         assert result["circuit_qpy"] == "circuit_qpy"
+        assert "original_circuit" in result
+        assert "optimized_circuit" in result
+        assert "improvements" in result
         mock_get_backend_service_success.assert_awaited_once_with(backend_name=mock_backend)
         mock_load_qasm_circuit_success.assert_called_once_with("dummy_circuit_qasm", circuit_format="qasm3")
         mock_ai_routing_success.assert_called_once_with(
@@ -277,6 +350,9 @@ class TestAICliffordSynthesis:
 
         assert result["status"] == "success"
         assert result["circuit_qpy"] == "circuit_qpy"
+        assert "original_circuit" in result
+        assert "optimized_circuit" in result
+        assert "improvements" in result
         mock_get_backend_service_success.assert_awaited_once_with(backend_name=mock_backend)
         mock_load_qasm_circuit_success.assert_called_once_with("dummy_circuit_qasm", circuit_format="qasm3")
         mock_ai_clifford_synthesis_success.assert_called_once_with(
@@ -383,6 +459,9 @@ class TestAILinearFunctionSynthesis:
 
         assert result["status"] == "success"
         assert result["circuit_qpy"] == "circuit_qpy"
+        assert "original_circuit" in result
+        assert "optimized_circuit" in result
+        assert "improvements" in result
         mock_get_backend_service_success.assert_awaited_once_with(backend_name=mock_backend)
         mock_load_qasm_circuit_success.assert_called_once_with(mock_circuit_qasm, circuit_format="qasm3")
         mock_ai_linear_function_synthesis_success.assert_called_once_with(
@@ -489,6 +568,9 @@ class TestAIPermutationSynthesis:
 
         assert result["status"] == "success"
         assert result["circuit_qpy"] == "circuit_qpy"
+        assert "original_circuit" in result
+        assert "optimized_circuit" in result
+        assert "improvements" in result
         mock_get_backend_service_success.assert_awaited_once_with(backend_name=mock_backend)
         mock_load_qasm_circuit_success.assert_called_once_with(mock_circuit_qasm, circuit_format="qasm3")
         mock_ai_permutation_synthesis_success.assert_called_once_with(
@@ -595,6 +677,9 @@ class TestAIPauliNetworkSynthesis:
 
         assert result["status"] == "success"
         assert result["circuit_qpy"] == "circuit_qpy"
+        assert "original_circuit" in result
+        assert "optimized_circuit" in result
+        assert "improvements" in result
         mock_get_backend_service_success.assert_awaited_once_with(backend_name=mock_backend)
         mock_load_qasm_circuit_success.assert_called_once_with(mock_circuit_qasm, circuit_format="qasm3")
         mock_ai_pauli_network_synthesis_success.assert_called_once_with(
