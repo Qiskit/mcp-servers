@@ -44,6 +44,7 @@ def mock_ai_synthesis_success():
     """Successful ai_synthesis_pass_class in run_synthesis"""
     mock_instance = MagicMock()
     mock_class = MagicMock(return_value=mock_instance)
+    mock_class.__name__ = "MockAISynthesis"
     return mock_class
 
 
@@ -54,6 +55,7 @@ def mock_ai_synthesis_failure():
     mock_class = MagicMock(side_effect=Exception("AI Synthesis failed"))
     mock_instance = MagicMock()
     mock_class.return_value = mock_instance
+    mock_class.__name__ = "MockAISynthesis"
 
     return mock_class
 
@@ -183,6 +185,7 @@ def mock_ai_routing_success(mocker):
     mock_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.AIRouting")
     mock_instance = MagicMock()
     mock_class.return_value = mock_instance
+    mock_class.__name__ = "AIRouting"
     return mock_class
 
 
@@ -195,6 +198,7 @@ def mock_ai_routing_failure(mocker):
     )
     mock_instance = MagicMock()
     mock_class.return_value = mock_instance
+    mock_class.__name__ = "AIRouting"
     return mock_instance
 
 
@@ -226,6 +230,7 @@ def mock_ai_clifford_synthesis_success(mocker):
     )
     mock_clifford_synthesis_instance = MagicMock()
     mock_clifford_synthesis_class.return_value = mock_clifford_synthesis_instance
+    mock_clifford_synthesis_class.__name__ = "AICliffordSynthesis"
     return mock_clifford_synthesis_class
 
 
@@ -238,6 +243,7 @@ def mock_ai_clifford_synthesis_failure(mocker):
     )
     mock_clifford_synthesis_instance = MagicMock()
     mock_clifford_synthesis_class.return_value = mock_clifford_synthesis_instance
+    mock_clifford_synthesis_class.__name__ = "AICliffordSynthesis"
     return mock_clifford_synthesis_instance
 
 
@@ -249,6 +255,7 @@ def mock_ai_linear_function_synthesis_success(mocker):
     )
     mock_linear_function_instance = MagicMock()
     mock_linear_function_class.return_value = mock_linear_function_instance
+    mock_linear_function_class.__name__ = "AILinearFunctionSynthesis"
     return mock_linear_function_class
 
 
@@ -261,6 +268,7 @@ def mock_ai_linear_function_synthesis_failure(mocker):
     )
     mock_linear_function_instance = MagicMock()
     mock_linear_function_class.return_value = mock_linear_function_instance
+    mock_linear_function_class.__name__ = "AILinearFunctionSynthesis"
     return mock_linear_function_instance
 
 
@@ -272,6 +280,7 @@ def mock_ai_permutation_synthesis_success(mocker):
     )
     mock_permutation_instance = MagicMock()
     mock_permutation_class.return_value = mock_permutation_instance
+    mock_permutation_class.__name__ = "AIPermutationSynthesis"
     return mock_permutation_class
 
 
@@ -284,6 +293,7 @@ def mock_ai_permutation_synthesis_failure(mocker):
     )
     mock_permutation_instance = MagicMock()
     mock_permutation_class.return_value = mock_permutation_instance
+    mock_permutation_class.__name__ = "AIPermutationSynthesis"
     return mock_permutation_instance
 
 
@@ -295,6 +305,7 @@ def mock_ai_pauli_network_synthesis_success(mocker):
     )
     mock_pauli_network_instance = MagicMock()
     mock_pauli_network_class.return_value = mock_pauli_network_instance
+    mock_pauli_network_class.__name__ = "AIPauliNetworkSynthesis"
     return mock_pauli_network_class
 
 
@@ -307,6 +318,7 @@ def mock_ai_pauli_network_synthesis_failure(mocker):
     )
     mock_pauli_network_instance = MagicMock()
     mock_pauli_network_class.return_value = mock_pauli_network_instance
+    mock_pauli_network_class.__name__ = "AIPauliNetworkSynthesis"
     return mock_pauli_network_instance
 
 
