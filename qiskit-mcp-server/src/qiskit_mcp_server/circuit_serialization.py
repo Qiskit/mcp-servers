@@ -330,3 +330,47 @@ def qpy_to_qasm3(qpy_b64: str) -> dict[str, Any]:
             "status": "error",
             "message": f"Failed to convert circuit to QASM3: {e}",
         }
+
+
+def qasm3_to_qpy(qasm_string: str) -> dict[str, Any]:
+    """Convert a QASM3 (or QASM2) circuit to base64-encoded QPY format.
+
+    This is a convenience function for converting human-readable QASM circuits
+    to QPY format for use with MCP tools that accept QPY input.
+
+    Args:
+        qasm_string: A valid OpenQASM 3.0 or 2.0 string describing the circuit.
+
+    Returns:
+        A dictionary with:
+        - status: "success" or "error"
+        - circuit_qpy: The base64-encoded QPY string (if successful)
+        - message: Error message (if failed)
+
+    Example:
+        >>> from qiskit_mcp_server import qasm3_to_qpy
+        >>> qasm = 'OPENQASM 3.0; include "stdgates.inc"; qubit[2] q; h q[0];'
+        >>> result = qasm3_to_qpy(qasm)
+        >>> if result["status"] == "success":
+        ...     qpy_str = result["circuit_qpy"]
+    """
+    load_result = load_qasm_circuit(qasm_string)
+    if load_result["status"] == "error":
+        return {
+            "status": "error",
+            "message": load_result["message"],
+        }
+
+    circuit = load_result["circuit"]
+    try:
+        qpy_str = dump_qpy_circuit(circuit)
+        return {
+            "status": "success",
+            "circuit_qpy": qpy_str,
+        }
+    except Exception as e:
+        logger.error(f"Error converting to QPY: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to convert circuit to QPY: {e}",
+        }

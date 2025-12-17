@@ -320,6 +320,73 @@ class TestQpyToQasm3:
         assert loaded_circuit.depth() == simple_circuit.depth()
 
 
+class TestQasm3ToQpy:
+    """Tests for qasm3_to_qpy conversion utility."""
+
+    def test_qasm3_to_qpy_success(self, valid_qasm3):
+        """Test successful QASM3 to QPY conversion."""
+        from qiskit_mcp_server.circuit_serialization import qasm3_to_qpy
+
+        result = qasm3_to_qpy(valid_qasm3)
+
+        assert result["status"] == "success"
+        assert "circuit_qpy" in result
+        assert isinstance(result["circuit_qpy"], str)
+        # Verify it's valid base64 that can be loaded back
+        load_result = load_qpy_circuit(result["circuit_qpy"])
+        assert load_result["status"] == "success"
+
+    def test_qasm3_to_qpy_invalid_qasm(self, invalid_qasm3):
+        """Test qasm3_to_qpy with invalid QASM data."""
+        from qiskit_mcp_server.circuit_serialization import qasm3_to_qpy
+
+        result = qasm3_to_qpy(invalid_qasm3)
+
+        assert result["status"] == "error"
+        assert "message" in result
+
+    def test_qasm3_to_qpy_preserves_structure(self, valid_qasm3):
+        """Test that qasm3_to_qpy produces QPY that preserves circuit structure."""
+        from qiskit_mcp_server.circuit_serialization import qasm3_to_qpy
+
+        # Convert QASM3 to QPY
+        result = qasm3_to_qpy(valid_qasm3)
+        assert result["status"] == "success"
+
+        # Load the QPY back
+        load_result = load_qpy_circuit(result["circuit_qpy"])
+        assert load_result["status"] == "success"
+
+        # Original circuit from QASM3
+        original_result = load_qasm_circuit(valid_qasm3)
+        original_circuit = original_result["circuit"]
+
+        # Verify structure is preserved
+        loaded_circuit = load_result["circuit"]
+        assert loaded_circuit.num_qubits == original_circuit.num_qubits
+        assert loaded_circuit.depth() == original_circuit.depth()
+
+    def test_qasm2_to_qpy_fallback(self):
+        """Test that QASM2 input works via fallback."""
+        from qiskit_mcp_server.circuit_serialization import qasm3_to_qpy
+
+        qasm2_string = """OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[2];
+h q[0];
+cx q[0],q[1];
+"""
+        result = qasm3_to_qpy(qasm2_string)
+
+        assert result["status"] == "success"
+        assert "circuit_qpy" in result
+
+        # Verify the loaded circuit
+        load_result = load_qpy_circuit(result["circuit_qpy"])
+        assert load_result["status"] == "success"
+        assert load_result["circuit"].num_qubits == 2
+
+
 class TestDetectCircuitFormat:
     """Tests for auto-detection of circuit format."""
 
