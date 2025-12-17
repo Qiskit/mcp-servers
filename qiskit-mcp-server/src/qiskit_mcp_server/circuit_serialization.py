@@ -126,22 +126,28 @@ def load_qasm_circuit(qasm_string: str) -> dict[str, Any]:
         >>> result["status"]
         'success'
     """
+    qasm3_error_msg = None
+
     # Try QASM3 first
     try:
         circuit = qasm3_loads(qasm_string)
         return {"status": "success", "circuit": circuit}
     except Exception as qasm3_error:
-        logger.debug(f"QASM3 parsing failed: {qasm3_error}, trying QASM2")
+        qasm3_error_msg = str(qasm3_error)
+        logger.debug(f"QASM3 parsing failed: {qasm3_error_msg}, trying QASM2")
 
     # Fall back to QASM2
     try:
         circuit = qasm2.loads(qasm_string)
         return {"status": "success", "circuit": circuit}
     except Exception as qasm2_error:
-        logger.error(f"Both QASM3 and QASM2 parsing failed: {qasm2_error}")
+        qasm2_error_msg = str(qasm2_error)
+        logger.error(
+            f"Both QASM3 and QASM2 parsing failed. QASM3: {qasm3_error_msg}; QASM2: {qasm2_error_msg}"
+        )
         return {
             "status": "error",
-            "message": "QASM string not valid. Cannot be loaded as QuantumCircuit (tried both QASM3 and QASM2).",
+            "message": f"QASM string not valid. QASM3 error: {qasm3_error_msg}; QASM2 error: {qasm2_error_msg}",
         }
 
 
