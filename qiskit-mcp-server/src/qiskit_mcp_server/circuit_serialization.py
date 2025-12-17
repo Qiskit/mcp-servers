@@ -68,6 +68,12 @@ def detect_circuit_format(circuit_data: str) -> CircuitFormat:
     - QASM3/QASM2: Text starting with "OPENQASM" or containing typical QASM markers
     - QPY: Base64-encoded binary data that decodes to QPY magic number
 
+    The detection order is important:
+    1. First check for explicit QASM header (definitive)
+    2. Then check for QPY magic number (definitive)
+    3. Then check for QASM keywords (heuristic)
+    4. Default to QASM3 if undetermined
+
     Args:
         circuit_data: The circuit data string to analyze.
 
@@ -83,15 +89,13 @@ def detect_circuit_format(circuit_data: str) -> CircuitFormat:
     # Strip whitespace for detection
     stripped = circuit_data.strip()
 
-    # Check for QASM indicators (both QASM2 and QASM3)
+    # 1. Check for explicit QASM header (definitive - QASM always starts with this)
     if stripped.upper().startswith("OPENQASM"):
         return "qasm3"
 
-    # Check for other common QASM indicators
-    if any(marker in stripped for marker in ["qubit", "qreg", "include"]):
-        return "qasm3"
-
-    # Try to decode as base64 and check for QPY magic
+    # 2. Try to decode as base64 and check for QPY magic (definitive check)
+    # Do this BEFORE checking for QASM keywords to avoid false positives
+    # when base64 strings happen to contain substrings like "include"
     try:
         decoded = base64.b64decode(stripped)
         if decoded.startswith(QPY_MAGIC):
@@ -100,7 +104,12 @@ def detect_circuit_format(circuit_data: str) -> CircuitFormat:
         # Not valid base64, likely QASM - this is expected for QASM input
         logger.debug("Input is not valid base64, treating as QASM")
 
-    # Default to QASM3 if we can't determine
+    # 3. Check for other common QASM indicators (heuristic)
+    # Only check these after ruling out QPY, as these are substring matches
+    if any(marker in stripped for marker in ["qubit", "qreg", "include"]):
+        return "qasm3"
+
+    # 4. Default to QASM3 if we can't determine
     logger.debug("Could not definitively detect format, defaulting to qasm3")
     return "qasm3"
 
