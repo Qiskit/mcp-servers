@@ -237,6 +237,28 @@ if conversion["status"] == "success":
     print(conversion["qasm3"])
 ```
 
+### Converting QASM3 to QPY
+
+To convert a QASM circuit to QPY format (for full fidelity when chaining tools), use `qasm3_to_qpy`:
+
+```python
+from qiskit_mcp_server import qasm3_to_qpy
+
+qasm_circuit = '''
+OPENQASM 3.0;
+include "stdgates.inc";
+qubit[2] q;
+h q[0];
+cx q[0], q[1];
+'''
+
+# Convert to QPY format
+result = qasm3_to_qpy(qasm_circuit)
+if result["status"] == "success":
+    qpy_string = result["circuit_qpy"]
+    # Use qpy_string with tools that accept QPY input
+```
+
 ### Available Basis Gate Sets
 
 | Preset | Gates | Description |
