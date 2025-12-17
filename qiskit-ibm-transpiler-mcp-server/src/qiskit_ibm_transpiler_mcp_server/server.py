@@ -13,7 +13,6 @@ import logging
 from typing import Any, Literal
 
 from fastmcp import FastMCP
-from qiskit_mcp_server.circuit_serialization import qasm3_to_qpy, qpy_to_qasm3
 
 from qiskit_ibm_transpiler_mcp_server.qta import (
     ai_clifford_synthesis,
@@ -231,43 +230,6 @@ async def ai_pauli_network_synthesis_tool(
         local_mode=local_mode,
         circuit_format=circuit_format,
     )
-
-
-@mcp.tool()
-async def convert_qpy_to_qasm3_tool(
-    circuit_qpy: str,
-) -> dict[str, Any]:
-    """Convert a QPY circuit to human-readable QASM3 format.
-
-    Use this tool to view the contents of a QPY circuit output from other tools
-    (like ai_routing, ai_clifford_synthesis, etc.) in a human-readable OpenQASM 3.0 format.
-
-    Args:
-        circuit_qpy: Base64-encoded QPY circuit string (from circuit_qpy output field)
-
-    Returns:
-        Dict with 'status' and 'qasm3' (the human-readable circuit string).
-    """
-    return qpy_to_qasm3(circuit_qpy)
-
-
-@mcp.tool()
-async def convert_qasm3_to_qpy_tool(
-    circuit_qasm: str,
-) -> dict[str, Any]:
-    """Convert a QASM3 (or QASM2) circuit to base64-encoded QPY format.
-
-    Use this tool to convert human-readable QASM circuits to QPY format,
-    which preserves full circuit fidelity (exact parameters, metadata, custom gates).
-    The QPY output can then be used with other tools that accept QPY input.
-
-    Args:
-        circuit_qasm: OpenQASM 3.0 or 2.0 circuit string
-
-    Returns:
-        Dict with 'status' and 'circuit_qpy' (base64-encoded QPY string).
-    """
-    return qasm3_to_qpy(circuit_qasm)
 
 
 def main() -> None:

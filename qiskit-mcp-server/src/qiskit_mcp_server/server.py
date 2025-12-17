@@ -29,7 +29,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from qiskit_mcp_server.circuit_serialization import CircuitFormat, qpy_to_qasm3
+from qiskit_mcp_server.circuit_serialization import CircuitFormat, qasm3_to_qpy, qpy_to_qasm3
 from qiskit_mcp_server.transpiler import (
     analyze_circuit,
     compare_optimization_levels,
@@ -162,9 +162,28 @@ async def convert_qpy_to_qasm3_tool(
         circuit_qpy: Base64-encoded QPY circuit string (from transpile_circuit output)
 
     Returns:
-        Dictionary with 'status' and 'qasm3' (the human-readable circuit string)
+        Dict with 'status' and 'qasm3' (the human-readable circuit string).
     """
     return qpy_to_qasm3(circuit_qpy)
+
+
+@mcp.tool()
+async def convert_qasm3_to_qpy_tool(
+    circuit_qasm: str,
+) -> dict[str, Any]:
+    """Convert a QASM3 (or QASM2) circuit to base64-encoded QPY format.
+
+    Use this tool to convert human-readable QASM circuits to QPY format,
+    which preserves full circuit fidelity (exact parameters, metadata, custom gates).
+    The QPY output can then be used with other tools that accept QPY input.
+
+    Args:
+        circuit_qasm: OpenQASM 3.0 or 2.0 circuit string
+
+    Returns:
+        Dict with 'status' and 'circuit_qpy' (base64-encoded QPY string).
+    """
+    return qasm3_to_qpy(circuit_qasm)
 
 
 # Resources - Static metadata accessible without tool calls
