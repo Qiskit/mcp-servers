@@ -350,86 +350,63 @@ async def hybrid_ai_transpile(
         - optimized_circuit: Metrics dict for the optimized circuit
         - improvements: Dict with depth_reduction and two_qubit_gate_reduction
     """
-    if not backend_name or not backend_name.strip():
-        return {
-            "status": "error",
-            "message": "backend_name is required and cannot be empty",
-        }
-
-    # Validate ai_optimization_level
-    if ai_optimization_level not in (1, 2, 3):
-        return {
-            "status": "error",
-            "message": f"ai_optimization_level must be 1, 2, or 3, got {ai_optimization_level}",
-        }
-
-    # Validate optimization_level
-    if optimization_level not in (1, 2, 3):
-        return {
-            "status": "error",
-            "message": f"optimization_level must be 1, 2, or 3, got {optimization_level}",
-        }
-
-    # Validate ai_layout_mode
+    # Validate parameters
     valid_layout_modes = ("keep", "improve", "optimize")
-    if ai_layout_mode not in valid_layout_modes:
-        return {
-            "status": "error",
-            "message": f"ai_layout_mode must be one of {valid_layout_modes}, got '{ai_layout_mode}'",
-        }
+    validation_error = None
+    if not backend_name or not backend_name.strip():
+        validation_error = "backend_name is required and cannot be empty"
+    elif ai_optimization_level not in (1, 2, 3):
+        validation_error = f"ai_optimization_level must be 1, 2, or 3, got {ai_optimization_level}"
+    elif optimization_level not in (1, 2, 3):
+        validation_error = f"optimization_level must be 1, 2, or 3, got {optimization_level}"
+    elif ai_layout_mode not in valid_layout_modes:
+        validation_error = f"ai_layout_mode must be one of {valid_layout_modes}, got '{ai_layout_mode}'"
+    if validation_error:
+        return {"status": "error", "message": validation_error}
 
     try:
         logger.info("Hybrid AI transpilation pass")
 
         # Get backend to extract coupling map
-        backend_service_coroutine = await get_backend_service(backend_name=backend_name)
-        if backend_service_coroutine["status"] == "success":
-            backend_service = backend_service_coroutine["backend"]
-        else:
-            return {"status": "error", "message": backend_service_coroutine["message"]}
+        backend_service_result = await get_backend_service(backend_name=backend_name)
+        if backend_service_result["status"] != "success":
+            return {"status": "error", "message": backend_service_result["message"]}
+        backend_service = backend_service_result["backend"]
 
-        # Get coupling map from backend
-        coupling_map = backend_service.coupling_map
+        # Load input circuit
+        loaded_quantum_circuit = load_circuit(circuit, circuit_format=circuit_format)
+        if loaded_quantum_circuit["status"] != "success":
+            return {"status": "error", "message": loaded_quantum_circuit["message"]}
+        original_circuit = loaded_quantum_circuit["circuit"]
 
         # Create hybrid AI pass manager
         ai_pass_manager = generate_ai_pass_manager(
-            coupling_map=coupling_map,
+            coupling_map=backend_service.coupling_map,
             ai_optimization_level=ai_optimization_level,
             optimization_level=optimization_level,
             ai_layout_mode=ai_layout_mode,
         )
 
-        # Load input circuit
-        loaded_quantum_circuit = load_circuit(circuit, circuit_format=circuit_format)
-        if loaded_quantum_circuit["status"] == "success":
-            original_circuit = loaded_quantum_circuit["circuit"]
-            original_metrics = _get_circuit_metrics(original_circuit)
+        # Run the hybrid transpilation
+        original_metrics = _get_circuit_metrics(original_circuit)
+        transpiled_circuit = ai_pass_manager.run(original_circuit)
+        optimized_metrics = _get_circuit_metrics(transpiled_circuit)
 
-            # Run the hybrid transpilation
-            transpiled_circuit = ai_pass_manager.run(original_circuit)
-            optimized_metrics = _get_circuit_metrics(transpiled_circuit)
+        # Return QPY format (source of truth for precision and chaining)
+        qpy_str = dump_circuit(transpiled_circuit, circuit_format="qpy")
 
-            # Return QPY format (source of truth for precision and chaining)
-            qpy_str = dump_circuit(transpiled_circuit, circuit_format="qpy")
-
-            # Calculate improvements (positive = reduction/improvement)
-            depth_reduction = original_metrics["depth"] - optimized_metrics["depth"]
-            two_qubit_reduction = (
-                original_metrics["two_qubit_gates"] - optimized_metrics["two_qubit_gates"]
-            )
-
-            return {
-                "status": "success",
-                "circuit_qpy": qpy_str,
-                "original_circuit": original_metrics,
-                "optimized_circuit": optimized_metrics,
-                "improvements": {
-                    "depth_reduction": depth_reduction,
-                    "two_qubit_gate_reduction": two_qubit_reduction,
-                },
-            }
-        else:
-            return {"status": "error", "message": loaded_quantum_circuit["message"]}
+        return {
+            "status": "success",
+            "circuit_qpy": qpy_str,
+            "original_circuit": original_metrics,
+            "optimized_circuit": optimized_metrics,
+            "improvements": {
+                "depth_reduction": original_metrics["depth"] - optimized_metrics["depth"],
+                "two_qubit_gate_reduction": (
+                    original_metrics["two_qubit_gates"] - optimized_metrics["two_qubit_gates"]
+                ),
+            },
+        }
     except Exception as e:
         logger.error(f"Hybrid AI transpilation failed: {e}")
         return {"status": "error", "message": f"{e}"}
