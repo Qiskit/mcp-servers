@@ -12,5 +12,3 @@ To install individual servers:
     pip install qiskit-mcp-servers[code-assistant]
     pip install qiskit-mcp-servers[runtime]
 """
-
-__version__ = "0.1.0"

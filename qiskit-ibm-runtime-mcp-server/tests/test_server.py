@@ -218,9 +218,7 @@ class TestInitializeService:
             mock_qrs.save_account.assert_called_once_with(
                 channel="ibm_quantum_platform", token="test_token", overwrite=True
             )
-            mock_qrs.assert_called_with(
-                channel="ibm_quantum_platform", instance="my-instance-crn"
-            )
+            mock_qrs.assert_called_with(channel="ibm_quantum_platform", instance="my-instance-crn")
 
 
 class TestSetupIBMQuantumAccount:

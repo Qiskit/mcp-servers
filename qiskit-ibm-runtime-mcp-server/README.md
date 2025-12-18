@@ -83,7 +83,7 @@ This project recommends using [uv](https://astral.sh/uv) for virtual environment
    To speed up service initialization, you can specify your IBM Quantum instance:
    - Set `QISKIT_IBM_RUNTIME_MCP_INSTANCE` environment variable with your instance CRN
    - This skips the automatic instance lookup which can be slow
-   - Find your instance CRN in [IBM Quantum Platform](https://quantum.cloud.ibm.com/)
+   - Find your instance CRN in [IBM Quantum Platform](https://quantum.cloud.ibm.com/instances)
 
    **Instance Priority:**
    - If you saved credentials with an instance (via `save_account(instance="...")`), the SDK uses it automatically

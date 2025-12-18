@@ -15,6 +15,7 @@ on:
           - meta-package
           - code-assistant
           - runtime
+          - transpiler
 
 jobs:
   publish-code-assistant:
@@ -40,7 +41,15 @@ jobs:
     - name: Build package
       working-directory: ./qiskit-code-assistant-mcp-server
       run: |
-        uv build
+        uv build --out-dir dist
+
+    - name: Verify build output
+      run: |
+        ls -la qiskit-code-assistant-mcp-server/dist/
+        if [ ! -d "qiskit-code-assistant-mcp-server/dist" ] || [ -z "$(ls -A qiskit-code-assistant-mcp-server/dist)" ]; then
+          echo "ERROR: Build did not produce any distribution files"
+          exit 1
+        fi
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
@@ -71,7 +80,15 @@ jobs:
     - name: Build package
       working-directory: ./qiskit-ibm-runtime-mcp-server
       run: |
-        uv build
+        uv build --out-dir dist
+
+    - name: Verify build output
+      run: |
+        ls -la qiskit-ibm-runtime-mcp-server/dist/
+        if [ ! -d "qiskit-ibm-runtime-mcp-server/dist" ] || [ -z "$(ls -A qiskit-ibm-runtime-mcp-server/dist)" ]; then
+          echo "ERROR: Build did not produce any distribution files"
+          exit 1
+        fi
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
@@ -79,15 +96,55 @@ jobs:
         packages-dir: qiskit-ibm-runtime-mcp-server/dist/
         verbose: true
 
+  publish-transpiler:
+    if: |
+      (github.event_name == 'release' && contains(github.ref, 'transpiler')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'transpiler'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for trusted publishing
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Build package
+      working-directory: ./qiskit-ibm-transpiler-mcp-server
+      run: |
+        uv build --out-dir dist
+
+    - name: Verify build output
+      run: |
+        ls -la qiskit-ibm-transpiler-mcp-server/dist/
+        if [ ! -d "qiskit-ibm-transpiler-mcp-server/dist" ] || [ -z "$(ls -A qiskit-ibm-transpiler-mcp-server/dist)" ]; then
+          echo "ERROR: Build did not produce any distribution files"
+          exit 1
+        fi
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: qiskit-ibm-transpiler-mcp-server/dist/
+        verbose: true
+
   publish-meta-package:
     runs-on: ubuntu-latest
     # Meta-package should be published after individual servers
-    needs: [publish-code-assistant, publish-runtime]
+    needs: [publish-code-assistant, publish-runtime, publish-transpiler]
     # Allow meta-package to run even if individual packages were skipped (already published)
     if: |
       always() &&
       (needs.publish-code-assistant.result == 'success' || needs.publish-code-assistant.result == 'skipped') &&
       (needs.publish-runtime.result == 'success' || needs.publish-runtime.result == 'skipped') &&
+      (needs.publish-transpiler.result == 'success' || needs.publish-transpiler.result == 'skipped') &&
       ((github.event_name == 'release' && contains(github.ref, 'meta')) ||
        (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'meta-package')))
     permissions:
