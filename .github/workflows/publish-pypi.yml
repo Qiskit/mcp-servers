@@ -13,11 +13,51 @@ on:
         options:
           - all
           - meta-package
+          - qiskit
           - code-assistant
           - runtime
           - transpiler
 
 jobs:
+  publish-qiskit:
+    if: |
+      (github.event_name == 'release' && contains(github.ref, 'qiskit-v')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'qiskit'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for trusted publishing
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Build package
+      working-directory: ./qiskit-mcp-server
+      run: |
+        uv build --out-dir dist
+
+    - name: Verify build output
+      run: |
+        ls -la qiskit-mcp-server/dist/
+        if [ ! -d "qiskit-mcp-server/dist" ] || [ -z "$(ls -A qiskit-mcp-server/dist)" ]; then
+          echo "ERROR: Build did not produce any distribution files"
+          exit 1
+        fi
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: qiskit-mcp-server/dist/
+        verbose: true
+
   publish-code-assistant:
     if: |
       (github.event_name == 'release' && contains(github.ref, 'code-assistant')) ||
@@ -138,10 +178,11 @@ jobs:
   publish-meta-package:
     runs-on: ubuntu-latest
     # Meta-package should be published after individual servers
-    needs: [publish-code-assistant, publish-runtime, publish-transpiler]
+    needs: [publish-qiskit, publish-code-assistant, publish-runtime, publish-transpiler]
     # Allow meta-package to run even if individual packages were skipped (already published)
     if: |
       always() &&
+      (needs.publish-qiskit.result == 'success' || needs.publish-qiskit.result == 'skipped') &&
       (needs.publish-code-assistant.result == 'success' || needs.publish-code-assistant.result == 'skipped') &&
       (needs.publish-runtime.result == 'success' || needs.publish-runtime.result == 'skipped') &&
       (needs.publish-transpiler.result == 'success' || needs.publish-transpiler.result == 'skipped') &&
