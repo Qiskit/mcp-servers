@@ -133,3 +133,9 @@ dev = [
     "mypy>=1.18.2",
     "ruff>=0.14.6",
 ]
+examples = [
+    "langchain>=1.2.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "langchain-anthropic>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
