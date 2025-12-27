@@ -21,6 +21,7 @@ from qiskit_ibm_transpiler_mcp_server.qta import (
     ai_pauli_network_synthesis,
     ai_permutation_synthesis,
     ai_routing,
+    hybrid_ai_transpile,
 )
 
 
@@ -766,6 +767,193 @@ class TestAIPauliNetworkSynthesis:
         Failed test AI Pauli Network synthesis tool with existing backend, quantum circuit and PassManager
         """
         result = await ai_pauli_network_synthesis(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+        )
+        assert result["status"] == "error"
+        assert expected_message in result["message"]
+
+
+class TestHybridAITranspile:
+    """Test hybrid AI transpilation tool"""
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_success(
+        self,
+        mock_circuit_qasm,
+        mock_backend,
+        mock_load_qasm_circuit_success,
+        mock_dumps_qasm_success,
+        mock_get_backend_service_with_coupling_map,
+        mock_generate_ai_pass_manager_success,
+        mock_get_circuit_metrics,
+    ):
+        """
+        Successful test hybrid AI transpilation with existing backend and quantum circuit.
+        """
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+        )
+
+        assert result["status"] == "success"
+        assert result["circuit_qpy"] == "circuit_qpy"
+        assert "original_circuit" in result
+        assert "optimized_circuit" in result
+        assert "improvements" in result
+        mock_get_backend_service_with_coupling_map.assert_awaited_once_with(
+            backend_name=mock_backend
+        )
+        mock_load_qasm_circuit_success.assert_called_once_with(
+            mock_circuit_qasm, circuit_format="qasm3"
+        )
+        mock_generate_ai_pass_manager_success.assert_called_once_with(
+            coupling_map="mock_coupling_map",
+            ai_optimization_level=3,
+            optimization_level=3,
+            ai_layout_mode="optimize",
+        )
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_with_custom_params(
+        self,
+        mock_circuit_qasm,
+        mock_backend,
+        mock_load_qasm_circuit_success,
+        mock_dumps_qasm_success,
+        mock_get_backend_service_with_coupling_map,
+        mock_generate_ai_pass_manager_success,
+        mock_get_circuit_metrics,
+    ):
+        """
+        Test hybrid AI transpilation with custom optimization levels and layout mode.
+        """
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            ai_optimization_level=1,
+            optimization_level=2,
+            ai_layout_mode="improve",
+        )
+
+        assert result["status"] == "success"
+        mock_generate_ai_pass_manager_success.assert_called_once_with(
+            coupling_map="mock_coupling_map",
+            ai_optimization_level=1,
+            optimization_level=2,
+            ai_layout_mode="improve",
+        )
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_empty_backend(self, mock_circuit_qasm):
+        """
+        Test hybrid AI transpilation with empty backend returns error.
+        """
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name="",
+        )
+        assert result["status"] == "error"
+        assert result["message"] == "backend_name is required and cannot be empty"
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_invalid_ai_optimization_level(
+        self, mock_circuit_qasm, mock_backend
+    ):
+        """
+        Test hybrid AI transpilation with invalid ai_optimization_level returns error.
+        """
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            ai_optimization_level=5,
+        )
+        assert result["status"] == "error"
+        assert "ai_optimization_level must be 1, 2, or 3" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_invalid_optimization_level(
+        self, mock_circuit_qasm, mock_backend
+    ):
+        """
+        Test hybrid AI transpilation with invalid optimization_level returns error.
+        """
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            optimization_level=0,
+        )
+        assert result["status"] == "error"
+        assert "optimization_level must be 1, 2, or 3" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_invalid_layout_mode(self, mock_circuit_qasm, mock_backend):
+        """
+        Test hybrid AI transpilation with invalid ai_layout_mode returns error.
+        """
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            ai_layout_mode="invalid",
+        )
+        assert result["status"] == "error"
+        assert "ai_layout_mode must be one of" in result["message"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "get_backend_fixture, load_qasm_fixture, dumps_fixture, generate_ai_pass_manager_fixture, expected_message",
+        [
+            (
+                "mock_get_backend_service_failure",
+                "mock_load_qasm_circuit_success",
+                "mock_dumps_qasm_success",
+                "mock_generate_ai_pass_manager_success",
+                "get_backend failed",
+            ),
+            (
+                "mock_get_backend_service_with_coupling_map",
+                "mock_load_qasm_circuit_failure",
+                "mock_dumps_qasm_success",
+                "mock_generate_ai_pass_manager_success",
+                "Error in loading QuantumCircuit",
+            ),
+            (
+                "mock_get_backend_service_with_coupling_map",
+                "mock_load_qasm_circuit_success",
+                "mock_dumps_qasm_failure",
+                "mock_generate_ai_pass_manager_success",
+                "Circuit dump failed",
+            ),
+            (
+                "mock_get_backend_service_with_coupling_map",
+                "mock_load_qasm_circuit_success",
+                "mock_dumps_qasm_success",
+                "mock_generate_ai_pass_manager_failure",
+                "Hybrid AI transpilation failed",
+            ),
+        ],
+        indirect=[
+            "get_backend_fixture",
+            "load_qasm_fixture",
+            "dumps_fixture",
+            "generate_ai_pass_manager_fixture",
+        ],
+    )
+    async def test_hybrid_ai_transpile_failures_parametrized(
+        self,
+        get_backend_fixture,
+        load_qasm_fixture,
+        dumps_fixture,
+        generate_ai_pass_manager_fixture,
+        expected_message,
+        mock_circuit_qasm,
+        mock_backend,
+        mock_get_circuit_metrics,
+    ):
+        """
+        Test hybrid AI transpilation failures with various error scenarios.
+        """
+        result = await hybrid_ai_transpile(
             circuit=mock_circuit_qasm,
             backend_name=mock_backend,
         )

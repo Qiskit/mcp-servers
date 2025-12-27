@@ -20,6 +20,7 @@ from qiskit_ibm_transpiler_mcp_server.qta import (
     ai_pauli_network_synthesis,
     ai_permutation_synthesis,
     ai_routing,
+    hybrid_ai_transpile,
 )
 from qiskit_ibm_transpiler_mcp_server.utils import CircuitFormat, setup_ibm_quantum_account
 
@@ -228,6 +229,49 @@ async def ai_pauli_network_synthesis_tool(
         backend_name=backend_name,
         replace_only_if_better=replace_only_if_better,
         local_mode=local_mode,
+        circuit_format=circuit_format,
+    )
+
+
+@mcp.tool()
+async def hybrid_ai_transpile_tool(
+    circuit: str,
+    backend_name: str,
+    ai_optimization_level: Literal[1, 2, 3] = 3,
+    optimization_level: Literal[1, 2, 3] = 3,
+    ai_layout_mode: Literal["keep", "improve", "optimize"] = "optimize",
+    circuit_format: CircuitFormat = "qasm3",
+) -> dict[str, Any]:
+    """Transpile a circuit using a hybrid pass manager combining Qiskit heuristics with AI-powered passes.
+
+    This provides end-to-end transpilation that leverages both classical heuristic optimization
+    and AI-based optimization for routing and synthesis in a single unified pipeline.
+
+    Args:
+        circuit: Input quantum circuit as QASM 3.0 string or base64-encoded QPY
+        backend_name: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+        ai_optimization_level: Optimization level (1-3) for AI components. Higher = better results but slower.
+        optimization_level: Optimization level (1-3) for heuristic components.
+        ai_layout_mode: Layout selection strategy:
+            - 'keep': Respect existing layout (for specific qubit requirements)
+            - 'improve': Use prior layout as starting point
+            - 'optimize': Best for general circuits (default)
+        circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
+
+    Returns:
+        Dict with:
+        - status: 'success' or 'error'
+        - circuit_qpy: Base64-encoded QPY format (for chaining with other tools)
+        - original_circuit: Metrics dict (num_qubits, depth, size, two_qubit_gates)
+        - optimized_circuit: Metrics dict for the optimized circuit
+        - improvements: Dict with depth_reduction and two_qubit_gate_reduction
+    """
+    return await hybrid_ai_transpile(
+        circuit=circuit,
+        backend_name=backend_name,
+        ai_optimization_level=ai_optimization_level,
+        optimization_level=optimization_level,
+        ai_layout_mode=ai_layout_mode,
         circuit_format=circuit_format,
     )
 
