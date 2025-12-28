@@ -17,9 +17,12 @@ This module provides functions to:
 - Monitor training progress and metrics
 - Stop running training sessions
 - Batch train across multiple environments/topologies
+- Background (async) training with polling
 """
 
 import logging
+import threading
+import time
 from pathlib import Path
 from typing import Any, Literal
 
@@ -98,6 +101,70 @@ def _ensure_tensorboard_dir(experiment_name: str | None) -> str | None:
 # ============================================================================
 
 
+def _run_training_in_background(
+    session_id: str,
+    env_id: str,
+    env_type: str,
+    env_coupling_map_edges: list[list[int]],
+    env_num_qubits: int,
+    gym_instance: Any,
+    algorithm: str,
+    policy: str,
+    num_iterations: int,
+    tb_path: str | None,
+) -> None:
+    """Run training in a background thread.
+
+    This function is called from a thread and updates the state as it progresses.
+    """
+    try:
+        from qiskit_gym.rl import RLSynthesis
+
+        state = GymStateProvider()
+
+        # Get configs
+        rl_config = _get_rl_config(algorithm)
+        policy_config = _get_policy_config(policy)
+
+        # Create RLSynthesis instance
+        rls = RLSynthesis(gym_instance, rl_config, policy_config)
+
+        # Store RLS instance in session
+        state.set_training_rls_instance(session_id, rls)
+        state.set_training_status(session_id, "running")
+
+        # Run training
+        logger.info(f"Background training started for session {session_id}")
+        if tb_path:
+            rls.learn(num_iterations=num_iterations, tb_path=tb_path)
+        else:
+            rls.learn(num_iterations=num_iterations)
+
+        # Training completed
+        state.set_training_status(session_id, "completed")
+        state.update_training_progress(session_id, num_iterations)
+
+        # Register as a model
+        model_id = state.register_model(
+            model_name=f"trained_{env_type}_{session_id}",
+            env_type=env_type,
+            coupling_map_edges=env_coupling_map_edges,
+            num_qubits=env_num_qubits,
+            rls_instance=rls,
+            from_session_id=session_id,
+        )
+
+        # Store model_id in session for retrieval
+        state.set_training_model_id(session_id, model_id)
+
+        logger.info(f"Background training completed for session {session_id}, model_id={model_id}")
+
+    except Exception as e:
+        logger.error(f"Background training failed for session {session_id}: {e}")
+        # state is already available from the try block
+        GymStateProvider().set_training_status(session_id, "error", str(e))
+
+
 @with_sync
 async def start_training(
     env_id: str,
@@ -105,11 +172,11 @@ async def start_training(
     policy: Literal["basic", "conv1d"] = "basic",
     num_iterations: int = 100,
     tensorboard_experiment: str | None = None,
+    background: bool = False,
 ) -> dict[str, Any]:
     """Start training an RL agent on an environment.
 
     This initiates a training session that learns to synthesize optimal circuits.
-    Training runs synchronously - the call will return when training completes.
 
     Args:
         env_id: Environment ID from create_*_env tools
@@ -121,13 +188,16 @@ async def start_training(
             - "conv1d": 1D convolutional network (better for larger problems)
         num_iterations: Number of training iterations (default: 100)
         tensorboard_experiment: Name for TensorBoard experiment logging (optional)
+        background: If True, run training in background and return immediately.
+            Use get_training_status to poll for completion, or wait_for_training
+            to block until done. (default: False)
 
     Returns:
-        Dict with session_id, final status, and training metrics
+        Dict with session_id. If background=False, also includes final status
+        and training metrics. If background=True, returns immediately with
+        session_id for polling.
     """
     try:
-        from qiskit_gym.rl import RLSynthesis
-
         # Validate iteration count
         if num_iterations > QISKIT_GYM_MAX_ITERATIONS:
             return {
@@ -162,6 +232,45 @@ async def start_training(
             tensorboard_path=tb_path,
         )
 
+        if background:
+            # Run training in background thread
+            thread = threading.Thread(
+                target=_run_training_in_background,
+                args=(
+                    session_id,
+                    env_id,
+                    env.env_type,
+                    env.coupling_map_edges,
+                    env.num_qubits,
+                    env.gym_instance,
+                    algorithm,
+                    policy,
+                    num_iterations,
+                    tb_path,
+                ),
+                daemon=True,
+            )
+            thread.start()
+
+            return {
+                "status": "started",
+                "session_id": session_id,
+                "env_id": env_id,
+                "algorithm": algorithm,
+                "policy": policy,
+                "num_iterations": num_iterations,
+                "background": True,
+                "tensorboard_path": tb_path,
+                "message": "Training started in background",
+                "next_steps": [
+                    f"Use get_training_status('{session_id}') to check progress",
+                    f"Use wait_for_training('{session_id}') to wait for completion",
+                ],
+            }
+
+        # Synchronous training (original behavior)
+        from qiskit_gym.rl import RLSynthesis
+
         # Get configs
         rl_config = _get_rl_config(algorithm)
         policy_config = _get_policy_config(policy)
@@ -194,6 +303,9 @@ async def start_training(
                 rls_instance=rls,
                 from_session_id=session_id,
             )
+
+            # Store model_id in session for retrieval via wait_for_training
+            state.set_training_model_id(session_id, model_id)
 
             return {
                 "status": "success",
@@ -245,7 +357,7 @@ async def get_training_status(session_id: str) -> dict[str, Any]:
             "message": f"Training session '{session_id}' not found",
         }
 
-    return {
+    result = {
         "status": "success",
         "session_id": session.session_id,
         "env_id": session.env_id,
@@ -261,6 +373,89 @@ async def get_training_status(session_id: str) -> dict[str, Any]:
         "tensorboard_path": session.tensorboard_path,
         "error_message": session.error_message,
     }
+
+    # Include model_id if training completed
+    if session.status == "completed" and hasattr(session, "model_id") and session.model_id:
+        result["model_id"] = session.model_id
+
+    return result
+
+
+@with_sync
+async def wait_for_training(
+    session_id: str,
+    timeout: int = 600,
+    poll_interval: float = 2.0,
+) -> dict[str, Any]:
+    """Wait for a background training session to complete.
+
+    Blocks until the training session completes, fails, or times out.
+    Use this after starting training with background=True.
+
+    Args:
+        session_id: Training session ID to wait for
+        timeout: Maximum time to wait in seconds (default: 600 = 10 minutes)
+        poll_interval: How often to check status in seconds (default: 2.0)
+
+    Returns:
+        Dict with final training status. If completed successfully, includes
+        model_id for synthesis.
+    """
+    state = GymStateProvider()
+    start_time = time.time()
+
+    while True:
+        session = state.get_training_session(session_id)
+
+        if session is None:
+            return {
+                "status": "error",
+                "message": f"Training session '{session_id}' not found",
+            }
+
+        # Check if training finished
+        if session.status in ("completed", "error", "stopped"):
+            result = {
+                "status": "success" if session.status == "completed" else "error",
+                "session_id": session_id,
+                "training_status": session.status,
+                "progress": session.progress,
+                "total_iterations": session.total_iterations,
+                "error_message": session.error_message,
+            }
+
+            if session.status == "completed":
+                # Include model_id
+                if hasattr(session, "model_id") and session.model_id:
+                    result["model_id"] = session.model_id
+                result["message"] = "Training completed successfully"
+                result["next_steps"] = [
+                    f"Use save_model('{session_id}') to persist the model",
+                    "Use synthesize_* with model_id to generate circuits",
+                ]
+            elif session.status == "error":
+                result["message"] = f"Training failed: {session.error_message}"
+            else:
+                result["message"] = "Training was stopped"
+
+            return result
+
+        # Check timeout
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            return {
+                "status": "timeout",
+                "session_id": session_id,
+                "training_status": session.status,
+                "progress": session.progress,
+                "total_iterations": session.total_iterations,
+                "elapsed_seconds": round(elapsed, 1),
+                "message": f"Timeout after {timeout} seconds. Training still running. "
+                "Use get_training_status to check progress later.",
+            }
+
+        # Wait before next poll
+        time.sleep(poll_interval)
 
 
 @with_sync
@@ -336,6 +531,7 @@ async def batch_train_environments(
     policy: Literal["basic", "conv1d"] = "basic",
     num_iterations: int = 100,
     tensorboard_prefix: str | None = None,
+    background: bool = False,
 ) -> dict[str, Any]:
     """Train multiple environments in sequence.
 
@@ -347,13 +543,17 @@ async def batch_train_environments(
         policy: Neural network policy architecture
         num_iterations: Number of iterations per environment
         tensorboard_prefix: Prefix for TensorBoard experiment names
+        background: If True, start all training in background and return immediately.
+            Use get_training_status or wait_for_training to monitor each session.
 
     Returns:
-        Dict with results for each environment
+        If background=False: Dict with results for each environment.
+        If background=True: Dict with session IDs for each environment (returns immediately).
     """
     results: list[dict[str, Any]] = []
     successful = 0
     failed = 0
+    session_ids: list[str] = []
 
     for i, env_id in enumerate(env_ids):
         logger.info(f"Batch training {i + 1}/{len(env_ids)}: {env_id}")
@@ -370,15 +570,34 @@ async def batch_train_environments(
             policy=policy,
             num_iterations=num_iterations,
             tensorboard_experiment=tb_name,
+            background=background,
         )
 
         result["env_id"] = env_id
         results.append(result)
 
-        if result["status"] == "success":
+        if background:
+            # Track session IDs for background mode
+            if "session_id" in result:
+                session_ids.append(result["session_id"])
+        elif result["status"] == "success":
             successful += 1
         else:
             failed += 1
+
+    if background:
+        return {
+            "status": "started",
+            "message": f"Started {len(session_ids)} training sessions in background",
+            "total_environments": len(env_ids),
+            "session_ids": session_ids,
+            "results": results,
+            "next_steps": [
+                "Use get_training_status_tool(session_id) to check progress of each session",
+                "Use wait_for_training_tool(session_id) to wait for each session to complete",
+                "Use list_training_sessions_tool() to see all sessions",
+            ],
+        }
 
     return {
         "status": "success" if failed == 0 else "partial",

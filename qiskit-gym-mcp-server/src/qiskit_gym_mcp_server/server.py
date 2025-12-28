@@ -78,6 +78,7 @@ from qiskit_gym_mcp_server.training import (
     list_training_sessions,
     start_training,
     stop_training,
+    wait_for_training,
 )
 
 
@@ -228,11 +229,11 @@ async def start_training_tool(
     policy: Literal["basic", "conv1d"] = "basic",
     num_iterations: int = 100,
     tensorboard_experiment: str | None = None,
+    background: bool = False,
 ) -> dict[str, Any]:
     """Start training an RL agent on a created environment.
 
     This initiates training that learns to synthesize optimal circuits.
-    Training runs synchronously - use this for short training runs.
 
     Args:
         env_id: Environment ID from create_*_env_tool
@@ -244,12 +245,18 @@ async def start_training_tool(
             - "conv1d": 1D convolutional network (better for larger problems)
         num_iterations: Number of training iterations. Default: 100
         tensorboard_experiment: Name for TensorBoard logging (optional)
+        background: If True, run training in background and return immediately.
+            Use get_training_status_tool to poll progress, or wait_for_training_tool
+            to block until done. Default: False (synchronous).
 
     Returns:
-        Dict with session_id, model_id, training metrics on success.
+        If background=False: Dict with session_id, model_id, training metrics.
+        If background=True: Dict with session_id for polling. Use
+            wait_for_training_tool or get_training_status_tool to check progress.
 
     Note:
-        Large num_iterations may take significant time.
+        For long training runs (>100 iterations), set background=True to avoid
+        timeouts, then use wait_for_training_tool to get results.
     """
     return await start_training(
         env_id=env_id,
@@ -257,6 +264,7 @@ async def start_training_tool(
         policy=policy,
         num_iterations=num_iterations,
         tensorboard_experiment=tensorboard_experiment,
+        background=background,
     )
 
 
@@ -267,6 +275,7 @@ async def batch_train_environments_tool(
     policy: Literal["basic", "conv1d"] = "basic",
     num_iterations: int = 100,
     tensorboard_prefix: str | None = None,
+    background: bool = False,
 ) -> dict[str, Any]:
     """Train multiple environments in sequence.
 
@@ -279,9 +288,16 @@ async def batch_train_environments_tool(
         policy: Neural network policy architecture
         num_iterations: Number of iterations per environment
         tensorboard_prefix: Prefix for TensorBoard experiment names
+        background: If True, start all training in background and return immediately.
+            Use get_training_status_tool or wait_for_training_tool to monitor.
 
     Returns:
-        Dict with results for each environment.
+        If background=False: Dict with results for each environment.
+        If background=True: Dict with session_ids for polling progress.
+
+    Note:
+        For batch training with many environments, set background=True to avoid
+        timeouts. Training sessions run in parallel background threads.
     """
     return await batch_train_environments(
         env_ids=env_ids,
@@ -289,6 +305,7 @@ async def batch_train_environments_tool(
         policy=policy,
         num_iterations=num_iterations,
         tensorboard_prefix=tensorboard_prefix,
+        background=background,
     )
 
 
@@ -303,6 +320,32 @@ async def get_training_status_tool(session_id: str) -> dict[str, Any]:
         Dict with session status, progress, and metrics.
     """
     return await get_training_status(session_id)
+
+
+@mcp.tool()
+async def wait_for_training_tool(
+    session_id: str,
+    timeout: int = 600,
+) -> dict[str, Any]:
+    """Wait for a background training session to complete.
+
+    Blocks until training completes, fails, or times out. Use this after
+    starting training with background=True.
+
+    Args:
+        session_id: Training session ID to wait for
+        timeout: Maximum time to wait in seconds (default: 600 = 10 minutes)
+
+    Returns:
+        Dict with final training status. If completed, includes model_id
+        for synthesis.
+
+    Example workflow:
+        1. start_training_tool(env_id, background=True) -> session_id
+        2. wait_for_training_tool(session_id) -> model_id
+        3. synthesize_*_tool(model_id, ...) -> circuit
+    """
+    return await wait_for_training(session_id, timeout)
 
 
 @mcp.tool()

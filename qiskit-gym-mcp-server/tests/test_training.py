@@ -23,6 +23,7 @@ from qiskit_gym_mcp_server.training import (
     list_training_sessions,
     start_training,
     stop_training,
+    wait_for_training,
 )
 
 
@@ -192,6 +193,35 @@ class TestBatchTraining:
         assert result["successful"] == 2
         assert result["failed"] == 0
 
+    @pytest.mark.asyncio
+    async def test_batch_train_background(
+        self,
+        mock_permutation_gym,
+        mock_rls_synthesis,
+        mock_ppo_config,
+        mock_basic_policy_config,
+    ):
+        """Test batch training with background=True returns immediately."""
+        # Create multiple environments
+        env1_result = await create_permutation_environment(preset="linear_5")
+        env2_result = await create_permutation_environment(preset="grid_3x3")
+
+        env_ids = [env1_result["env_id"], env2_result["env_id"]]
+
+        result = await batch_train_environments(
+            env_ids=env_ids,
+            num_iterations=5,
+            background=True,
+        )
+
+        # Should return "started" status with session_ids
+        assert result["status"] == "started"
+        assert result["total_environments"] == 2
+        assert "session_ids" in result
+        assert len(result["session_ids"]) == 2
+        assert "next_steps" in result
+        assert "results" in result
+
 
 class TestAlgorithmsAndPolicies:
     """Tests for algorithm and policy information."""
@@ -211,3 +241,111 @@ class TestAlgorithmsAndPolicies:
         assert result["status"] == "success"
         assert "basic" in result["policies"]
         assert "conv1d" in result["policies"]
+
+
+class TestBackgroundTraining:
+    """Tests for background/async training functionality."""
+
+    @pytest.mark.asyncio
+    async def test_start_training_background(
+        self,
+        mock_permutation_gym,
+        mock_rls_synthesis,
+        mock_ppo_config,
+        mock_basic_policy_config,
+    ):
+        """Test starting training in background mode returns immediately."""
+        # Create environment first
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        # Start training in background
+        result = await start_training(
+            env_id=env_id,
+            algorithm="ppo",
+            policy="basic",
+            num_iterations=10,
+            background=True,
+        )
+
+        # Should return immediately with "started" status
+        assert result["status"] == "started"
+        assert "session_id" in result
+        assert result["background"] is True
+        assert result["env_id"] == env_id
+        assert result["algorithm"] == "ppo"
+        assert result["policy"] == "basic"
+        assert "next_steps" in result
+
+    @pytest.mark.asyncio
+    async def test_wait_for_training_not_found(self):
+        """Test error when waiting for nonexistent session."""
+        result = await wait_for_training("nonexistent_session", timeout=1)
+        assert result["status"] == "error"
+        assert "not found" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_wait_for_training_completed(
+        self,
+        mock_permutation_gym,
+        mock_rls_synthesis,
+        mock_ppo_config,
+        mock_basic_policy_config,
+    ):
+        """Test waiting for a completed training session."""
+        # Create environment and start synchronous training (which completes immediately)
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        # Start training synchronously (completes immediately with mocks)
+        train_result = await start_training(
+            env_id=env_id,
+            num_iterations=5,
+            background=False,
+        )
+        session_id = train_result["session_id"]
+
+        # Wait should return immediately since training is already completed
+        result = await wait_for_training(session_id, timeout=1)
+        assert result["status"] == "success"
+        assert result["training_status"] == "completed"
+        assert "model_id" in result
+
+    @pytest.mark.asyncio
+    async def test_wait_for_training_timeout(
+        self,
+        mock_permutation_gym,
+        mock_rls_synthesis,
+        mock_ppo_config,
+        mock_basic_policy_config,
+        mocker,
+    ):
+        """Test timeout when waiting for training that doesn't complete."""
+        # Create environment
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        # Make the background training never complete by making learn() block
+        def slow_learn(*args, **kwargs):
+            import time
+
+            time.sleep(10)  # This will be interrupted by timeout
+
+        mock_rls_synthesis.return_value.learn.side_effect = slow_learn
+
+        # Start training in background
+        result = await start_training(
+            env_id=env_id,
+            num_iterations=10,
+            background=True,
+        )
+        session_id = result["session_id"]
+
+        # Wait with very short timeout - should timeout
+        wait_result = await wait_for_training(
+            session_id, timeout=0.1, poll_interval=0.05
+        )
+
+        assert wait_result["status"] == "timeout"
+        assert wait_result["session_id"] == session_id
+        assert "elapsed_seconds" in wait_result
