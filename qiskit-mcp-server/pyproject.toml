@@ -80,6 +80,12 @@ test = [
     "pytest-mock>=3.11.0",
     "pytest-cov>=4.1.0",
 ]
+examples = [
+    "langchain>=1.2.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "langchain-anthropic>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
