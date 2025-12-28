@@ -119,6 +119,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 ]
 "**/qiskit_gym_mcp_server/training.py" = [
     "PLC0415",  # Import inside function (lazy loading qiskit-gym)
+    "PLR0911",  # Too many return statements (async training logic)
 ]
 "**/qiskit_gym_mcp_server/synthesis.py" = [
     "PLC0415",  # Import inside function (lazy loading)
@@ -137,6 +138,18 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
     "C401",     # Generator vs comprehension (readability)
     "SIM102",   # Nested if statements (topology detection logic)
     "PERF401",  # List comprehension (readability in loop)
+]
+
+# Example agent scripts (conditional imports for optional LLM providers)
+"**/examples/langchain_agent.py" = [
+    "PLC0415",  # Import inside function (optional LLM providers)
+    "TCH002",   # Type-checking import (BaseChatModel for type hint)
+]
+"**/examples/langchain_agent.ipynb" = [
+    "I001",     # Import sorting (cell-by-cell execution doesn't need strict sorting)
+    "W293",     # Blank lines with whitespace (notebook formatting)
+    "ERA001",   # Commented out code (examples for users to uncomment)
+    "PLC0415",  # Import inside function (optional LLM providers)
 ]
 
 [lint.isort]

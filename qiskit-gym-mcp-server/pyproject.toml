@@ -32,8 +32,17 @@ test = [
     "bandit[toml]>=1.9.2"
 ]
 
+examples = [
+    "langchain>=0.3.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "python-dotenv>=1.0.0",
+    # LLM providers (install the one you need):
+    # langchain-openai, langchain-anthropic, langchain-google-genai,
+    # langchain-ollama, langchain-ibm
+]
+
 all = [
-    "qiskit-gym-mcp-server[dev,test]",
+    "qiskit-gym-mcp-server[dev,test,examples]",
 ]
 
 [[project.authors]]
