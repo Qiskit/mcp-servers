@@ -101,6 +101,27 @@ def _ensure_tensorboard_dir(experiment_name: str | None) -> str | None:
 # ============================================================================
 
 
+def _suppress_training_logs():
+    """Suppress verbose INFO training logs from twisterl (uses loguru).
+
+    This only suppresses INFO-level terminal output. WARNING and ERROR
+    logs are still shown. Training metrics are still logged to TensorBoard.
+    """
+    import sys
+
+    try:
+        from loguru import logger as loguru_logger
+
+        # Remove default handler and add one with WARNING level minimum
+        # This preserves WARNING and ERROR logs for debugging
+        loguru_logger.remove()
+        loguru_logger.add(sys.stderr, level="WARNING")
+    except ImportError:
+        pass  # loguru not available, logs will still appear
+    except ValueError:
+        pass  # Handler already removed or other configuration issue
+
+
 def _run_training_in_background(
     session_id: str,
     env_id: str,
@@ -132,6 +153,9 @@ def _run_training_in_background(
         # Store RLS instance in session
         state.set_training_rls_instance(session_id, rls)
         state.set_training_status(session_id, "running")
+
+        # Suppress verbose twisterl logs (metrics still go to TensorBoard)
+        _suppress_training_logs()
 
         # Run training
         logger.info(f"Background training started for session {session_id}")
@@ -292,6 +316,9 @@ async def start_training(
         # Store RLS instance in session
         state.set_training_rls_instance(session_id, rls)
         state.set_training_status(session_id, "running")
+
+        # Suppress verbose twisterl logs (metrics still go to TensorBoard)
+        _suppress_training_logs()
 
         # Run training
         logger.info(f"Starting training session {session_id} with {num_iterations} iterations")
