@@ -172,6 +172,13 @@ async def synthesize_permutation(
             deterministic=deterministic,
         )
 
+        # Handle case where synthesis fails to find a solution
+        if circuit is None:
+            return {
+                "status": "error",
+                "message": "Synthesis failed to find a solution. Try increasing num_searches or training the model longer.",
+            }
+
         # Get metrics
         metrics = _get_circuit_metrics(circuit)
 
@@ -270,6 +277,13 @@ async def synthesize_linear_function(
             num_searches=num_searches,
             deterministic=deterministic,
         )
+
+        # Handle case where synthesis fails to find a solution
+        if circuit is None:
+            return {
+                "status": "error",
+                "message": "Synthesis failed to find a solution. Try increasing num_searches or training the model longer.",
+            }
 
         # Get metrics
         metrics = _get_circuit_metrics(circuit)
@@ -379,6 +393,13 @@ async def synthesize_clifford(
             num_searches=num_searches,
             deterministic=deterministic,
         )
+
+        # Handle case where synthesis fails to find a solution
+        if circuit is None:
+            return {
+                "status": "error",
+                "message": "Synthesis failed to find a solution. Try increasing num_searches or training the model longer.",
+            }
 
         # Get metrics
         metrics = _get_circuit_metrics(circuit)
