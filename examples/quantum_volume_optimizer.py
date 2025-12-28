@@ -92,14 +92,12 @@ import asyncio
 import os
 from typing import Any
 
-from dotenv import load_dotenv
-
 # Deep Agents imports
 from deepagents import create_deep_agent
+from dotenv import load_dotenv
 
 # LangChain MCP imports
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_mcp_adapters.tools import load_mcp_tools
 
 
 # Load environment variables
@@ -249,6 +247,7 @@ Report your findings with specific metrics for each strategy.
 # MCP Server Configuration
 # =============================================================================
 
+
 def get_mcp_servers_config() -> dict[str, dict[str, Any]]:
     """Get MCP server configuration for all Qiskit servers."""
     return {
@@ -258,9 +257,7 @@ def get_mcp_servers_config() -> dict[str, dict[str, Any]]:
             "args": [],
             "env": {
                 "QISKIT_IBM_TOKEN": os.getenv("QISKIT_IBM_TOKEN", ""),
-                "QISKIT_IBM_RUNTIME_MCP_INSTANCE": os.getenv(
-                    "QISKIT_IBM_RUNTIME_MCP_INSTANCE", ""
-                ),
+                "QISKIT_IBM_RUNTIME_MCP_INSTANCE": os.getenv("QISKIT_IBM_RUNTIME_MCP_INSTANCE", ""),
             },
         },
         "qiskit": {
@@ -284,6 +281,7 @@ def get_llm(provider: str, model: str | None = None):
     """Get the appropriate LLM based on the provider."""
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
+
         return ChatAnthropic(
             model=model or "claude-sonnet-4-20250514",
             temperature=0,
@@ -291,9 +289,11 @@ def get_llm(provider: str, model: str | None = None):
         )
     elif provider == "openai":
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(model=model or "gpt-4o", temperature=0)
     elif provider == "google":
         from langchain_google_genai import ChatGoogleGenerativeAI
+
         return ChatGoogleGenerativeAI(model=model or "gemini-2.5-pro", temperature=0)
     else:
         raise ValueError(f"Unknown provider: {provider}")
@@ -303,7 +303,8 @@ def get_llm(provider: str, model: str | None = None):
 # QV Circuit Generation Utilities
 # =============================================================================
 
-def generate_qv_qasm(num_qubits: int, depth: int = None, seed: int = 42) -> str:
+
+def generate_qv_qasm(num_qubits: int, depth: int | None = None, seed: int = 42) -> str:
     """Generate a Quantum Volume circuit in QASM 3.0 format.
 
     QV circuits have equal width and depth, with each layer containing
@@ -326,6 +327,7 @@ qubit[{num_qubits}] q;
 """
 
     import random
+
     random.seed(seed)
 
     for layer in range(depth):
@@ -343,8 +345,8 @@ qubit[{num_qubits}] q;
             qasm += f"rz({theta:.4f}) q[{q1}];\n"
             qasm += f"ry({phi:.4f}) q[{q2}];\n"
             qasm += f"cx q[{q1}], q[{q2}];\n"
-            qasm += f"rz({theta/2:.4f}) q[{q2}];\n"
-            qasm += f"ry({phi/2:.4f}) q[{q1}];\n"
+            qasm += f"rz({theta / 2:.4f}) q[{q2}];\n"
+            qasm += f"ry({phi / 2:.4f}) q[{q1}];\n"
 
     return qasm
 
@@ -352,6 +354,7 @@ qubit[{num_qubits}] q;
 # =============================================================================
 # Main Agent Creation
 # =============================================================================
+
 
 async def create_qv_optimizer_agent(
     provider: str = "anthropic",
@@ -419,10 +422,7 @@ async def create_qv_optimizer_agent(
         "name": "transpiler-benchmarker",
         "description": "Expert in circuit optimization. Use this agent to compare transpilation strategies and find the best optimization approach.",
         "system_prompt": TRANSPILER_BENCHMARKER_PROMPT,
-        "tools": (
-            server_tools.get("qiskit", []) +
-            server_tools.get("qiskit-ibm-transpiler", [])
-        ),
+        "tools": (server_tools.get("qiskit", []) + server_tools.get("qiskit-ibm-transpiler", [])),
     }
 
     # Create the coordinator agent
@@ -494,17 +494,17 @@ Here are sample QV circuits you can use for transpilation comparison:
 
 ### QV-2 (2 qubits, depth 2):
 ```qasm
-{qv_circuits.get(2, 'N/A')}
+{qv_circuits.get(2, "N/A")}
 ```
 
 ### QV-3 (3 qubits, depth 3):
 ```qasm
-{qv_circuits.get(3, 'N/A')}
+{qv_circuits.get(3, "N/A")}
 ```
 
 ### QV-4 (4 qubits, depth 4):
 ```qasm
-{qv_circuits.get(4, 'N/A')}
+{qv_circuits.get(4, "N/A")}
 ```
 
 Please proceed with the analysis and provide your comprehensive recommendation.
@@ -518,9 +518,7 @@ Please proceed with the analysis and provide your comprehensive recommendation.
     print("-" * 70)
 
     # Run the agent
-    result = await agent.ainvoke({
-        "messages": [{"role": "user", "content": request}]
-    })
+    result = await agent.ainvoke({"messages": [{"role": "user", "content": request}]})
 
     # Extract final response
     messages = result.get("messages", [])
@@ -538,14 +536,17 @@ Please proceed with the analysis and provide your comprehensive recommendation.
 
 async def interactive_mode(provider: str, model: str | None) -> None:
     """Run interactive mode where users can ask follow-up questions."""
+    from langchain_core.messages import HumanMessage
+
     agent, mcp_client = await create_qv_optimizer_agent(provider, model, 5)
 
     print("\n" + "-" * 70)
     print("Interactive Mode - Ask questions about Quantum Volume optimization")
-    print("Type 'quit' to exit, 'optimize' to run full optimization")
+    print("Type 'quit' to exit, 'clear' to reset history, 'optimize' to run full optimization")
     print("-" * 70 + "\n")
 
-    conversation_history = []
+    # Maintain conversation history for context
+    history: list = []
 
     while True:
         try:
@@ -558,6 +559,11 @@ async def interactive_mode(provider: str, model: str | None) -> None:
                 print("Goodbye!")
                 break
 
+            if query.lower() == "clear":
+                history = []
+                print("Conversation history cleared.\n")
+                continue
+
             if query.lower() == "optimize":
                 query = """Run the full Quantum Volume optimization workflow:
                 1. List available backends
@@ -565,16 +571,19 @@ async def interactive_mode(provider: str, model: str | None) -> None:
                 3. Compare transpilation strategies
                 4. Generate recommendation report"""
 
-            conversation_history.append({"role": "user", "content": query})
+            # Build messages with history
+            messages = list(history) if history else []
+            messages.append(HumanMessage(content=query))
 
             print("\nThinking...\n")
 
-            result = await agent.ainvoke({"messages": conversation_history})
+            result = await agent.ainvoke({"messages": messages})
 
-            messages = result.get("messages", [])
-            if messages:
-                response = messages[-1].content
-                conversation_history.append({"role": "assistant", "content": response})
+            result_messages = result.get("messages", [])
+            if result_messages:
+                response = result_messages[-1].content
+                # Update history with full conversation from agent
+                history = result_messages
                 print(f"Assistant:\n{response}\n")
 
         except KeyboardInterrupt:
@@ -594,7 +603,7 @@ Examples:
   python quantum_volume_optimizer.py
   python quantum_volume_optimizer.py --provider openai --depth 6
   python quantum_volume_optimizer.py --interactive
-        """
+        """,
     )
     parser.add_argument(
         "--provider",
