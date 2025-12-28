@@ -134,6 +134,7 @@ dev = [
     "ruff>=0.14.6",
 ]
 examples = [
+    "deepagents>=0.1.0; python_version >= '3.11'",
     "langchain>=1.2.0",
     "langchain-mcp-adapters>=0.1.0",
     "langchain-anthropic>=1.0.0",
