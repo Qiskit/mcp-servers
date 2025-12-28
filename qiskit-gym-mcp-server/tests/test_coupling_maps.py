@@ -157,3 +157,55 @@ class TestAsyncFunctions:
         assert result["status"] == "success"
         assert "shape_counts" in result
         assert result["total_subtopologies"] > 0
+
+
+class TestFakeBackendCouplingMaps:
+    """Tests for fake backend coupling map functions."""
+
+    @pytest.mark.asyncio
+    async def test_list_available_fake_backends(self):
+        """Test listing available fake backends."""
+        from qiskit_gym_mcp_server.coupling_maps import list_available_fake_backends
+
+        result = await list_available_fake_backends()
+        assert result["status"] == "success"
+        assert "backends" in result
+        assert len(result["backends"]) > 0
+        # Check that some known fake backends are present (names are "fake_*" format)
+        backend_names = [b["name"] for b in result["backends"]]
+        assert "fake_fez" in backend_names or "fake_brisbane" in backend_names
+
+    @pytest.mark.asyncio
+    async def test_get_fake_backend_coupling_map_valid(self):
+        """Test getting coupling map from a valid fake backend."""
+        from qiskit_gym_mcp_server.coupling_maps import (
+            get_fake_backend_coupling_map,
+            list_available_fake_backends,
+        )
+
+        # First get a valid backend name
+        backends_result = await list_available_fake_backends()
+        assert backends_result["status"] == "success"
+        assert len(backends_result["backends"]) > 0
+
+        # Use the first available backend
+        backend_name = backends_result["backends"][0]["name"]
+        result = await get_fake_backend_coupling_map(backend_name)
+
+        assert result["status"] == "success"
+        assert result["backend_name"] == backend_name
+        assert "num_qubits" in result
+        assert result["num_qubits"] > 0
+        assert "edges" in result
+        assert len(result["edges"]) > 0
+        assert "source" in result
+        assert result["source"] == "fake_backend"
+
+    @pytest.mark.asyncio
+    async def test_get_fake_backend_coupling_map_invalid(self):
+        """Test getting coupling map from an invalid backend."""
+        from qiskit_gym_mcp_server.coupling_maps import get_fake_backend_coupling_map
+
+        result = await get_fake_backend_coupling_map("nonexistent_backend")
+        assert result["status"] == "error"
+        assert "not found" in result["message"].lower() or "unknown" in result["message"].lower()

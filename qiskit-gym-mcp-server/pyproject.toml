@@ -12,6 +12,7 @@ dependencies = [
     "nest-asyncio>=1.5.0",
     "qiskit-mcp-server",
     "pydantic>=2.0.0",
+    "qiskit-ibm-runtime>=0.34.0",  # For fake backends (exact IBM topologies without credentials)
 ]
 
 [tool.uv.sources]

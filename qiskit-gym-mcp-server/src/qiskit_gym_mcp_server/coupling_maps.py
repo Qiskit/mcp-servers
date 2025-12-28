@@ -693,3 +693,149 @@ async def list_subtopology_shapes(
     except Exception as e:
         logger.error(f"Failed to list subtopology shapes: {e}")
         return {"status": "error", "message": str(e)}
+
+
+# ============================================================================
+# Fake Backend Coupling Maps (Offline IBM Topologies)
+# ============================================================================
+
+# Mapping of fake backend class names for offline access to exact IBM topologies
+FAKE_BACKEND_MAP: dict[str, str] = {
+    # Heron backends (133 qubits, heavy-hex)
+    "ibm_fez": "FakeFez",
+    "ibm_marrakesh": "FakeMarrakesh",
+    "ibm_torino": "FakeTorino",
+    # Eagle backends (127 qubits, heavy-hex)
+    "ibm_brisbane": "FakeBrisbane",
+    "ibm_kyoto": "FakeKyoto",
+    "ibm_osaka": "FakeOsaka",
+    "ibm_sherbrooke": "FakeSherbrooke",
+    # Older backends
+    "ibm_algiers": "FakeAlgiers",
+    "ibm_hanoi": "FakeHanoi",
+    "ibm_cairo": "FakeCairo",
+    "ibm_kolkata": "FakeKolkata",
+    "ibm_mumbai": "FakeMumbai",
+    "ibm_peekskill": "FakePeekskill",
+    "ibm_prague": "FakePrague",
+    "ibm_cusco": "FakeCusco",
+    "ibm_kawasaki": "FakeKawasaki",
+    "ibm_kyiv": "FakeKyiv",
+    "ibm_nazca": "FakeNazca",
+    "ibm_quebec": "FakeQuebec",
+}
+
+
+def _get_fake_backend(backend_name: str) -> Any:
+    """Get a fake backend instance by name.
+
+    Args:
+        backend_name: Backend name (e.g., "ibm_fez", "ibm_brisbane")
+
+    Returns:
+        Fake backend instance
+
+    Raises:
+        ValueError: If backend not found in fake provider
+    """
+    from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
+
+    provider = FakeProviderForBackendV2()
+    available = [b.name for b in provider.backends()]
+
+    # Try exact match first
+    for backend in provider.backends():
+        if backend.name == backend_name:
+            return backend
+
+    # Try without ibm_ prefix
+    name_without_prefix = backend_name.replace("ibm_", "")
+    for backend in provider.backends():
+        if backend.name == name_without_prefix:
+            return backend
+
+    raise ValueError(
+        f"Fake backend '{backend_name}' not found. Available: {', '.join(sorted(available))}"
+    )
+
+
+@with_sync
+async def get_fake_backend_coupling_map(backend_name: str) -> dict[str, Any]:
+    """Get the exact coupling map from a fake IBM backend (no credentials needed).
+
+    Use this to get exact IBM Quantum hardware topologies without needing
+    IBM Quantum credentials. Fake backends provide accurate coupling maps
+    for offline development and testing.
+
+    Args:
+        backend_name: Backend name (e.g., "ibm_fez", "ibm_brisbane", "ibm_torino")
+
+    Returns:
+        Dict with exact coupling map edges, num_qubits, and backend info
+    """
+    try:
+        backend = _get_fake_backend(backend_name)
+        coupling_map = backend.coupling_map
+
+        if coupling_map is None:
+            return {
+                "status": "error",
+                "message": f"Backend '{backend_name}' has no coupling map (fully connected)",
+            }
+
+        edges = [[int(e[0]), int(e[1])] for e in coupling_map.get_edges()]
+        num_qubits = coupling_map.size()
+
+        return {
+            "status": "success",
+            "backend_name": backend.name,
+            "num_qubits": num_qubits,
+            "num_edges": len(edges),
+            "edges": edges,
+            "source": "fake_backend",
+            "note": "Exact IBM topology from qiskit-ibm-runtime fake provider",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get fake backend coupling map: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@with_sync
+async def list_available_fake_backends() -> dict[str, Any]:
+    """List all available fake backends for offline topology access.
+
+    Returns:
+        Dict with list of fake backends and their properties
+    """
+    try:
+        from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
+
+        provider = FakeProviderForBackendV2()
+        backends = []
+
+        for backend in provider.backends():
+            coupling_map = backend.coupling_map
+            num_qubits = coupling_map.size() if coupling_map else backend.num_qubits
+
+            backends.append(
+                {
+                    "name": backend.name,
+                    "num_qubits": num_qubits,
+                    "has_coupling_map": coupling_map is not None,
+                }
+            )
+
+        # Sort by qubit count descending
+        backends.sort(key=lambda x: x["num_qubits"], reverse=True)
+
+        return {
+            "status": "success",
+            "num_backends": len(backends),
+            "backends": backends,
+            "usage": "Use get_fake_backend_coupling_map(backend_name) to get exact topology",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to list fake backends: {e}")
+        return {"status": "error", "message": str(e)}

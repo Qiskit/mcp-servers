@@ -42,6 +42,8 @@ from qiskit_gym_mcp_server.coupling_maps import (
     create_custom_coupling_map,
     extract_subtopologies,
     get_coupling_map_presets,
+    get_fake_backend_coupling_map,
+    list_available_fake_backends,
     list_subtopology_shapes,
 )
 from qiskit_gym_mcp_server.gym_core import (
@@ -601,6 +603,42 @@ async def list_subtopology_shapes_tool(
         Dict with shape counts and example subtopologies.
     """
     return await list_subtopology_shapes(preset, num_qubits)
+
+
+@mcp.tool()
+async def get_fake_backend_coupling_map_tool(backend_name: str) -> dict[str, Any]:
+    """Get the exact coupling map from a fake IBM backend (no credentials needed).
+
+    Use this to get exact IBM Quantum hardware topologies without needing
+    IBM Quantum credentials. This is the recommended way to get accurate
+    topologies for offline development.
+
+    Args:
+        backend_name: Backend name (e.g., "ibm_fez", "ibm_brisbane", "ibm_torino",
+            "ibm_sherbrooke"). Use list_available_fake_backends to see all options.
+
+    Returns:
+        Dict with exact coupling map edges that can be used with create_*_env tools.
+
+    Example:
+        1. get_fake_backend_coupling_map_tool("ibm_fez") -> edges
+        2. create_clifford_env_tool(num_qubits=..., coupling_map=edges)
+    """
+    return await get_fake_backend_coupling_map(backend_name)
+
+
+@mcp.tool()
+async def list_available_fake_backends_tool() -> dict[str, Any]:
+    """List all available fake backends for offline topology access.
+
+    Returns a list of IBM Quantum backends that have fake versions available
+    in qiskit-ibm-runtime. These provide exact coupling maps without needing
+    IBM Quantum credentials.
+
+    Returns:
+        Dict with list of backends, their qubit counts, and usage instructions.
+    """
+    return await list_available_fake_backends()
 
 
 # ============================================================================

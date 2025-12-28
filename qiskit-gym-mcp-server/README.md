@@ -10,6 +10,7 @@ A Model Context Protocol (MCP) server that provides reinforcement learning-based
   - **Linear Function**: CNOT synthesis for linear Boolean functions
   - **Clifford**: Optimal Clifford circuit synthesis with custom gate sets
 - **Hardware Support**: Presets for IBM Heron, Nighthawk, and common grid/linear topologies
+- **Exact IBM Topologies**: Access exact coupling maps from IBM Quantum fake backends (offline, no credentials needed)
 - **Subtopology Extraction**: Extract connected subgraphs from hardware coupling maps for targeted training
 - **Model Persistence**: Save, load, and manage trained models
 - **TensorBoard Integration**: Monitor training progress with TensorBoard
@@ -66,6 +67,17 @@ AI Agent:
    - save_model_tool(session_id, model_name=f"nighthawk_6q_{i}")
 ```
 
+```
+User: "Train a model using the exact topology of IBM Fez backend"
+
+AI Agent:
+1. get_fake_backend_coupling_map_tool(backend_name="fake_fez")  # -> exact 156-qubit Heron topology
+2. extract_subtopologies_tool(edges=coupling_map["edges"], num_qubits=5)  # -> 5-qubit subtopologies
+3. For each subtopology:
+   - create_permutation_env_tool(num_qubits=5, coupling_map=subtopology["edges"])
+   - start_training_tool(env_id, algorithm="ppo", num_iterations=100)
+```
+
 ## Tools Reference
 
 ### Environment Management
@@ -115,6 +127,8 @@ AI Agent:
 | `create_coupling_map_tool` | Create custom coupling map |
 | `extract_subtopologies_tool` | Extract N-qubit subtopologies from hardware |
 | `list_subtopology_shapes_tool` | List subtopology shapes (line, grid, etc.) |
+| `get_fake_backend_coupling_map_tool` | Get exact topology from fake IBM backend (no credentials needed) |
+| `list_available_fake_backends_tool` | List all available fake backends for offline topology access |
 
 ### Utility Tools
 
@@ -188,6 +202,7 @@ uv run mypy src
 - [qiskit-gym](https://github.com/AI4quantum/qiskit-gym) - RL environments for quantum circuit synthesis
 - [FastMCP](https://github.com/jlowin/fastmcp) - MCP server framework
 - [Qiskit](https://qiskit.org/) - Quantum computing framework
+- [qiskit-ibm-runtime](https://github.com/Qiskit/qiskit-ibm-runtime) - IBM Quantum access and fake backends
 
 ## License
 
