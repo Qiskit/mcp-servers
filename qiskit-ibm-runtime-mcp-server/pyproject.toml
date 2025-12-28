@@ -25,6 +25,14 @@ test = [
     "pytest-mock>=3.11.0",
     "pytest-cov>=4.1.0",
 ]
+examples = [
+    "langchain>=1.2.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "python-dotenv>=1.0.0",
+    # LLM provider packages (install the one you need):
+    # langchain-openai, langchain-anthropic, langchain-google-genai,
+    # langchain-ollama, langchain-ibm
+]
 all = [
     "qiskit-ibm-runtime-mcp-server[dev,test]",
 ]
@@ -79,6 +87,12 @@ test = [
     "pytest-asyncio>=0.21.0",
     "pytest-mock>=3.11.0",
     "pytest-cov>=4.1.0",
+]
+examples = [
+    "langchain>=1.2.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "langchain-anthropic>=1.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 # Bandit security configuration
