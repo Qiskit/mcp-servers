@@ -15,11 +15,17 @@
 import contextlib
 import logging
 import os
-from typing import Any
+from typing import Any, Literal
 
-from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+from qiskit_ibm_runtime.options import SamplerOptions
+from qiskit_mcp_server.circuit_serialization import CircuitFormat, load_circuit
 
 from qiskit_ibm_runtime_mcp_server.utils import with_sync
+
+
+# Type alias for dynamical decoupling sequence types
+DDSequenceType = Literal["XX", "XpXm", "XY4"]
 
 
 def get_instance_from_env() -> str | None:
@@ -751,6 +757,336 @@ async def get_service_status() -> str:
         logger.error(f"Failed to check service status: {e}")
         status_info = {"connected": False, "error": str(e), "service": "IBM Quantum"}
         return f"IBM Quantum Service Status: {status_info}"
+
+
+def _get_sampler_backend(
+    svc: QiskitRuntimeService, backend_name: str | None
+) -> tuple[Any | None, str | None]:
+    """Get the backend for sampler execution.
+
+    Returns:
+        Tuple of (backend, error_message). If successful, error_message is None.
+    """
+    if backend_name:
+        try:
+            return svc.backend(backend_name), None
+        except Exception as e:
+            return None, f"Failed to get backend '{backend_name}': {e!s}"
+
+    # Find least busy backend
+    backends = svc.backends(simulator=False)
+    backend = least_busy(backends)
+    if backend is None:
+        return (
+            None,
+            "No operational backend available. Please specify a backend_name or try again later.",
+        )
+    return backend, None
+
+
+@with_sync
+async def run_sampler(
+    circuit: str,
+    backend_name: str | None = None,
+    shots: int = 4096,
+    circuit_format: CircuitFormat = "auto",
+    dynamical_decoupling: bool = True,
+    dd_sequence: DDSequenceType = "XY4",
+    twirling: bool = True,
+    measure_twirling: bool = True,
+) -> dict[str, Any]:
+    """
+    Run a quantum circuit using the Qiskit Runtime SamplerV2 primitive.
+
+    The Sampler primitive returns measurement outcome samples from circuit execution.
+    This is useful for algorithms that need to sample from probability distributions,
+    such as variational algorithms, quantum machine learning, and quantum simulation.
+
+    Error Mitigation:
+        This function includes built-in error mitigation techniques enabled by default:
+        - Dynamical Decoupling (DD): Suppresses decoherence during idle periods
+        - Twirling: Randomizes errors to improve measurement accuracy
+
+    Args:
+        circuit: The quantum circuit to execute. Accepts:
+                - OpenQASM 3.0 string (recommended)
+                - OpenQASM 2.0 string (legacy, auto-detected)
+                - Base64-encoded QPY binary (for tool chaining)
+                The circuit must include measurement operations to produce results.
+        backend_name: Name of the IBM Quantum backend to use (e.g., 'ibm_brisbane').
+                     If not provided, uses the least busy operational backend.
+        shots: Number of measurement shots (repetitions) per circuit. Default is 4096.
+               Maximum depends on the backend (typically 8192 or higher).
+        circuit_format: Format of the circuit input. Options:
+                       - "auto" (default): Automatically detect format
+                       - "qasm3": OpenQASM 3.0/2.0 text format
+                       - "qpy": Base64-encoded QPY binary format
+        dynamical_decoupling: Enable dynamical decoupling to suppress decoherence
+                             during idle periods in the circuit. Default is True.
+        dd_sequence: Type of dynamical decoupling sequence to use. Options:
+                    - "XX": Basic X-X sequence
+                    - "XpXm": X+/X- sequence with better noise suppression
+                    - "XY4": Most robust 4-pulse sequence (default, recommended)
+        twirling: Enable Pauli twirling on 2-qubit gates to convert coherent
+                 errors into stochastic noise. Default is True.
+        measure_twirling: Enable twirling on measurement operations for improved
+                         readout error mitigation. Default is True.
+
+    Returns:
+        Dictionary containing:
+        - status: "success" or "error"
+        - job_id: The ID of the submitted job (can be used to check status later)
+        - backend: Name of the backend used
+        - shots: Number of shots executed
+        - execution_mode: "job" (direct execution)
+        - error_mitigation: Summary of enabled error mitigation techniques
+        - message: Status message indicating job was submitted
+        - note: Information about how to retrieve results
+
+    Note:
+        This function submits the job and returns immediately. For long-running jobs,
+        use get_job_status_tool to check completion, then retrieve results separately.
+        Results include measurement outcomes as bitstrings with their counts.
+    """
+    global service
+
+    try:
+        if service is None:
+            service = initialize_service()
+
+        # Load the circuit using the shared serialization module
+        load_result = load_circuit(circuit, circuit_format)
+        if load_result["status"] == "error":
+            return {"status": "error", "message": load_result["message"]}
+        qc = load_result["circuit"]
+
+        # Get the backend
+        backend, backend_error = _get_sampler_backend(service, backend_name)
+        if backend_error:
+            return {"status": "error", "message": backend_error}
+        assert backend is not None  # Type narrowing for mypy  # nosec B101
+
+        # Validate shots
+        if shots < 1:
+            return {"status": "error", "message": "shots must be at least 1"}
+
+        # Configure error mitigation options
+        options = SamplerOptions()
+
+        # Dynamical Decoupling - suppresses decoherence during idle periods
+        options.dynamical_decoupling.enable = dynamical_decoupling
+        if dynamical_decoupling:
+            options.dynamical_decoupling.sequence_type = dd_sequence
+
+        # Twirling - randomizes errors to convert coherent errors to stochastic noise
+        options.twirling.enable_gates = twirling
+        options.twirling.enable_measure = measure_twirling
+
+        # Build error mitigation summary for response
+        error_mitigation: dict[str, Any] = {
+            "dynamical_decoupling": {
+                "enabled": dynamical_decoupling,
+                "sequence": dd_sequence if dynamical_decoupling else None,
+            },
+            "twirling": {
+                "gates_enabled": twirling,
+                "measure_enabled": measure_twirling,
+            },
+        }
+
+        # Create SamplerV2 with options and run
+        sampler = SamplerV2(mode=backend, options=options)
+        job = sampler.run([qc], shots=shots)
+
+        return {
+            "status": "success",
+            "job_id": job.job_id(),
+            "backend": backend.name,
+            "shots": shots,
+            "execution_mode": "job",
+            "error_mitigation": error_mitigation,
+            "message": f"Sampler job submitted successfully to {backend.name}",
+            "note": "Use get_job_status_tool with the job_id to check completion. "
+            "Results will contain measurement bitstrings and their counts.",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to run sampler: {e}")
+        return {"status": "error", "message": f"Failed to run sampler: {e!s}"}
+
+
+def get_bell_state_circuit() -> dict[str, Any]:
+    """Get a Bell state (maximally entangled 2-qubit) circuit in QASM3 format.
+
+    The Bell state |Φ+⟩ = (|00⟩ + |11⟩)/√2 is created by applying a Hadamard gate
+    to the first qubit followed by a CNOT gate. This is the simplest demonstration
+    of quantum entanglement.
+
+    Returns:
+        Dictionary containing:
+        - circuit: QASM3 string ready to use with run_sampler_tool
+        - description: Explanation of the circuit
+        - expected_results: What measurement outcomes to expect
+        - num_qubits: Number of qubits used
+    """
+    qasm3_circuit = """OPENQASM 3.0;
+include "stdgates.inc";
+qubit[2] q;
+bit[2] c;
+
+// Create Bell state |Φ+⟩ = (|00⟩ + |11⟩)/√2
+h q[0];        // Put first qubit in superposition
+cx q[0], q[1]; // Entangle with second qubit
+
+c = measure q;
+"""
+    return {
+        "circuit": qasm3_circuit,
+        "name": "Bell State",
+        "description": "Creates the Bell state |Φ+⟩ = (|00⟩ + |11⟩)/√2, "
+        "demonstrating quantum entanglement between two qubits.",
+        "expected_results": "Approximately 50% '00' and 50% '11' outcomes. "
+        "Never '01' or '10' due to entanglement.",
+        "num_qubits": 2,
+        "usage": "Pass the 'circuit' field directly to run_sampler_tool",
+    }
+
+
+def get_ghz_state_circuit(num_qubits: int = 3) -> dict[str, Any]:
+    """Get a GHZ (Greenberger-Horne-Zeilinger) state circuit in QASM3 format.
+
+    The GHZ state is a maximally entangled state of N qubits:
+    |GHZ⟩ = (|00...0⟩ + |11...1⟩)/√2
+
+    This generalizes the Bell state to more qubits and is useful for
+    demonstrating multi-qubit entanglement.
+
+    Args:
+        num_qubits: Number of qubits for the GHZ state (2-10). Default is 3.
+
+    Returns:
+        Dictionary containing:
+        - circuit: QASM3 string ready to use with run_sampler_tool
+        - description: Explanation of the circuit
+        - expected_results: What measurement outcomes to expect
+        - num_qubits: Number of qubits used
+    """
+    # Validate num_qubits
+    if num_qubits < 2:
+        num_qubits = 2
+    elif num_qubits > 10:
+        num_qubits = 10
+
+    # Build the circuit
+    lines = [
+        "OPENQASM 3.0;",
+        'include "stdgates.inc";',
+        f"qubit[{num_qubits}] q;",
+        f"bit[{num_qubits}] c;",
+        "",
+        f"// Create {num_qubits}-qubit GHZ state",
+        "h q[0];  // Put first qubit in superposition",
+    ]
+
+    # Add CNOT cascade
+    lines.extend(
+        f"cx q[{i}], q[{i + 1}];  // Entangle qubit {i} with {i + 1}" for i in range(num_qubits - 1)
+    )
+
+    lines.extend(["", "c = measure q;", ""])
+
+    qasm3_circuit = "\n".join(lines)
+
+    all_zeros = "0" * num_qubits
+    all_ones = "1" * num_qubits
+
+    return {
+        "circuit": qasm3_circuit,
+        "name": f"{num_qubits}-qubit GHZ State",
+        "description": f"Creates the {num_qubits}-qubit GHZ state "
+        f"|GHZ⟩ = (|{all_zeros}⟩ + |{all_ones}⟩)/√2, "
+        "demonstrating multi-qubit entanglement.",
+        "expected_results": f"Approximately 50% '{all_zeros}' and 50% '{all_ones}' outcomes. "
+        "No other bitstrings should appear due to entanglement.",
+        "num_qubits": num_qubits,
+        "usage": "Pass the 'circuit' field directly to run_sampler_tool",
+    }
+
+
+def get_quantum_random_circuit() -> dict[str, Any]:
+    """Get a simple quantum random number generator circuit in QASM3 format.
+
+    Creates true random bits using quantum superposition. Each qubit is put into
+    an equal superposition using a Hadamard gate, then measured. The outcome is
+    fundamentally random according to quantum mechanics.
+
+    Returns:
+        Dictionary containing:
+        - circuit: QASM3 string ready to use with run_sampler_tool
+        - description: Explanation of the circuit
+        - expected_results: What measurement outcomes to expect
+        - num_qubits: Number of qubits used
+    """
+    qasm3_circuit = """OPENQASM 3.0;
+include "stdgates.inc";
+qubit[4] q;
+bit[4] c;
+
+// Quantum random number generator
+// Each qubit produces a truly random bit
+h q[0];
+h q[1];
+h q[2];
+h q[3];
+
+c = measure q;
+"""
+    return {
+        "circuit": qasm3_circuit,
+        "name": "Quantum Random Number Generator",
+        "description": "Generates 4 truly random bits using quantum superposition. "
+        "Each Hadamard gate creates a 50/50 superposition that collapses randomly upon measurement.",
+        "expected_results": "All 16 possible 4-bit outcomes (0000 to 1111) with roughly equal probability. "
+        "Each outcome should appear about 6.25% of the time.",
+        "num_qubits": 4,
+        "usage": "Pass the 'circuit' field directly to run_sampler_tool. "
+        "Use multiple shots to generate many random numbers.",
+    }
+
+
+def get_superposition_circuit() -> dict[str, Any]:
+    """Get a simple single-qubit superposition circuit in QASM3 format.
+
+    The simplest possible quantum circuit: puts one qubit in superposition
+    using a Hadamard gate. Perfect for testing and learning.
+
+    Returns:
+        Dictionary containing:
+        - circuit: QASM3 string ready to use with run_sampler_tool
+        - description: Explanation of the circuit
+        - expected_results: What measurement outcomes to expect
+        - num_qubits: Number of qubits used
+    """
+    qasm3_circuit = """OPENQASM 3.0;
+include "stdgates.inc";
+qubit[1] q;
+bit[1] c;
+
+// Simple superposition: |0⟩ -> (|0⟩ + |1⟩)/√2
+h q[0];
+
+c = measure q;
+"""
+    return {
+        "circuit": qasm3_circuit,
+        "name": "Single Qubit Superposition",
+        "description": "The simplest quantum circuit: applies a Hadamard gate to create "
+        "an equal superposition (|0⟩ + |1⟩)/√2.",
+        "expected_results": "Approximately 50% '0' and 50% '1' outcomes.",
+        "num_qubits": 1,
+        "usage": "Pass the 'circuit' field directly to run_sampler_tool. "
+        "This is the simplest possible quantum experiment.",
+    }
 
 
 # Assisted by watsonx Code Assistant

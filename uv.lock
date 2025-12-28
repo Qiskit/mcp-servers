@@ -2666,6 +2666,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "qiskit-ibm-runtime" },
+    { name = "qiskit-mcp-server" },
 ]
 
 [package.optional-dependencies]
@@ -2720,6 +2721,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "qiskit-ibm-runtime", specifier = ">=0.40.0" },
     { name = "qiskit-ibm-runtime-mcp-server", extras = ["dev", "test"], marker = "extra == 'all'", editable = "qiskit-ibm-runtime-mcp-server" },
+    { name = "qiskit-mcp-server", editable = "qiskit-mcp-server" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.13" },
 ]
 provides-extras = ["dev", "test", "all"]
@@ -2916,12 +2918,13 @@ test = [
 
 [[package]]
 name = "qiskit-mcp-servers"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "qiskit-code-assistant-mcp-server" },
     { name = "qiskit-ibm-runtime-mcp-server" },
     { name = "qiskit-ibm-transpiler-mcp-server" },
+    { name = "qiskit-mcp-server" },
 ]
 
 [package.optional-dependencies]
@@ -2929,9 +2932,13 @@ all = [
     { name = "qiskit-code-assistant-mcp-server" },
     { name = "qiskit-ibm-runtime-mcp-server" },
     { name = "qiskit-ibm-transpiler-mcp-server" },
+    { name = "qiskit-mcp-server" },
 ]
 code-assistant = [
     { name = "qiskit-code-assistant-mcp-server" },
+]
+qiskit = [
+    { name = "qiskit-mcp-server" },
 ]
 runtime = [
     { name = "qiskit-ibm-runtime-mcp-server" },
@@ -2957,8 +2964,11 @@ requires-dist = [
     { name = "qiskit-ibm-transpiler-mcp-server", editable = "qiskit-ibm-transpiler-mcp-server" },
     { name = "qiskit-ibm-transpiler-mcp-server", marker = "extra == 'all'", editable = "qiskit-ibm-transpiler-mcp-server" },
     { name = "qiskit-ibm-transpiler-mcp-server", marker = "extra == 'transpiler'", editable = "qiskit-ibm-transpiler-mcp-server" },
+    { name = "qiskit-mcp-server", editable = "qiskit-mcp-server" },
+    { name = "qiskit-mcp-server", marker = "extra == 'all'", editable = "qiskit-mcp-server" },
+    { name = "qiskit-mcp-server", marker = "extra == 'qiskit'", editable = "qiskit-mcp-server" },
 ]
-provides-extras = ["code-assistant", "runtime", "transpiler", "all"]
+provides-extras = ["qiskit", "code-assistant", "runtime", "transpiler", "all"]
 
 [package.metadata.requires-dev]
 dev = [
