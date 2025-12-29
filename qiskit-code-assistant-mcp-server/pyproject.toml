@@ -81,6 +81,12 @@ test = [
     "httpx>=0.25.0",
     "respx>=0.20.0",
 ]
+examples = [
+    "langchain>=1.2.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "langchain-anthropic>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
 
 # Bandit security configuration
 [tool.bandit]
