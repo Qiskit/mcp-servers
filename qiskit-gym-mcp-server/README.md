@@ -190,8 +190,8 @@ QISKIT_GYM_MODEL_DIR=~/.qiskit-gym/models
 # TensorBoard logs (default: ~/.qiskit-gym/runs)
 QISKIT_GYM_TENSORBOARD_DIR=~/.qiskit-gym/runs
 
-# Training limits
-QISKIT_GYM_MAX_ITERATIONS=10000
+# Training limits (0 = no limit, default)
+# QISKIT_GYM_MAX_ITERATIONS=10000  # Uncomment to set a limit
 QISKIT_GYM_MAX_QUBITS=15
 QISKIT_GYM_MAX_SEARCHES=10000
 ```

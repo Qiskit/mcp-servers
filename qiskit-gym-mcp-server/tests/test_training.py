@@ -79,8 +79,15 @@ class TestStartTraining:
         self,
         mock_permutation_gym,
         mock_rls_synthesis,
+        mocker,
     ):
-        """Test error when iterations exceed maximum."""
+        """Test error when iterations exceed maximum (when limit is set)."""
+        # Set a limit for this test (default is 0 = no limit)
+        mocker.patch(
+            "qiskit_gym_mcp_server.training.QISKIT_GYM_MAX_ITERATIONS",
+            10000,
+        )
+
         env_result = await create_permutation_environment(preset="linear_5")
         env_id = env_result["env_id"]
 

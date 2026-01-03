@@ -227,11 +227,12 @@ async def start_training(
         - max_depth: Maximum circuit depth (default: 128)
     """
     try:
-        # Validate iteration count
-        if num_iterations > QISKIT_GYM_MAX_ITERATIONS:
+        # Validate iteration count (only if limit is explicitly set)
+        if QISKIT_GYM_MAX_ITERATIONS > 0 and num_iterations > QISKIT_GYM_MAX_ITERATIONS:
             return {
                 "status": "error",
-                "message": f"num_iterations ({num_iterations}) exceeds maximum ({QISKIT_GYM_MAX_ITERATIONS})",
+                "message": f"num_iterations ({num_iterations}) exceeds maximum ({QISKIT_GYM_MAX_ITERATIONS}). "
+                "Set QISKIT_GYM_MAX_ITERATIONS=0 to remove limit.",
             }
 
         if num_iterations < 1:

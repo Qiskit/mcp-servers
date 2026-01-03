@@ -42,8 +42,10 @@ QISKIT_GYM_TENSORBOARD_DIR = os.getenv(
 # Training Limits
 # ============================================================================
 
-# Maximum training iterations (prevents runaway training)
-QISKIT_GYM_MAX_ITERATIONS = int(os.getenv("QISKIT_GYM_MAX_ITERATIONS", "10000"))
+# Maximum training iterations (optional limit)
+# Default is 0 (no limit) - set via environment variable to enforce a limit
+# Example: QISKIT_GYM_MAX_ITERATIONS=10000 to limit training runs
+QISKIT_GYM_MAX_ITERATIONS = int(os.getenv("QISKIT_GYM_MAX_ITERATIONS", "0"))
 
 # Maximum number of qubits for environments
 QISKIT_GYM_MAX_QUBITS = int(os.getenv("QISKIT_GYM_MAX_QUBITS", "15"))
@@ -97,8 +99,8 @@ def validate_configuration() -> bool:
             logger.warning(f"Could not create TensorBoard directory {tb_dir}: {e}")
 
     # Validate numeric limits
-    if QISKIT_GYM_MAX_ITERATIONS < 1:
-        logger.error("QISKIT_GYM_MAX_ITERATIONS must be at least 1")
+    if QISKIT_GYM_MAX_ITERATIONS < 0:
+        logger.error("QISKIT_GYM_MAX_ITERATIONS must be >= 0 (0 means no limit)")
         valid = False
 
     if QISKIT_GYM_MAX_QUBITS < 2:
