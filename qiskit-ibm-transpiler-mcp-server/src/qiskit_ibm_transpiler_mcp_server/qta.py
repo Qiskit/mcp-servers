@@ -34,6 +34,34 @@ from qiskit_ibm_transpiler_mcp_server.utils import (
 
 logger = logging.getLogger(__name__)
 
+# Allowed values for optimization parameters
+ALLOWED_OPTIMIZATION_LEVELS = (1, 2, 3)
+ALLOWED_LAYOUT_MODES = ("keep", "improve", "optimize")
+
+
+def _validate_optimization_params(
+    optimization_level: int | None = None,
+    layout_mode: str | None = None,
+    param_prefix: str = "",
+) -> str | None:
+    """Validate optimization level and layout mode parameters.
+
+    Args:
+        optimization_level: The optimization level to validate (1, 2, or 3).
+        layout_mode: The layout mode to validate ("keep", "improve", or "optimize").
+        param_prefix: Optional prefix for parameter name in error messages (e.g., "ai_").
+
+    Returns:
+        Error message string if validation fails, None if all validations pass.
+    """
+    if optimization_level is not None and optimization_level not in ALLOWED_OPTIMIZATION_LEVELS:
+        param_name = f"{param_prefix}optimization_level"
+        return f"{param_name} must be 1, 2, or 3, got {optimization_level}"
+    if layout_mode is not None and layout_mode not in ALLOWED_LAYOUT_MODES:
+        param_name = f"{param_prefix}layout_mode"
+        return f"{param_name} must be one of {ALLOWED_LAYOUT_MODES}, got '{layout_mode}'"
+    return None
+
 
 def _get_circuit_metrics(circuit: QuantumCircuit) -> dict[str, Any]:
     """Extract metrics from a quantum circuit for reporting.
@@ -155,20 +183,12 @@ async def ai_routing(
         local_mode: determines where the AIRouting pass runs. If False, AIRouting runs remotely through the Qiskit Transpiler Service. If True, the package tries to run the pass in your local environment with a fallback to cloud mode if the required dependencies are not found
         circuit_format: format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3".
     """
-    # Validate optimization_level
-    if optimization_level not in (1, 2, 3):
-        return {
-            "status": "error",
-            "message": f"optimization_level must be 1, 2, or 3, got {optimization_level}",
-        }
-
-    # Validate layout_mode
-    valid_layout_modes = ("keep", "improve", "optimize")
-    if layout_mode not in valid_layout_modes:
-        return {
-            "status": "error",
-            "message": f"layout_mode must be one of {valid_layout_modes}, got '{layout_mode}'",
-        }
+    # Validate parameters
+    validation_error = _validate_optimization_params(
+        optimization_level=optimization_level, layout_mode=layout_mode
+    )
+    if validation_error:
+        return {"status": "error", "message": validation_error}
 
     ai_routing_pass_kwargs = {
         "optimization_level": optimization_level,
@@ -351,17 +371,17 @@ async def hybrid_ai_transpile(
         - improvements: Dict with depth_reduction and two_qubit_gate_reduction
     """
     # Validate parameters
-    valid_layout_modes = ("keep", "improve", "optimize")
     validation_error = None
     if not backend_name or not backend_name.strip():
         validation_error = "backend_name is required and cannot be empty"
-    elif ai_optimization_level not in (1, 2, 3):
-        validation_error = f"ai_optimization_level must be 1, 2, or 3, got {ai_optimization_level}"
-    elif optimization_level not in (1, 2, 3):
-        validation_error = f"optimization_level must be 1, 2, or 3, got {optimization_level}"
-    elif ai_layout_mode not in valid_layout_modes:
+    else:
+        # Validate AI optimization level, then heuristic optimization level, then AI layout mode
         validation_error = (
-            f"ai_layout_mode must be one of {valid_layout_modes}, got '{ai_layout_mode}'"
+            _validate_optimization_params(
+                optimization_level=ai_optimization_level, param_prefix="ai_"
+            )
+            or _validate_optimization_params(optimization_level=optimization_level)
+            or _validate_optimization_params(layout_mode=ai_layout_mode, param_prefix="ai_")
         )
     if validation_error:
         return {"status": "error", "message": validation_error}
