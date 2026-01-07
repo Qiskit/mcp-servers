@@ -1,16 +1,20 @@
 [project]
 name = "qiskit-ibm-runtime-mcp-server"
-version = "0.1.2"
+version = "0.2.0"
 description = "MCP server for IBM Quantum computing services through Qiskit IBM Runtime"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
 dependencies = [
     "fastmcp>=2.8.1",
     "qiskit-ibm-runtime>=0.40.0",
+    "qiskit-mcp-server",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "nest-asyncio>=1.5.0",
 ]
+
+[tool.uv.sources]
+qiskit-mcp-server = { workspace = true }
 
 [project.optional-dependencies]
 dev = [
