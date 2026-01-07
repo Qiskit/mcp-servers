@@ -444,3 +444,44 @@ def reset_singleton():
     QiskitRuntimeServiceProvider._instance = None
     yield
     QiskitRuntimeServiceProvider._instance = None
+
+
+@pytest.fixture
+def generate_ai_pass_manager_fixture(request):
+    """Retrieve the specific fixture given the input request. Useful in parametrized tests"""
+    return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def mock_generate_ai_pass_manager_success(mocker):
+    """Successful generate_ai_pass_manager procedure"""
+    mock_pass_manager = MagicMock()
+    mock_pass_manager.run.return_value = "transpiled_circuit"
+    mock_func = mocker.patch(
+        "qiskit_ibm_transpiler_mcp_server.qta.generate_ai_pass_manager",
+        return_value=mock_pass_manager,
+    )
+    return mock_func
+
+
+@pytest.fixture
+def mock_generate_ai_pass_manager_failure(mocker):
+    """Failed generate_ai_pass_manager procedure"""
+    mock_func = mocker.patch(
+        "qiskit_ibm_transpiler_mcp_server.qta.generate_ai_pass_manager",
+        side_effect=Exception("Hybrid AI transpilation failed"),
+    )
+    return mock_func
+
+
+@pytest.fixture
+def mock_get_backend_service_with_coupling_map(mocker):
+    """Successful get_backend_service with coupling_map attribute"""
+    mock = mocker.patch(
+        "qiskit_ibm_transpiler_mcp_server.qta.get_backend_service",
+        new_callable=AsyncMock,
+    )
+    mock_backend = MagicMock()
+    mock_backend.coupling_map = "mock_coupling_map"
+    mock.return_value = {"backend": mock_backend, "status": "success"}
+    return mock
