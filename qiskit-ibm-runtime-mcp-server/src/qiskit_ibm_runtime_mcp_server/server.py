@@ -141,12 +141,15 @@ async def get_backend_calibration_tool(
 
 @mcp.tool()
 async def get_coupling_map_tool(backend_name: str) -> dict[str, Any]:
-    """Get the coupling map (qubit connectivity) for a specific IBM Quantum backend.
+    """Get the coupling map (qubit connectivity) for an IBM Quantum backend.
 
-    Returns detailed connectivity information for circuit optimization and qubit mapping.
+    Supports both real backends (requires credentials) and fake backends (no credentials).
+    Use 'fake_' prefix for offline testing without IBM Quantum credentials.
 
     Args:
-        backend_name: Name of the backend (e.g., 'ibm_brisbane', 'ibm_fez')
+        backend_name: Name of the backend. Examples:
+            - Real backends: 'ibm_brisbane', 'ibm_fez' (requires credentials)
+            - Fake backends: 'fake_brisbane', 'fake_sherbrooke' (no credentials needed)
 
     Returns:
         Coupling map details including:
@@ -154,11 +157,13 @@ async def get_coupling_map_tool(backend_name: str) -> dict[str, Any]:
         - edges: List of [control, target] qubit connection pairs
         - bidirectional: Whether all connections work in both directions
         - adjacency_list: Neighbor mapping for each qubit (key: qubit index as string)
+        - source: 'fake_backend' if using a fake backend (only present for fake backends)
 
     Use cases:
         - Identify physically connected qubits for circuit optimization
         - Plan qubit assignments to minimize SWAP gates
         - Understand backend architecture for advanced optimization
+        - Test circuit routing offline with fake backends
 
     Note:
         For processor type and other backend info, use get_backend_properties_tool.
