@@ -61,12 +61,6 @@ Key patterns:
 - Return type is `dict[str, Any]`
 - Delegate to core module, don't implement logic here
 
-**Alternative pattern** (used by Code Assistant server):
-```python
-# Define function in core module, register in server.py
-mcp.tool()(my_function_from_core_module)
-```
-
 ## Error Handling Pattern
 
 All tools return consistent response format:
