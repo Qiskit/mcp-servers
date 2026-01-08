@@ -87,6 +87,14 @@ def get_token_from_env() -> str | None:
     return None
 
 
+def _build_adjacency_list(edges: list[list[int]], num_qubits: int) -> dict[str, list[int]]:
+    """Build adjacency list from edges."""
+    adjacency: dict[str, list[int]] = {str(i): [] for i in range(num_qubits)}
+    for edge in edges:
+        adjacency[str(edge[0])].append(edge[1])
+    return adjacency
+
+
 logger = logging.getLogger(__name__)
 
 # Global service instance
@@ -424,6 +432,60 @@ async def get_backend_properties(backend_name: str) -> dict[str, Any]:
         return {
             "status": "error",
             "message": f"Failed to get backend properties: {e!s}",
+        }
+
+
+@with_sync
+async def get_coupling_map(backend_name: str) -> dict[str, Any]:
+    """
+    Get the coupling map (qubit connectivity) for a specific backend.
+
+    Args:
+        backend_name: Name of the backend
+
+    Returns:
+        Coupling map details including edges, processor_type, and adjacency list
+    """
+    global service
+
+    try:
+        if service is None:
+            service = initialize_service()
+
+        backend = service.backend(backend_name)
+        num_qubits = getattr(backend, "num_qubits", 0)
+
+        # Get configuration
+        edges: list[list[int]] = []
+        try:
+            config = backend.configuration()
+            coupling_map_raw = getattr(config, "coupling_map", []) or []
+            edges = [[int(e[0]), int(e[1])] for e in coupling_map_raw]
+        except Exception:
+            pass  # nosec B110 - Config errors are acceptable; defaults used
+
+        # Check if bidirectional (both [i,j] and [j,i] exist for all edges)
+        edge_set = {(e[0], e[1]) for e in edges}
+        bidirectional = len(edges) > 0 and all((e[1], e[0]) in edge_set for e in edges)
+
+        # Build adjacency list
+        adjacency_list = _build_adjacency_list(edges, num_qubits)
+
+        return {
+            "status": "success",
+            "backend_name": backend.name,
+            "num_qubits": num_qubits,
+            "num_edges": len(edges),
+            "edges": edges,
+            "bidirectional": bidirectional,
+            "adjacency_list": adjacency_list,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get coupling map: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to get coupling map: {e!s}",
         }
 
 

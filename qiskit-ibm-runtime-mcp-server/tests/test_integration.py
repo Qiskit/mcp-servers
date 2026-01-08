@@ -128,6 +128,76 @@ class TestToolIntegration:
                 assert cancel_result["status"] == "success"
 
 
+class TestCouplingMapTool:
+    """Test coupling map tool functionality."""
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_success(self, mock_env_vars, mock_runtime_service):
+        """Test getting coupling map for a backend."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            # Mock backend with coupling map
+            mock_backend = Mock()
+            mock_backend.name = "ibm_brisbane"
+            mock_backend.num_qubits = 5
+            mock_config = Mock()
+            mock_config.coupling_map = [
+                [0, 1], [1, 0], [1, 2], [2, 1], [2, 3], [3, 2], [3, 4], [4, 3]
+            ]
+            mock_backend.configuration.return_value = mock_config
+            mock_runtime_service.backend.return_value = mock_backend
+
+            result = await get_coupling_map("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert result["backend_name"] == "ibm_brisbane"
+            assert result["num_qubits"] == 5
+            assert result["num_edges"] == 8
+            assert len(result["edges"]) == 8
+            assert result["bidirectional"] is True
+            assert "adjacency_list" in result
+            assert result["adjacency_list"]["0"] == [1]
+            assert result["adjacency_list"]["1"] == [0, 2]
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_unidirectional(self, mock_env_vars, mock_runtime_service):
+        """Test coupling map with unidirectional edges."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_backend = Mock()
+            mock_backend.name = "test_backend"
+            mock_backend.num_qubits = 3
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1], [1, 2]]  # Only one direction
+            mock_backend.configuration.return_value = mock_config
+            mock_runtime_service.backend.return_value = mock_backend
+
+            result = await get_coupling_map("test_backend")
+
+            assert result["status"] == "success"
+            assert result["bidirectional"] is False
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_error(self, mock_env_vars, mock_runtime_service):
+        """Test coupling map with backend error."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.backend.side_effect = Exception("Backend not found")
+
+            result = await get_coupling_map("nonexistent_backend")
+
+            assert result["status"] == "error"
+            assert "Backend not found" in result["message"]
+
+
 class TestResourceIntegration:
     """Test MCP resource integration."""
 
