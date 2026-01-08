@@ -111,6 +111,26 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
     "PLC0415",  # Import inside cleanup function (asyncio)
 ]
 
+# Ignore certain rules in examples (intended patterns for demonstration code)
+"**/examples/**/*.py" = [
+    "PLC0415",  # Import inside function (lazy loading for optional providers)
+    "PLR0911",  # Too many return statements
+    "PLR0912",  # Too many branches
+    "PLR0915",  # Too many statements
+    "PERF203",  # Try-except in loop (error handling per server)
+    "RUF059",   # Unused unpacked variable (mcp_client for cleanup)
+    "SIM118",   # dict.keys() iteration (more explicit)
+    "B007",     # Unused loop variable (intentional in examples)
+]
+
+# Same ignores for Jupyter notebooks in examples
+"**/examples/**/*.ipynb" = [
+    "PLC0415",  # Import inside function
+    "PERF203",  # Try-except in loop
+    "RUF059",   # Unused unpacked variable
+    "B007",     # Unused loop variable
+]
+
 [lint.isort]
 known-first-party = ["qiskit_code_assistant_mcp_server", "qiskit_ibm_runtime_mcp_server"]
 force-single-line = false
