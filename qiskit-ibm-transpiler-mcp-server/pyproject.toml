@@ -1,6 +1,6 @@
 [project]
 name = "qiskit-ibm-transpiler-mcp-server"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for AI Transpiler IBM Quantum services through local and Qiskit IBM Runtime executions"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"

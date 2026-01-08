@@ -197,21 +197,32 @@ async def create_transpiler_agent_with_session(
     return agent
 
 
-async def run_agent_query(agent: Any, query: str) -> str:
-    """Run a single query through the agent.
+async def run_agent_query(
+    agent: Any, query: str, history: list[Any] | None = None
+) -> tuple[str, list[Any]]:
+    """Run a query through the agent with conversation history.
 
     Args:
         agent: The LangChain agent
         query: The user's question or request
+        history: Optional list of previous messages for context
 
     Returns:
-        The agent's response
+        Tuple of (response_text, updated_history)
     """
-    result = await agent.ainvoke({"messages": [HumanMessage(content=query)]})
-    messages = result.get("messages", [])
-    if messages:
-        return messages[-1].content
-    return "No response generated."
+    # Build messages with history
+    messages = list(history) if history else []
+    messages.append(HumanMessage(content=query))
+
+    result = await agent.ainvoke({"messages": messages})
+    result_messages = result.get("messages", [])
+
+    if result_messages:
+        response = result_messages[-1].content
+        # Return the full conversation history from the agent
+        return response, result_messages
+
+    return "No response generated.", messages
 
 
 async def interactive_session(provider: str, model: str | None) -> None:
@@ -246,8 +257,11 @@ async def interactive_session(provider: str, model: str | None) -> None:
         print("  - 'Transpile my bell circuit for IBM Heron'")
         print("  - 'Analyze my ghz circuit'")
         print("  - 'Compare optimization levels for my qft circuit'")
-        print("\nType 'quit' to exit.")
+        print("\nType 'quit' to exit, 'clear' to reset conversation history.")
         print("-" * 60 + "\n")
+
+        # Maintain conversation history for context
+        history: list[Any] = []
 
         while True:
             try:
@@ -260,6 +274,11 @@ async def interactive_session(provider: str, model: str | None) -> None:
                     print("Goodbye!")
                     break
 
+                if query.lower() == "clear":
+                    history = []
+                    print("Conversation history cleared.\n")
+                    continue
+
                 # Replace sample circuit keywords with actual QASM
                 if "bell" in query.lower() and "circuit" in query.lower():
                     query = query + f"\n\nHere is the Bell state circuit:\n{SAMPLE_BELL_STATE}"
@@ -269,7 +288,7 @@ async def interactive_session(provider: str, model: str | None) -> None:
                     query = query + f"\n\nHere is the QFT circuit:\n{SAMPLE_QFT_CIRCUIT}"
 
                 print("\nAssistant: ", end="", flush=True)
-                response = await run_agent_query(agent, query)
+                response, history = await run_agent_query(agent, query, history)
                 print(response)
                 print()
 
@@ -305,15 +324,13 @@ level provides the best trade-off between circuit quality and compilation time:
         print(f"\nQuery: {query}\n")
         print("-" * 60)
         print("\nAssistant: ", end="", flush=True)
-        response = await run_agent_query(agent, query)
+        response, _ = await run_agent_query(agent, query)
         print(response)
 
 
 def main() -> None:
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="LangChain Agent for Qiskit MCP Server"
-    )
+    parser = argparse.ArgumentParser(description="LangChain Agent for Qiskit MCP Server")
     parser.add_argument(
         "--provider",
         choices=["openai", "anthropic", "google", "ollama", "watsonx"],

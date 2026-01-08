@@ -21,14 +21,19 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     cancel_job,
     get_backend_calibration,
     get_backend_properties,
+    get_bell_state_circuit,
+    get_ghz_state_circuit,
     get_instance_from_env,
     get_job_status,
+    get_quantum_random_circuit,
     get_service_status,
+    get_superposition_circuit,
     get_token_from_env,
     initialize_service,
     least_busy_backend,
     list_backends,
     list_my_jobs,
+    run_sampler,
     setup_ibm_quantum_account,
 )
 
@@ -877,6 +882,580 @@ class TestGetBackendCalibration:
             # Qubit 1 should be operational (not in faulty_qubits)
             qubit_1 = next(q for q in qubit_data if q["qubit"] == 1)
             assert qubit_1["operational"] is True
+
+
+class TestRunSampler:
+    """Test run_sampler function."""
+
+    # Sample valid QASM3 circuit for testing
+    SAMPLE_QASM3 = """OPENQASM 3.0;
+include "stdgates.inc";
+qubit[2] q;
+bit[2] c;
+h q[0];
+cx q[0], q[1];
+c = measure q;
+"""
+
+    # Sample valid QASM2 circuit for testing (legacy format)
+    SAMPLE_QASM2 = """OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[2];
+creg c[2];
+h q[0];
+cx q[0], q[1];
+measure q -> c;
+"""
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_success(self, mock_runtime_service):
+        """Test successful sampler execution with QASM3 and default error mitigation."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+
+            # Mock circuit loading
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            # Mock SamplerOptions
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            # Mock the job returned by sampler.run()
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_123"
+
+            # Mock the sampler instance
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            result = await run_sampler(self.SAMPLE_QASM3, "ibm_brisbane", 1024)
+
+            assert result["status"] == "success"
+            assert result["job_id"] == "sampler_job_123"
+            assert result["backend"] == "ibm_brisbane"
+            assert result["shots"] == 1024
+            # Verify error mitigation in response (defaults)
+            assert "error_mitigation" in result
+            assert result["error_mitigation"]["dynamical_decoupling"]["enabled"] is True
+            assert result["error_mitigation"]["dynamical_decoupling"]["sequence"] == "XY4"
+            assert result["error_mitigation"]["twirling"]["gates_enabled"] is True
+            assert result["error_mitigation"]["twirling"]["measure_enabled"] is True
+            mock_sampler_class.assert_called_once()
+            mock_load.assert_called_once_with(self.SAMPLE_QASM3, "auto")
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_with_qasm2(self, mock_runtime_service):
+        """Test sampler with legacy QASM2 circuit."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_qasm2"
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            result = await run_sampler(self.SAMPLE_QASM2, "ibm_brisbane", 1024, "qasm3")
+
+            assert result["status"] == "success"
+            mock_load.assert_called_once_with(self.SAMPLE_QASM2, "qasm3")
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_with_qpy_format(self, mock_runtime_service):
+        """Test sampler with QPY format."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_qpy"
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            qpy_data = "base64_encoded_qpy_data"
+            result = await run_sampler(qpy_data, "ibm_brisbane", 1024, "qpy")
+
+            assert result["status"] == "success"
+            mock_load.assert_called_once_with(qpy_data, "qpy")
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_least_busy_backend(self, mock_runtime_service):
+        """Test sampler uses least busy backend when none specified."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.least_busy") as mock_least_busy,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            # Set up least_busy to return a specific backend
+            mock_backend = Mock()
+            mock_backend.name = "ibm_least_busy"
+            mock_least_busy.return_value = mock_backend
+
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_456"
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            result = await run_sampler(self.SAMPLE_QASM3)
+
+            assert result["status"] == "success"
+            assert result["backend"] == "ibm_least_busy"
+            mock_least_busy.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_invalid_circuit(self, mock_runtime_service):
+        """Test sampler with invalid circuit."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_load.return_value = {
+                "status": "error",
+                "message": "QASM string not valid. QASM3 error: ...; QASM2 error: ...",
+            }
+
+            result = await run_sampler("invalid circuit string", "ibm_brisbane")
+
+            assert result["status"] == "error"
+            assert "QASM string not valid" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_backend_not_found(self, mock_runtime_service):
+        """Test sampler with non-existent backend."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+            mock_runtime_service.backend.side_effect = Exception("Backend not found")
+
+            result = await run_sampler(self.SAMPLE_QASM3, "nonexistent_backend")
+
+            assert result["status"] == "error"
+            assert "Failed to get backend" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_no_operational_backend(self, mock_runtime_service):
+        """Test sampler when no operational backends available."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.least_busy") as mock_least_busy,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+            mock_least_busy.return_value = None  # No operational backend
+
+            result = await run_sampler(self.SAMPLE_QASM3)
+
+            assert result["status"] == "error"
+            assert "No operational backend available" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_invalid_shots(self, mock_runtime_service):
+        """Test sampler with invalid shots parameter."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            result = await run_sampler(self.SAMPLE_QASM3, "ibm_brisbane", shots=0)
+
+            assert result["status"] == "error"
+            assert "shots must be at least 1" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_service_not_initialized(self):
+        """Test sampler when service initialization fails."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.side_effect = Exception("Service initialization failed")
+
+            result = await run_sampler(self.SAMPLE_QASM3, "ibm_brisbane")
+
+            assert result["status"] == "error"
+            assert "Failed to run sampler" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_submission_failure(self, mock_runtime_service):
+        """Test sampler when job submission fails."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            mock_sampler = Mock()
+            mock_sampler.run.side_effect = Exception("Job submission failed")
+            mock_sampler_class.return_value = mock_sampler
+
+            result = await run_sampler(self.SAMPLE_QASM3, "ibm_brisbane")
+
+            assert result["status"] == "error"
+            assert "Failed to run sampler" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_default_shots(self, mock_runtime_service):
+        """Test sampler uses default shots when not specified."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_789"
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            result = await run_sampler(self.SAMPLE_QASM3, "ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert result["shots"] == 4096  # Default value
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_error_mitigation_disabled(self, mock_runtime_service):
+        """Test sampler with error mitigation disabled."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_no_mitigation"
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            # Disable all error mitigation
+            result = await run_sampler(
+                self.SAMPLE_QASM3,
+                "ibm_brisbane",
+                1024,
+                "auto",
+                dynamical_decoupling=False,
+                dd_sequence="XX",
+                twirling=False,
+                measure_twirling=False,
+            )
+
+            assert result["status"] == "success"
+            assert result["error_mitigation"]["dynamical_decoupling"]["enabled"] is False
+            assert result["error_mitigation"]["dynamical_decoupling"]["sequence"] is None
+            assert result["error_mitigation"]["twirling"]["gates_enabled"] is False
+            assert result["error_mitigation"]["twirling"]["measure_enabled"] is False
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_custom_dd_sequence(self, mock_runtime_service):
+        """Test sampler with custom dynamical decoupling sequence."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_xx"
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            # Use XX sequence instead of default XY4
+            result = await run_sampler(
+                self.SAMPLE_QASM3,
+                "ibm_brisbane",
+                1024,
+                "auto",
+                dynamical_decoupling=True,
+                dd_sequence="XX",
+            )
+
+            assert result["status"] == "success"
+            assert result["error_mitigation"]["dynamical_decoupling"]["enabled"] is True
+            assert result["error_mitigation"]["dynamical_decoupling"]["sequence"] == "XX"
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_twirling_gates_only(self, mock_runtime_service):
+        """Test sampler with only gate twirling enabled (no measure twirling)."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_gates_only"
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            result = await run_sampler(
+                self.SAMPLE_QASM3,
+                "ibm_brisbane",
+                1024,
+                "auto",
+                twirling=True,
+                measure_twirling=False,
+            )
+
+            assert result["status"] == "success"
+            assert result["error_mitigation"]["twirling"]["gates_enabled"] is True
+            assert result["error_mitigation"]["twirling"]["measure_enabled"] is False
+
+    @pytest.mark.asyncio
+    async def test_run_sampler_xpxm_sequence(self, mock_runtime_service):
+        """Test sampler with XpXm dynamical decoupling sequence."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerV2") as mock_sampler_class,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.load_circuit") as mock_load,
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.SamplerOptions") as mock_options,
+        ):
+            mock_init.return_value = mock_runtime_service
+            mock_circuit = Mock()
+            mock_load.return_value = {"status": "success", "circuit": mock_circuit}
+
+            mock_opts_instance = Mock()
+            mock_opts_instance.dynamical_decoupling = Mock()
+            mock_opts_instance.twirling = Mock()
+            mock_options.return_value = mock_opts_instance
+
+            mock_job = Mock()
+            mock_job.job_id.return_value = "sampler_job_xpxm"
+            mock_sampler = Mock()
+            mock_sampler.run.return_value = mock_job
+            mock_sampler_class.return_value = mock_sampler
+
+            result = await run_sampler(
+                self.SAMPLE_QASM3,
+                "ibm_brisbane",
+                1024,
+                "auto",
+                dd_sequence="XpXm",
+            )
+
+            assert result["status"] == "success"
+            assert result["error_mitigation"]["dynamical_decoupling"]["sequence"] == "XpXm"
+
+
+class TestExampleCircuits:
+    """Test example circuit functions for LLM usability."""
+
+    def test_bell_state_circuit_structure(self):
+        """Test Bell state circuit has correct structure."""
+        result = get_bell_state_circuit()
+
+        assert "circuit" in result
+        assert "name" in result
+        assert "description" in result
+        assert "expected_results" in result
+        assert "num_qubits" in result
+        assert "usage" in result
+
+        assert result["name"] == "Bell State"
+        assert result["num_qubits"] == 2
+        assert "entanglement" in result["description"].lower()
+
+    def test_bell_state_circuit_valid_qasm3(self):
+        """Test Bell state circuit is valid QASM3."""
+        result = get_bell_state_circuit()
+        circuit = result["circuit"]
+
+        assert "OPENQASM 3.0" in circuit
+        assert 'include "stdgates.inc"' in circuit
+        assert "qubit[2]" in circuit
+        assert "bit[2]" in circuit
+        assert "h q[0]" in circuit
+        assert "cx q[0], q[1]" in circuit
+        assert "measure" in circuit
+
+    def test_ghz_state_circuit_default(self):
+        """Test GHZ state circuit with default 3 qubits."""
+        result = get_ghz_state_circuit()
+
+        assert result["num_qubits"] == 3
+        assert "GHZ" in result["name"]
+        assert "000" in result["expected_results"]
+        assert "111" in result["expected_results"]
+
+    def test_ghz_state_circuit_custom_qubits(self):
+        """Test GHZ state circuit with custom qubit count."""
+        result = get_ghz_state_circuit(5)
+
+        assert result["num_qubits"] == 5
+        assert "5-qubit" in result["name"]
+        assert "00000" in result["expected_results"]
+        assert "11111" in result["expected_results"]
+
+        circuit = result["circuit"]
+        assert "qubit[5]" in circuit
+        assert "bit[5]" in circuit
+        # Should have 4 CNOT gates for 5 qubits
+        assert circuit.count("cx q[") == 4
+
+    def test_ghz_state_circuit_min_qubits(self):
+        """Test GHZ state circuit enforces minimum 2 qubits."""
+        result = get_ghz_state_circuit(1)
+        assert result["num_qubits"] == 2
+
+    def test_ghz_state_circuit_max_qubits(self):
+        """Test GHZ state circuit enforces maximum 10 qubits."""
+        result = get_ghz_state_circuit(15)
+        assert result["num_qubits"] == 10
+
+    def test_quantum_random_circuit_structure(self):
+        """Test quantum random circuit has correct structure."""
+        result = get_quantum_random_circuit()
+
+        assert result["name"] == "Quantum Random Number Generator"
+        assert result["num_qubits"] == 4
+        assert "random" in result["description"].lower()
+        assert "16" in result["expected_results"]  # 16 possible outcomes
+
+    def test_quantum_random_circuit_valid_qasm3(self):
+        """Test quantum random circuit is valid QASM3."""
+        result = get_quantum_random_circuit()
+        circuit = result["circuit"]
+
+        assert "OPENQASM 3.0" in circuit
+        assert "qubit[4]" in circuit
+        # Should have 4 Hadamard gates
+        assert circuit.count("h q[") == 4
+        assert "measure" in circuit
+
+    def test_superposition_circuit_structure(self):
+        """Test superposition circuit has correct structure."""
+        result = get_superposition_circuit()
+
+        assert result["name"] == "Single Qubit Superposition"
+        assert result["num_qubits"] == 1
+        assert "simplest" in result["description"].lower()
+        assert "50%" in result["expected_results"]
+
+    def test_superposition_circuit_valid_qasm3(self):
+        """Test superposition circuit is valid QASM3."""
+        result = get_superposition_circuit()
+        circuit = result["circuit"]
+
+        assert "OPENQASM 3.0" in circuit
+        assert "qubit[1]" in circuit
+        assert "bit[1]" in circuit
+        assert "h q[0]" in circuit
+        assert "measure" in circuit
+
+    def test_all_circuits_have_usage_instructions(self):
+        """Test all example circuits include usage instructions."""
+        circuits = [
+            get_bell_state_circuit(),
+            get_ghz_state_circuit(),
+            get_quantum_random_circuit(),
+            get_superposition_circuit(),
+        ]
+
+        for circuit in circuits:
+            assert "usage" in circuit
+            assert "run_sampler_tool" in circuit["usage"]
 
 
 # Assisted by watsonx Code Assistant

@@ -14,6 +14,7 @@ from typing import Any, Literal
 
 from qiskit import QuantumCircuit
 from qiskit.transpiler import PassManager
+from qiskit_ibm_transpiler import generate_ai_pass_manager
 from qiskit_ibm_transpiler.ai.routing import AIRouting
 from qiskit_ibm_transpiler.ai.synthesis import (
     AICliffordSynthesis,
@@ -32,6 +33,34 @@ from qiskit_ibm_transpiler_mcp_server.utils import (
 
 
 logger = logging.getLogger(__name__)
+
+# Allowed values for optimization parameters
+ALLOWED_OPTIMIZATION_LEVELS = (1, 2, 3)
+ALLOWED_LAYOUT_MODES = ("keep", "improve", "optimize")
+
+
+def _validate_optimization_params(
+    optimization_level: int | None = None,
+    layout_mode: str | None = None,
+    param_prefix: str = "",
+) -> str | None:
+    """Validate optimization level and layout mode parameters.
+
+    Args:
+        optimization_level: The optimization level to validate (1, 2, or 3).
+        layout_mode: The layout mode to validate ("keep", "improve", or "optimize").
+        param_prefix: Optional prefix for parameter name in error messages (e.g., "ai_").
+
+    Returns:
+        Error message string if validation fails, None if all validations pass.
+    """
+    if optimization_level is not None and optimization_level not in ALLOWED_OPTIMIZATION_LEVELS:
+        param_name = f"{param_prefix}optimization_level"
+        return f"{param_name} must be 1, 2, or 3, got {optimization_level}"
+    if layout_mode is not None and layout_mode not in ALLOWED_LAYOUT_MODES:
+        param_name = f"{param_prefix}layout_mode"
+        return f"{param_name} must be one of {ALLOWED_LAYOUT_MODES}, got '{layout_mode}'"
+    return None
 
 
 def _get_circuit_metrics(circuit: QuantumCircuit) -> dict[str, Any]:
@@ -154,20 +183,12 @@ async def ai_routing(
         local_mode: determines where the AIRouting pass runs. If False, AIRouting runs remotely through the Qiskit Transpiler Service. If True, the package tries to run the pass in your local environment with a fallback to cloud mode if the required dependencies are not found
         circuit_format: format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3".
     """
-    # Validate optimization_level
-    if optimization_level not in (1, 2, 3):
-        return {
-            "status": "error",
-            "message": f"optimization_level must be 1, 2, or 3, got {optimization_level}",
-        }
-
-    # Validate layout_mode
-    valid_layout_modes = ("keep", "improve", "optimize")
-    if layout_mode not in valid_layout_modes:
-        return {
-            "status": "error",
-            "message": f"layout_mode must be one of {valid_layout_modes}, got '{layout_mode}'",
-        }
+    # Validate parameters
+    validation_error = _validate_optimization_params(
+        optimization_level=optimization_level, layout_mode=layout_mode
+    )
+    if validation_error:
+        return {"status": "error", "message": validation_error}
 
     ai_routing_pass_kwargs = {
         "optimization_level": optimization_level,
@@ -311,3 +332,103 @@ async def ai_pauli_network_synthesis(
         circuit_format=circuit_format,
     )
     return ai_pauli_network_synthesis_result
+
+
+@with_sync
+async def hybrid_ai_transpile(
+    circuit: str,
+    backend_name: str,
+    ai_optimization_level: Literal[1, 2, 3] = 3,
+    optimization_level: Literal[1, 2, 3] = 3,
+    ai_layout_mode: Literal["keep", "improve", "optimize"] = "optimize",
+    circuit_format: CircuitFormat = "qasm3",
+) -> dict[str, Any]:
+    """
+    Transpile a quantum circuit using a hybrid pass manager that combines Qiskit's heuristic
+    optimization with AI-powered transpiler passes.
+
+    This function creates a unified transpilation pipeline that leverages both classical
+    heuristic approaches and AI-based optimization for routing and synthesis.
+
+    Args:
+        circuit: quantum circuit as QASM 3.0 string or base64-encoded QPY.
+        backend_name: Qiskit Runtime Service backend name (e.g., 'ibm_torino', 'ibm_fez')
+        ai_optimization_level: Optimization level (1-3) for AI components. Higher values
+            yield better results but require more computational resources.
+        optimization_level: Optimization level (1-3) for heuristic components in the PassManager.
+        ai_layout_mode: Specifies how the AI routing component handles layout selection:
+            - 'keep': Respects the layout set by previous transpiler passes
+            - 'improve': Uses prior layouts as starting points for optimization
+            - 'optimize': Default; ignores previous layout selections for general circuits
+        circuit_format: format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3".
+
+    Returns:
+        Dictionary with:
+        - status: 'success' or 'error'
+        - circuit_qpy: Base64-encoded QPY format (for chaining with other tools)
+        - original_circuit: Metrics dict (num_qubits, depth, size, two_qubit_gates)
+        - optimized_circuit: Metrics dict for the optimized circuit
+        - improvements: Dict with depth_reduction and two_qubit_gate_reduction
+    """
+    # Validate parameters
+    validation_error = None
+    if not backend_name or not backend_name.strip():
+        validation_error = "backend_name is required and cannot be empty"
+    else:
+        # Validate AI optimization level, then heuristic optimization level, then AI layout mode
+        validation_error = (
+            _validate_optimization_params(
+                optimization_level=ai_optimization_level, param_prefix="ai_"
+            )
+            or _validate_optimization_params(optimization_level=optimization_level)
+            or _validate_optimization_params(layout_mode=ai_layout_mode, param_prefix="ai_")
+        )
+    if validation_error:
+        return {"status": "error", "message": validation_error}
+
+    try:
+        logger.info("Hybrid AI transpilation pass")
+
+        # Get backend to extract coupling map
+        backend_service_result = await get_backend_service(backend_name=backend_name)
+        if backend_service_result["status"] != "success":
+            return {"status": "error", "message": backend_service_result["message"]}
+        backend_service = backend_service_result["backend"]
+
+        # Load input circuit
+        loaded_quantum_circuit = load_circuit(circuit, circuit_format=circuit_format)
+        if loaded_quantum_circuit["status"] != "success":
+            return {"status": "error", "message": loaded_quantum_circuit["message"]}
+        original_circuit = loaded_quantum_circuit["circuit"]
+
+        # Create hybrid AI pass manager
+        ai_pass_manager = generate_ai_pass_manager(
+            coupling_map=backend_service.coupling_map,
+            ai_optimization_level=ai_optimization_level,
+            optimization_level=optimization_level,
+            ai_layout_mode=ai_layout_mode,
+        )
+
+        # Run the hybrid transpilation
+        original_metrics = _get_circuit_metrics(original_circuit)
+        transpiled_circuit = ai_pass_manager.run(original_circuit)
+        optimized_metrics = _get_circuit_metrics(transpiled_circuit)
+
+        # Return QPY format (source of truth for precision and chaining)
+        qpy_str = dump_circuit(transpiled_circuit, circuit_format="qpy")
+
+        return {
+            "status": "success",
+            "circuit_qpy": qpy_str,
+            "original_circuit": original_metrics,
+            "optimized_circuit": optimized_metrics,
+            "improvements": {
+                "depth_reduction": original_metrics["depth"] - optimized_metrics["depth"],
+                "two_qubit_gate_reduction": (
+                    original_metrics["two_qubit_gates"] - optimized_metrics["two_qubit_gates"]
+                ),
+            },
+        }
+    except Exception as e:
+        logger.error(f"Hybrid AI transpilation failed: {e}")
+        return {"status": "error", "message": f"{e}"}

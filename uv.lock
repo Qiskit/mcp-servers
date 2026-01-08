@@ -3119,6 +3119,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "qiskit-ibm-runtime" },
+    { name = "qiskit-mcp-server" },
 ]
 
 [package.optional-dependencies]
@@ -3187,6 +3188,7 @@ requires-dist = [
     { name = "python-dotenv", marker = "extra == 'examples'", specifier = ">=1.0.0" },
     { name = "qiskit-ibm-runtime", specifier = ">=0.40.0" },
     { name = "qiskit-ibm-runtime-mcp-server", extras = ["dev", "test"], marker = "extra == 'all'", editable = "qiskit-ibm-runtime-mcp-server" },
+    { name = "qiskit-mcp-server", editable = "qiskit-mcp-server" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.13" },
 ]
 provides-extras = ["dev", "test", "examples", "all"]

@@ -75,6 +75,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 
+
 # Load environment variables
 load_dotenv()
 
@@ -136,9 +137,7 @@ def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
         except ImportError:
-            raise ValueError(
-                "Install langchain-google-genai: pip install langchain-google-genai"
-            )
+            raise ValueError("Install langchain-google-genai: pip install langchain-google-genai")
         return ChatGoogleGenerativeAI(model=model or "gemini-2.5-pro", temperature=0)
 
     elif provider == "watsonx":
@@ -228,7 +227,7 @@ def check_api_key(provider: str) -> bool:
     print(f"Error: Missing required environment variables for {provider}:")
     for key in missing_keys:
         print(f"  - {key}")
-    print(f"\nSet them with:")
+    print("\nSet them with:")
     for key in missing_keys:
         print(f"  export {key}='your-value'")
     return False
@@ -249,7 +248,9 @@ def get_mcp_client() -> MultiServerMCPClient:
                 "args": [],
                 "env": {
                     "QISKIT_IBM_TOKEN": os.getenv("QISKIT_IBM_TOKEN", ""),
-                    "QISKIT_IBM_RUNTIME_MCP_INSTANCE": os.getenv("QISKIT_IBM_RUNTIME_MCP_INSTANCE", ""),
+                    "QISKIT_IBM_RUNTIME_MCP_INSTANCE": os.getenv(
+                        "QISKIT_IBM_RUNTIME_MCP_INSTANCE", ""
+                    ),
                 },
             }
         }
@@ -293,25 +294,33 @@ async def create_quantum_agent_with_session(
     return agent
 
 
-async def run_agent_query(agent, query: str) -> str:
+async def run_agent_query(agent, query: str, history: list | None = None) -> tuple[str, list]:
     """
-    Run a query through the agent.
+    Run a query through the agent with conversation history.
 
     Args:
         agent: The configured LangChain agent.
         query: The user's query.
+        history: Optional list of previous messages for context.
 
     Returns:
-        The agent's response.
+        Tuple of (response_text, updated_history).
     """
     from langchain_core.messages import HumanMessage
 
-    result = await agent.ainvoke({"messages": [HumanMessage(content=query)]})
-    # Extract the final AI message
-    messages = result.get("messages", [])
-    if messages:
-        return messages[-1].content
-    return "No response generated."
+    # Build messages with history
+    messages = list(history) if history else []
+    messages.append(HumanMessage(content=query))
+
+    result = await agent.ainvoke({"messages": messages})
+    result_messages = result.get("messages", [])
+
+    if result_messages:
+        response = result_messages[-1].content
+        # Return the full conversation history from the agent
+        return response, result_messages
+
+    return "No response generated.", messages
 
 
 async def interactive_session(provider: str, model: str | None):
@@ -324,7 +333,7 @@ async def interactive_session(provider: str, model: str | None):
     print(f"Provider: {provider}" + (f" (model: {model})" if model else ""))
     print("This agent connects to the qiskit-ibm-runtime-mcp-server")
     print("to interact with IBM Quantum services.")
-    print("Type 'quit' to exit.\n")
+    print("Type 'quit' to exit, 'clear' to reset conversation history.\n")
 
     # Example queries to demonstrate capabilities
     example_queries = [
@@ -348,6 +357,9 @@ async def interactive_session(provider: str, model: str | None):
         agent = await create_quantum_agent_with_session(session, provider, model)
         print("Connected! Ready to answer your questions.\n")
 
+        # Maintain conversation history for context
+        history: list = []
+
         while True:
             try:
                 user_input = input("You: ").strip()
@@ -356,8 +368,12 @@ async def interactive_session(provider: str, model: str | None):
                 if user_input.lower() in ["quit", "exit", "q"]:
                     print("Goodbye!")
                     break
+                if user_input.lower() == "clear":
+                    history = []
+                    print("Conversation history cleared.\n")
+                    continue
 
-                response = await run_agent_query(agent, user_input)
+                response, history = await run_agent_query(agent, user_input, history)
                 print(f"\nAssistant: {response}\n")
 
             except KeyboardInterrupt:
@@ -382,9 +398,8 @@ async def single_query_example(provider: str, model: str | None):
         agent = await create_quantum_agent_with_session(session, provider, model)
 
         # Run a sample query
-        response = await run_agent_query(
-            agent,
-            "List all available quantum backends and tell me which one is least busy"
+        response, _ = await run_agent_query(
+            agent, "List all available quantum backends and tell me which one is least busy"
         )
         print(f"\nResponse:\n{response}")
 

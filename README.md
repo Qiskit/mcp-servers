@@ -54,6 +54,21 @@ Access to the [qiskit-ibm-transpiler](https://github.com/Qiskit/qiskit-ibm-trans
 
 **📁 Directory**: [`./qiskit-ibm-transpiler-mcp-server/`](./qiskit-ibm-transpiler-mcp-server/)
 
+## 📚 Examples
+
+Each MCP server includes example code demonstrating how to build AI agents using LangChain:
+
+| Server | Examples |
+|--------|----------|
+| Qiskit MCP Server | [`qiskit-mcp-server/examples/`](./qiskit-mcp-server/examples/) |
+| Qiskit Code Assistant MCP Server | [`qiskit-code-assistant-mcp-server/examples/`](./qiskit-code-assistant-mcp-server/examples/) |
+| Qiskit IBM Runtime MCP Server | [`qiskit-ibm-runtime-mcp-server/examples/`](./qiskit-ibm-runtime-mcp-server/examples/) |
+| Qiskit IBM Transpiler MCP Server | [`qiskit-ibm-transpiler-mcp-server/examples/`](./qiskit-ibm-transpiler-mcp-server/examples/) |
+
+Each examples directory contains:
+- **Jupyter Notebook** (`langchain_agent.ipynb`) - Interactive tutorial with step-by-step examples
+- **Python Script** (`langchain_agent.py`) - Command-line agent with multiple LLM provider support
+
 ## 🚀 Quick Start
 
 ### Prerequisites
