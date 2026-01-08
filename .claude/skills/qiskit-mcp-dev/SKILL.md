@@ -56,7 +56,7 @@ async def my_tool_name(param: str, optional_param: int = 10) -> dict[str, Any]:
 ```
 
 Key patterns:
-- Tool function name typically ends with `_tool` suffix (exception: Code Assistant uses `qca_` prefix)
+- Tool function name typically ends with `_tool` suffix
 - Docstring describes the tool for AI assistants
 - Return type is `dict[str, Any]`
 - Delegate to core module, don't implement logic here
