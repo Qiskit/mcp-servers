@@ -103,9 +103,9 @@ Each MCP server follows this standard structure:
 │   ├── langchain_agent.ipynb    # Interactive tutorial with step-by-step examples
 │   └── langchain_agent.py       # Command-line agent with multiple LLM provider support
 ├── pyproject.toml               # Project metadata & dependencies
-├── pytest.ini                   # pytest configuration file
+├── pytest.ini                   # pytest configuration (optional)
 ├── README.md                    # Server-specific documentation
-├── .env.example                 # Environment variable template
+├── .env.example                 # Environment variable template (optional)
 └── run_tests.sh                 # Test execution script
 ```
 
@@ -155,6 +155,8 @@ Each MCP server follows this standard structure:
 - `qca.py`: Qiskit Code Assistant API integration (async)
 - `constants.py`: API endpoints and configuration
 - `utils.py`: HTTP client management and utilities
+
+**Note**: This server uses `mcp.tool()(function)` syntax instead of `@mcp.tool()` decorators, with tools defined in `qca.py` and registered in `server.py`.
 
 **Tools Provided**:
 | Tool | Description |
@@ -237,6 +239,7 @@ Each MCP server follows this standard structure:
 | `ai_linear_function_synthesis_tool` | AI synthesis for Linear Function circuits (CX, SWAP; up to 9 qubits) |
 | `ai_permutation_synthesis_tool` | AI synthesis for Permutation circuits (SWAP; 27, 33, 65 qubits) |
 | `ai_pauli_network_synthesis_tool` | AI synthesis for Pauli Network circuits (up to 6 qubits) |
+| `hybrid_ai_transpile_tool` | End-to-end hybrid transpilation combining Qiskit heuristics with AI passes |
 
 **Environment Variables**:
 - `QISKIT_IBM_TOKEN`: IBM Quantum API token (required)
@@ -367,11 +370,11 @@ AI Assistant → MCP Client → ai_routing_tool / ai_*_synthesis_tool
 
 3. **MCP Server Patterns**:
    - All servers use FastMCP framework
-   - Tools defined with `@mcp.tool()` decorator
-   - Resources defined with `@mcp.resource()` decorator
+   - Tools defined with `@mcp.tool()` decorator or `mcp.tool()(function)` syntax
+   - Resources defined with `@mcp.resource()` decorator or `mcp.resource()(function)` syntax
    - Async functions for all MCP handlers
    - Tool functions should delegate to core module functions
-   - Tool function names end with `_tool` suffix
+   - Tool function names typically end with `_tool` suffix (exception: Code Assistant uses `qca_` prefix)
    - Return type is `dict[str, Any]`
 
 4. **Error Handling**:
@@ -839,7 +842,6 @@ qiskit-mcp-servers/
 │   │   ├── langchain_agent.ipynb
 │   │   └── langchain_agent.py
 │   ├── pyproject.toml
-│   ├── pytest.ini
 │   ├── README.md
 │   └── run_tests.sh
 ├── qiskit-code-assistant-mcp-server/
