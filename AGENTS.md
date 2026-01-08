@@ -98,8 +98,12 @@ Each MCP server follows this standard structure:
 │   ├── unit/                    # Unit tests (optional subdirectory)
 │   ├── integration/             # Integration tests (optional subdirectory)
 │   └── test_*.py                # Test files
-├── examples/                    # Example usage (contains .env files)
+├── examples/
+│   ├── README.md                # MCP server example documentation
+│   ├── langchain_agent.ipynb    # Interactive tutorial with step-by-step examples
+│   └── langchain_agent.py       # Command-line agent with multiple LLM provider support
 ├── pyproject.toml               # Project metadata & dependencies
+├── pytest.ini                   # pytest configuration file
 ├── README.md                    # Server-specific documentation
 ├── .env.example                 # Environment variable template
 └── run_tests.sh                 # Test execution script
