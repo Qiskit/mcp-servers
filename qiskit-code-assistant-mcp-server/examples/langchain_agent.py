@@ -85,8 +85,8 @@ When answering questions:
 - Provide accurate and educational explanations
 - Reference Qiskit documentation when relevant
 
-If you encounter a disclaimer requirement, use accept_model_disclaimer_tool to accept it.
-After using a completion, use accept_completion_tool to provide feedback."""
+Always provide clear explanations about quantum computing concepts when relevant.
+If an operation fails, explain the error and suggest possible solutions."""
 
 
 def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
