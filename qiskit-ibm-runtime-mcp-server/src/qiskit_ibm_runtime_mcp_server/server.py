@@ -227,6 +227,8 @@ async def usage_info_tool() -> dict[str, Any]:
     utilization and planning job submissions.
     """
     return await usage_info()
+
+
 async def run_sampler_tool(
     circuit: str,
     backend_name: str | None = None,
