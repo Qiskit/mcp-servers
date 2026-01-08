@@ -3375,7 +3375,7 @@ test = [
 
 [[package]]
 name = "qiskit-gym"
-version = "0.1.2"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gymnasium" },
@@ -3383,18 +3383,15 @@ dependencies = [
     { name = "twisterl" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f0/51/6735f5823e526e000a4c827109c5b1fd29fcc8386be75f4e65a01270d964/qiskit_gym-0.1.2-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:962042dcc816d7b2db317c526b57d1d102dc8e1ed0b280cb9da41515207924c5", size = 443534, upload-time = "2025-10-30T14:34:35.818Z" },
-    { url = "https://files.pythonhosted.org/packages/45/42/6f1387e12f8a4cc8d07e65aff5003cef85319c24bf855fb9b434c20b2747/qiskit_gym-0.1.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:99533a1006e17435a6fa92f40fd7eee87b5ad939b159a6eed20aa558c49aee9a", size = 418639, upload-time = "2025-10-30T14:32:17.704Z" },
-    { url = "https://files.pythonhosted.org/packages/ab/15/5cef26fff869b0a11870f46c699eecccbc301bea38a4e60b1fdb59ade1d3/qiskit_gym-0.1.2-cp310-cp310-manylinux_2_34_x86_64.whl", hash = "sha256:94b169e92154b8a42a07812cca907f46df5cd72d5f12f660d1be8371d0a66aeb", size = 465607, upload-time = "2025-10-30T14:32:01.124Z" },
-    { url = "https://files.pythonhosted.org/packages/8d/8c/c8d4853508b2273e5a8a93a6b66ab8422fc0eb7215ef2cfd08b472134b12/qiskit_gym-0.1.2-cp310-cp310-win_amd64.whl", hash = "sha256:72621f75d60c5d756fb01001fc68741a8aef74c0837269ce3bcae4771d11fd3b", size = 322372, upload-time = "2025-10-30T14:33:28.772Z" },
-    { url = "https://files.pythonhosted.org/packages/ff/77/1af9152349cecbe89d985fadae1447e95b7c1f0f83b94122db16cf534b24/qiskit_gym-0.1.2-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:05d8d55c85181703528d8ce0007b00edd4c64ec4035730106bfa8579f6334193", size = 443419, upload-time = "2025-10-30T14:32:40.491Z" },
-    { url = "https://files.pythonhosted.org/packages/8e/35/eb4c8b66ec5985c8268c7b88e0df2f798a6e6666bedf6ed183fc0da56c95/qiskit_gym-0.1.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:0e5a3b9fd44a20df95afa4f20ff19f4779409430a299ccfcac2333af5ef51769", size = 418514, upload-time = "2025-10-30T14:32:46.263Z" },
-    { url = "https://files.pythonhosted.org/packages/25/85/52c00b287c07ee5c97fa2ca1ba511c2067c92f20b0fa76e1a9427f6e267a/qiskit_gym-0.1.2-cp311-cp311-manylinux_2_34_x86_64.whl", hash = "sha256:5a0474a533cceac6ae79caf005d2820ed3a0e18fd84e8c393a324a698482c03b", size = 465595, upload-time = "2025-10-30T14:24:42.514Z" },
-    { url = "https://files.pythonhosted.org/packages/b0/97/a61c2141798a9b8c2dfceb18e13d60b114aeee2d35ffda02fcf65572647e/qiskit_gym-0.1.2-cp311-cp311-win_amd64.whl", hash = "sha256:4fb1f1ba20ddb965130bb11826ebb27dd1ca88833f602a8283dd3b8cd5350b11", size = 322430, upload-time = "2025-10-30T14:32:46.855Z" },
-    { url = "https://files.pythonhosted.org/packages/09/ec/b7d555104872f762a286fff2b43592dd5d6ed7227a1113adda72d8e6e223/qiskit_gym-0.1.2-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:00e4eb622a7d64e405dbc0621eb2e51ebdf6b32db3e5db69082c2cfa25d5034c", size = 437552, upload-time = "2025-10-30T14:33:43.837Z" },
-    { url = "https://files.pythonhosted.org/packages/d1/81/6a488277748121d20caa205c70ad352f687e5297648a631c723e0fc964c0/qiskit_gym-0.1.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:cc2e57981cb0431a1f83597a6507ebb4ed96e18c3c735b9a7a838ad9f25c984e", size = 416487, upload-time = "2025-10-30T14:32:15.906Z" },
-    { url = "https://files.pythonhosted.org/packages/7d/59/cb4a7eb3f53e52b4cf9bef6a39c8312f56da1c89a0c9d67188e3b47b118f/qiskit_gym-0.1.2-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:7dd8bad8dabea1fee4565b8dc32e7b2f272715a9c3ddd3921da5acdaf358b1ab", size = 466870, upload-time = "2025-10-30T14:31:57.533Z" },
-    { url = "https://files.pythonhosted.org/packages/1e/e3/2446a4439b4066e575c984dc6602cdd794c9b5f8e62711fb8dfcd3737702/qiskit_gym-0.1.2-cp312-cp312-win_amd64.whl", hash = "sha256:9b3be3e95bfb4e9751f1e40c0c6740f65255af9b1ebd248844010a7e1580c84c", size = 324330, upload-time = "2025-10-30T14:34:03.155Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/8e/6d386f4c467f42651e88f7f8507d33a03f9c5000a36ede3ee4f71a36363b/qiskit_gym-0.2.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:2e14ac79fbb4de2267881b320a3a87a28188c6fa92353a9c08e5d7b51ec20af9", size = 468127, upload-time = "2026-01-08T14:45:59.548Z" },
+    { url = "https://files.pythonhosted.org/packages/04/2b/91cbbf846e9ac6acc29583e9795374e7157c122c4ce6a1d90166e9b6215c/qiskit_gym-0.2.0-cp310-cp310-manylinux_2_34_x86_64.whl", hash = "sha256:c147ce32b8b395e57020dc10feb09879ea64a48088220d886462f0b4d8fe91a1", size = 514334, upload-time = "2026-01-08T14:46:12.159Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/d2/230ca55830ea6de63b2ff6fdf496b761e8da0953c8a72f360dd2d1f3eaf5/qiskit_gym-0.2.0-cp310-cp310-win_amd64.whl", hash = "sha256:e74b07c8e75920189f800deec0b1494884b4e76d694a262442df5ce821842601", size = 371363, upload-time = "2026-01-08T14:47:43.696Z" },
+    { url = "https://files.pythonhosted.org/packages/69/aa/cf589518a0b230521e58a54ee8fa5a00e8cf8721887672ed2d04bf41c24e/qiskit_gym-0.2.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:5071a947c65bbaa37b2bdd700f55649407331f0dfdcd57da6d93459e2ad90a11", size = 466452, upload-time = "2026-01-08T14:45:32.802Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/e6/0c03e594d0267808c944f94bc46cf364b072f6f2a20a17ea1af346ad6982/qiskit_gym-0.2.0-cp311-cp311-manylinux_2_34_x86_64.whl", hash = "sha256:4c1efe76a4a0fb119c26244068bd72d025835a63be9037612116eca510d5f673", size = 513351, upload-time = "2026-01-08T14:45:33.481Z" },
+    { url = "https://files.pythonhosted.org/packages/99/10/ae6705dccdd3e7a36d56527101f48936538e34141020be5a5b82e5401628/qiskit_gym-0.2.0-cp311-cp311-win_amd64.whl", hash = "sha256:e71c1cb9af6e7259aadd906ea8fdde85ca29d9fb6d7a0f8f4622348a44f06590", size = 372536, upload-time = "2026-01-08T14:46:37.148Z" },
+    { url = "https://files.pythonhosted.org/packages/88/f1/100e8e1659d240aa64467810a502711e239c8915313efc0698b502cd8d45/qiskit_gym-0.2.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:a126fab6c62c409dc76ec846d3e71a383c16e3d5ee4a07581b3b11f507c2231a", size = 466639, upload-time = "2026-01-08T14:45:30.842Z" },
+    { url = "https://files.pythonhosted.org/packages/da/ea/74414da3720028f66e6db48f7a9d57f4ea0b24fcfe643cc39571584730eb/qiskit_gym-0.2.0-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:45aad4ca46cce28dbd47f325970a7f36ddc3ae74dc628ae1a1570a25df7d24e5", size = 516280, upload-time = "2026-01-08T14:45:43.039Z" },
+    { url = "https://files.pythonhosted.org/packages/89/59/74e4efd1ab3f1e70a504be1120aac5e3a9169f02f60ba4621e86a0e8656b/qiskit_gym-0.2.0-cp312-cp312-win_amd64.whl", hash = "sha256:f90854fcc65595b9811a84ddf32aaa3e0c2ee6114792cf08d4b65f1fa6a3e7ff", size = 374788, upload-time = "2026-01-08T14:46:30.559Z" },
 ]
 
 [[package]]
@@ -3409,13 +3406,13 @@ dependencies = [
     { name = "qiskit-gym" },
     { name = "qiskit-ibm-runtime" },
     { name = "qiskit-mcp-server" },
-    { name = "twisterl" },
 ]
 
 [package.optional-dependencies]
 all = [
     { name = "bandit", extra = ["toml"] },
     { name = "langchain" },
+    { name = "langchain-anthropic" },
     { name = "langchain-mcp-adapters" },
     { name = "mypy" },
     { name = "pytest" },
@@ -3431,6 +3428,7 @@ dev = [
 ]
 examples = [
     { name = "langchain" },
+    { name = "langchain-anthropic" },
     { name = "langchain-mcp-adapters" },
     { name = "python-dotenv" },
 ]
@@ -3448,6 +3446,12 @@ dev = [
     { name = "mypy" },
     { name = "ruff" },
 ]
+examples = [
+    { name = "langchain" },
+    { name = "langchain-anthropic" },
+    { name = "langchain-mcp-adapters" },
+    { name = "python-dotenv" },
+]
 test = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -3460,6 +3464,7 @@ requires-dist = [
     { name = "bandit", extras = ["toml"], marker = "extra == 'test'", specifier = ">=1.9.2" },
     { name = "fastmcp", specifier = ">=2.12.4" },
     { name = "langchain", marker = "extra == 'examples'", specifier = ">=0.3.0" },
+    { name = "langchain-anthropic", marker = "extra == 'examples'", specifier = ">=0.3.0" },
     { name = "langchain-mcp-adapters", marker = "extra == 'examples'", specifier = ">=0.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15.0" },
     { name = "nest-asyncio", specifier = ">=1.5.0" },
@@ -3470,12 +3475,11 @@ requires-dist = [
     { name = "pytest-mock", marker = "extra == 'test'", specifier = ">=3.15.1" },
     { name = "python-dotenv", marker = "extra == 'examples'", specifier = ">=1.0.0" },
     { name = "qiskit", specifier = ">=1.3.0" },
-    { name = "qiskit-gym", specifier = ">=0.1.0" },
+    { name = "qiskit-gym", specifier = ">=0.2.0" },
     { name = "qiskit-gym-mcp-server", extras = ["dev", "test", "examples"], marker = "extra == 'all'", editable = "qiskit-gym-mcp-server" },
     { name = "qiskit-ibm-runtime", specifier = ">=0.34.0" },
     { name = "qiskit-mcp-server", editable = "qiskit-mcp-server" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.13" },
-    { name = "twisterl", specifier = "<0.3.0" },
 ]
 provides-extras = ["dev", "test", "examples", "all"]
 
@@ -3484,6 +3488,12 @@ dev = [
     { name = "bandit", extras = ["toml"], specifier = ">=1.9.2" },
     { name = "mypy", specifier = ">=1.15.0" },
     { name = "ruff", specifier = ">=0.11.13" },
+]
+examples = [
+    { name = "langchain", specifier = ">=0.3.0" },
+    { name = "langchain-anthropic", specifier = ">=0.3.0" },
+    { name = "langchain-mcp-adapters", specifier = ">=0.1.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 test = [
     { name = "pytest", specifier = ">=8.4.2" },
@@ -4259,6 +4269,32 @@ wheels = [
 ]
 
 [[package]]
+name = "safetensors"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/29/9c/6e74567782559a63bd040a236edca26fd71bc7ba88de2ef35d75df3bca5e/safetensors-0.7.0.tar.gz", hash = "sha256:07663963b67e8bd9f0b8ad15bb9163606cd27cc5a1b96235a50d8369803b96b0", size = 200878, upload-time = "2025-11-19T15:18:43.199Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/47/aef6c06649039accf914afef490268e1067ed82be62bcfa5b7e886ad15e8/safetensors-0.7.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:c82f4d474cf725255d9e6acf17252991c3c8aac038d6ef363a4bf8be2f6db517", size = 467781, upload-time = "2025-11-19T15:18:35.84Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/00/374c0c068e30cd31f1e1b46b4b5738168ec79e7689ca82ee93ddfea05109/safetensors-0.7.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:94fd4858284736bb67a897a41608b5b0c2496c9bdb3bf2af1fa3409127f20d57", size = 447058, upload-time = "2025-11-19T15:18:34.416Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/06/578ffed52c2296f93d7fd2d844cabfa92be51a587c38c8afbb8ae449ca89/safetensors-0.7.0-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e07d91d0c92a31200f25351f4acb2bc6aff7f48094e13ebb1d0fb995b54b6542", size = 491748, upload-time = "2025-11-19T15:18:09.79Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/33/1debbbb70e4791dde185edb9413d1fe01619255abb64b300157d7f15dddd/safetensors-0.7.0-cp38-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:8469155f4cb518bafb4acf4865e8bb9d6804110d2d9bdcaa78564b9fd841e104", size = 503881, upload-time = "2025-11-19T15:18:16.145Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/1c/40c2ca924d60792c3be509833df711b553c60effbd91da6f5284a83f7122/safetensors-0.7.0-cp38-abi3-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:54bef08bf00a2bff599982f6b08e8770e09cc012d7bba00783fc7ea38f1fb37d", size = 623463, upload-time = "2025-11-19T15:18:21.11Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/3a/13784a9364bd43b0d61eef4bea2845039bc2030458b16594a1bd787ae26e/safetensors-0.7.0-cp38-abi3-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:42cb091236206bb2016d245c377ed383aa7f78691748f3bb6ee1bfa51ae2ce6a", size = 532855, upload-time = "2025-11-19T15:18:25.719Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/60/429e9b1cb3fc651937727befe258ea24122d9663e4d5709a48c9cbfceecb/safetensors-0.7.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dac7252938f0696ddea46f5e855dd3138444e82236e3be475f54929f0c510d48", size = 507152, upload-time = "2025-11-19T15:18:33.023Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/a8/4b45e4e059270d17af60359713ffd83f97900d45a6afa73aaa0d737d48b6/safetensors-0.7.0-cp38-abi3-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:1d060c70284127fa805085d8f10fbd0962792aed71879d00864acda69dbab981", size = 541856, upload-time = "2025-11-19T15:18:31.075Z" },
+    { url = "https://files.pythonhosted.org/packages/06/87/d26d8407c44175d8ae164a95b5a62707fcc445f3c0c56108e37d98070a3d/safetensors-0.7.0-cp38-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:cdab83a366799fa730f90a4ebb563e494f28e9e92c4819e556152ad55e43591b", size = 674060, upload-time = "2025-11-19T15:18:37.211Z" },
+    { url = "https://files.pythonhosted.org/packages/11/f5/57644a2ff08dc6325816ba7217e5095f17269dada2554b658442c66aed51/safetensors-0.7.0-cp38-abi3-musllinux_1_2_armv7l.whl", hash = "sha256:672132907fcad9f2aedcb705b2d7b3b93354a2aec1b2f706c4db852abe338f85", size = 771715, upload-time = "2025-11-19T15:18:38.689Z" },
+    { url = "https://files.pythonhosted.org/packages/86/31/17883e13a814bd278ae6e266b13282a01049b0c81341da7fd0e3e71a80a3/safetensors-0.7.0-cp38-abi3-musllinux_1_2_i686.whl", hash = "sha256:5d72abdb8a4d56d4020713724ba81dac065fedb7f3667151c4a637f1d3fb26c0", size = 714377, upload-time = "2025-11-19T15:18:40.162Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/d8/0c8a7dc9b41dcac53c4cbf9df2b9c83e0e0097203de8b37a712b345c0be5/safetensors-0.7.0-cp38-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:b0f6d66c1c538d5a94a73aa9ddca8ccc4227e6c9ff555322ea40bdd142391dd4", size = 677368, upload-time = "2025-11-19T15:18:41.627Z" },
+    { url = "https://files.pythonhosted.org/packages/05/e5/cb4b713c8a93469e3c5be7c3f8d77d307e65fe89673e731f5c2bfd0a9237/safetensors-0.7.0-cp38-abi3-win32.whl", hash = "sha256:c74af94bf3ac15ac4d0f2a7c7b4663a15f8c2ab15ed0fc7531ca61d0835eccba", size = 326423, upload-time = "2025-11-19T15:18:45.74Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/e6/ec8471c8072382cb91233ba7267fd931219753bb43814cbc71757bfd4dab/safetensors-0.7.0-cp38-abi3-win_amd64.whl", hash = "sha256:d1239932053f56f3456f32eb9625590cc7582e905021f94636202a864d470755", size = 341380, upload-time = "2025-11-19T15:18:44.427Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/6a/4d08d89a6fcbe905c5ae68b8b34f0791850882fc19782d0d02c65abbdf3b/safetensors-0.7.0-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f4729811a6640d019a4b7ba8638ee2fd21fa5ca8c7e7bdf0fed62068fcaac737", size = 492430, upload-time = "2025-11-19T15:18:11.884Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/29/59ed8152b30f72c42d00d241e58eaca558ae9dbfa5695206e2e0f54c7063/safetensors-0.7.0-pp310-pypy310_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:12f49080303fa6bb424b362149a12949dfbbf1e06811a88f2307276b0c131afd", size = 503977, upload-time = "2025-11-19T15:18:17.523Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/0b/4811bfec67fa260e791369b16dab105e4bae82686120554cc484064e22b4/safetensors-0.7.0-pp310-pypy310_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:0071bffba4150c2f46cae1432d31995d77acfd9f8db598b5d1a2ce67e8440ad2", size = 623890, upload-time = "2025-11-19T15:18:22.666Z" },
+    { url = "https://files.pythonhosted.org/packages/58/5b/632a58724221ef03d78ab65062e82a1010e1bef8e8e0b9d7c6d7b8044841/safetensors-0.7.0-pp310-pypy310_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:473b32699f4200e69801bf5abf93f1a4ecd432a70984df164fc22ccf39c4a6f3", size = 531885, upload-time = "2025-11-19T15:18:27.146Z" },
+]
+
+[[package]]
 name = "scipy"
 version = "1.15.3"
 source = { registry = "https://pypi.org/simple" }
@@ -4684,29 +4720,33 @@ wheels = [
 
 [[package]]
 name = "twisterl"
-version = "0.2.0"
+version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "loguru" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "safetensors" },
     { name = "tensorboard" },
     { name = "torch" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5f/91/e8fce3efd57d9594f6befcec832e73a6edb10f4a566d8e612eef33ef53c4/twisterl-0.2.0-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:97b93ef9769402ed10d466a190b55e01eec8f91d079537b8b77dff356f95d856", size = 420843, upload-time = "2025-10-03T09:53:09.48Z" },
-    { url = "https://files.pythonhosted.org/packages/34/b5/dff27f1d910eda14c7051b2e7132274023cefb51b0ee20305c4b0fe0f820/twisterl-0.2.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:5c0cdb65e1152072d3847170ef188e9dee73c7831519c0e5b6cdf51689308171", size = 399302, upload-time = "2025-10-03T09:50:32.496Z" },
-    { url = "https://files.pythonhosted.org/packages/6e/15/e92572c0fc9dcae691fc4e079b1552441e61547ee046904498d0bba6b60f/twisterl-0.2.0-cp310-cp310-manylinux_2_34_x86_64.whl", hash = "sha256:0d0510ed915d5280c19dd19c6b5a62d12227dfad2ca4c0029754828e662e461e", size = 449897, upload-time = "2025-10-03T09:51:44.994Z" },
-    { url = "https://files.pythonhosted.org/packages/98/38/f947a3f4c092f43c8d329effc151ea5603bbacae158f5b37699c72614197/twisterl-0.2.0-cp310-cp310-win_amd64.whl", hash = "sha256:963d23a51774737734ae722908c7a0490404a097dd8c78b7fc3117786e10a540", size = 303638, upload-time = "2025-10-03T09:53:33.64Z" },
-    { url = "https://files.pythonhosted.org/packages/41/3d/ddeb8e3ebb6fd697cf52f04401001245080f5f8dc81913369f7ff16b72b1/twisterl-0.2.0-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:81c08073f4d476a6640a560be2fb83a32f702713b7b7d78d977c69b2b91b8fb9", size = 420853, upload-time = "2025-10-03T09:52:37.004Z" },
-    { url = "https://files.pythonhosted.org/packages/16/3d/ce0e702af47b9b36196a987acc583ad793dbe0fb144d793cc1f4704eb87c/twisterl-0.2.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:452350007c5c1fd9bd03f494585a96ebd1fb70d9cc15b9a616194913e65d1f29", size = 400338, upload-time = "2025-10-03T09:50:27.27Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/eb/6a59cc5c447aace68cb52aaddd2ec001fd33f0f8beacb59d36db36b12b73/twisterl-0.2.0-cp311-cp311-manylinux_2_34_x86_64.whl", hash = "sha256:84cb89f1c2d733440d16bd9b5e360ae992a8e2c6ab565ca7b7cd2377d1405450", size = 449828, upload-time = "2025-10-03T09:51:42.263Z" },
-    { url = "https://files.pythonhosted.org/packages/4b/98/6e1003a991d02b000d262c387bc838d71c60508e438c1abbedd0631c5ed3/twisterl-0.2.0-cp311-cp311-win_amd64.whl", hash = "sha256:bdb1716ad3fecf46775722dd0338befb6aff4db4a25e3366f4f2ee02c1f3d34d", size = 303258, upload-time = "2025-10-03T09:52:55.962Z" },
-    { url = "https://files.pythonhosted.org/packages/91/09/6bd291659d18de261f821e0895fb8d7095822a4acac16697238ad668d140/twisterl-0.2.0-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:018bb6df39443cf58191305395f0c3f3d2ba4d0d2ea4ebd478eeaab70b9294df", size = 416890, upload-time = "2025-10-03T09:53:04.896Z" },
-    { url = "https://files.pythonhosted.org/packages/42/00/913f721fac47a5aebd22cec1c12cbd4b1478d2bcc725cf40ee0c527ebeab/twisterl-0.2.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:700f2f7f50c5b7fa63387a2c980572c04e03d29e2cdaaae557cd84c5ed63edd4", size = 397141, upload-time = "2025-10-03T09:50:12.049Z" },
-    { url = "https://files.pythonhosted.org/packages/64/e2/5049979babd087cb212ff342f0f3e64cb8e388577b90050818da5d968584/twisterl-0.2.0-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:196c2cdaa84ec94bcc4e1f94f390e4497624fedd55d83157df00a674af9b160e", size = 450200, upload-time = "2025-10-03T09:51:50.617Z" },
-    { url = "https://files.pythonhosted.org/packages/bf/37/6fee4e8f62813d573d803ba95fd84fbeb0bbf59ea6cc5f519e4d50f273bf/twisterl-0.2.0-cp312-cp312-win_amd64.whl", hash = "sha256:0f750a58ccc36f41a29cf30535364c035406d7931cb43a068a73c4dae422c915", size = 304863, upload-time = "2025-10-03T09:51:52.527Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/7f/a3b1545408ddad65d0bf60ae2051b87814ce16913a04a25b8b0be7abf5a6/twisterl-0.4.1-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:760d8f978bc01a413cc55ff366329106a69b09dabf7dfb7de7597dd0a9903ca5", size = 430469, upload-time = "2025-12-22T09:08:21.634Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/df/939a110739d85b64e01596a39cdbbed131fbd3e1d54ed316a808fcdb8cf1/twisterl-0.4.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:0acb88c6ce87b67016d33d190d8d8f8a4fb425b1048e39ce1b740c8ca8380fd3", size = 412699, upload-time = "2025-12-22T09:04:42.222Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/fd/bb20094feac6454423543eedf1fe0f876b559540dde4b71b5ba0bc418dd2/twisterl-0.4.1-cp310-cp310-manylinux_2_34_x86_64.whl", hash = "sha256:08efd92607df6cced153d997b74cfe14ea4110887de94ed93bd9144e8227004f", size = 455848, upload-time = "2025-12-22T09:05:27.393Z" },
+    { url = "https://files.pythonhosted.org/packages/09/12/08c54f80663272a69c2d1152d5c1ffc7faa84426c4170622dcc15c33224d/twisterl-0.4.1-cp310-cp310-win_amd64.whl", hash = "sha256:459b140e34031164e2764bdb31c644d8a0893fc6f32c585130d401951b3985e0", size = 318238, upload-time = "2025-12-22T09:05:26.603Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/70/8fb2796433d1c6efe0a19dc1e43279024c9f3055a89a7e191d0e4298de3d/twisterl-0.4.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:d5edaa8ba62eca8c9744b44ecfd3baa431ba028bdb0b50fffcace27ebe9a74fe", size = 430400, upload-time = "2025-12-22T09:06:23.152Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/5c/af1699fccc6115d4a010cc201bbf5e25a96a45ca09175fd6383a22d3af2d/twisterl-0.4.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:b9f55a0db0f073acc17a42b25bab6e0dac31f66f5369d3143222d7f33d46b2d5", size = 412569, upload-time = "2025-12-22T09:03:46.434Z" },
+    { url = "https://files.pythonhosted.org/packages/30/77/58eb418d35e97b6d60df1aab443d2d3ffe7cf78a1847abc98cc577937816/twisterl-0.4.1-cp311-cp311-manylinux_2_34_x86_64.whl", hash = "sha256:9b603851629c7e7a3171e27cea705372282184a272dcda136650b95f71e8d7fe", size = 455940, upload-time = "2025-12-22T09:05:03.385Z" },
+    { url = "https://files.pythonhosted.org/packages/97/34/7e7616d448326c41c3084f0f809e01deb06d468a876cc412a16011e3b342/twisterl-0.4.1-cp311-cp311-win_amd64.whl", hash = "sha256:52c9c23292e7fbe5103361c76188a54c254dc47a97576388bf85e93f04f0bf8c", size = 318406, upload-time = "2025-12-22T09:06:17.522Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/65/fb765f4ea546def159f13564a4a0681722cd4f4006d551b644670d81d768/twisterl-0.4.1-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:0036a566741ec6e657b8b3a9b1d7a85e3a212b55617b072d196dc88385a21c36", size = 429958, upload-time = "2025-12-22T09:05:21.303Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/8b/68557ae57e775c5e14b49261f0e2a35e1d3508847d6f894d22bbcece4702/twisterl-0.4.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:4b3816670c006e42455659a5b9cde9c147a6380dac537fc3f1b878436847b84e", size = 411884, upload-time = "2025-12-22T09:06:07.063Z" },
+    { url = "https://files.pythonhosted.org/packages/44/bf/431c73f09323c31ece1387631bb1d29d8e8d508e005f9781f12e2c2e1ec8/twisterl-0.4.1-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:22bb7cc00a6287e05fe1b05c92bece1a4485ee7a0e8d26b7a057b536cb08bc64", size = 456572, upload-time = "2025-12-22T09:05:23.5Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/ef/7f753bbc8dd64e18e69bbf6933c982050db0a876cc0b9062525ead594c6d/twisterl-0.4.1-cp312-cp312-win_amd64.whl", hash = "sha256:94ed14c55d03773e7522daaedbc1fad85d3f9d1f0c132cbacaa8afdd40df789c", size = 318290, upload-time = "2025-12-22T09:06:26.564Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/8a/e85a7ffbe158061ff1e42e983c36b34646b611418d57dcb17a804afb6636/twisterl-0.4.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:29c573af896d97463b769c82e178152da4557683bed6b3b6c6b05acda7fdab8e", size = 411693, upload-time = "2025-12-22T09:04:19.166Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/b0/5d641695fe23042541ce73534c971719727c8331cce4d412fcf31509a5ec/twisterl-0.4.1-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:aad265c834a303d8ab63e6756c02ba14e8f29eb254bd34e2b47f3a5d49f9b2cc", size = 455451, upload-time = "2025-12-22T09:05:10.147Z" },
+    { url = "https://files.pythonhosted.org/packages/48/61/f86ef0f666f249fe9422e1bf7e2478fcb4b40281ae7749a56b3006a9b1ac/twisterl-0.4.1-cp313-cp313-win_amd64.whl", hash = "sha256:436bcefb4e9f2c8e9561b9ecd2d3d1b67c3abb8613cac7e3914ba6d8faac2ee0", size = 317827, upload-time = "2025-12-22T09:06:11.936Z" },
 ]
 
 [[package]]
