@@ -145,7 +145,14 @@ class TestCouplingMapTool:
             mock_backend.num_qubits = 5
             mock_config = Mock()
             mock_config.coupling_map = [
-                [0, 1], [1, 0], [1, 2], [2, 1], [2, 3], [3, 2], [3, 4], [4, 3]
+                [0, 1],
+                [1, 0],
+                [1, 2],
+                [2, 1],
+                [2, 3],
+                [3, 2],
+                [3, 4],
+                [4, 3],
             ]
             mock_backend.configuration.return_value = mock_config
             mock_runtime_service.backend.return_value = mock_backend
