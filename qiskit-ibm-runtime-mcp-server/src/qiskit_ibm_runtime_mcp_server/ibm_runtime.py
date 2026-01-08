@@ -88,6 +88,12 @@ def get_token_from_env() -> str | None:
     return None
 
 
+logger = logging.getLogger(__name__)
+
+# Global service instance
+service: QiskitRuntimeService | None = None
+
+
 def _build_adjacency_list(edges: list[list[int]], num_qubits: int) -> dict[str, list[int]]:
     """Build adjacency list from edges."""
     adjacency: dict[str, list[int]] = {str(i): [] for i in range(num_qubits)}
@@ -96,10 +102,41 @@ def _build_adjacency_list(edges: list[list[int]], num_qubits: int) -> dict[str, 
     return adjacency
 
 
-logger = logging.getLogger(__name__)
+def _process_coupling_map(
+    edges: list[list[int]], num_qubits: int, backend_name: str, source: str | None = None
+) -> dict[str, Any]:
+    """Process coupling map data into standardized response format.
 
-# Global service instance
-service: QiskitRuntimeService | None = None
+    Args:
+        edges: List of [control, target] qubit connection pairs
+        num_qubits: Total number of qubits
+        backend_name: Name of the backend
+        source: Optional source identifier (e.g., "fake_backend")
+
+    Returns:
+        Standardized coupling map response dict
+    """
+    # Check if bidirectional (both [i,j] and [j,i] exist for all edges)
+    edge_set = {(e[0], e[1]) for e in edges}
+    bidirectional = len(edges) > 0 and all((e[1], e[0]) in edge_set for e in edges)
+
+    # Build adjacency list
+    adjacency_list = _build_adjacency_list(edges, num_qubits)
+
+    result: dict[str, Any] = {
+        "status": "success",
+        "backend_name": backend_name,
+        "num_qubits": num_qubits,
+        "num_edges": len(edges),
+        "edges": edges,
+        "bidirectional": bidirectional,
+        "adjacency_list": adjacency_list,
+    }
+
+    if source:
+        result["source"] = source
+
+    return result
 
 
 def _create_runtime_service(channel: str, instance: str | None) -> QiskitRuntimeService:
@@ -481,7 +518,7 @@ async def get_coupling_map(backend_name: str) -> dict[str, Any]:
     try:
         # Check if this is a fake backend request
         if backend_name.startswith("fake_"):
-            return await _get_fake_backend_coupling_map(backend_name)
+            return _get_fake_backend_coupling_map(backend_name)
 
         # Real backend - requires credentials
         global service
@@ -500,22 +537,7 @@ async def get_coupling_map(backend_name: str) -> dict[str, Any]:
         except Exception:
             pass  # nosec B110 - Config errors are acceptable; defaults used
 
-        # Check if bidirectional (both [i,j] and [j,i] exist for all edges)
-        edge_set = {(e[0], e[1]) for e in edges}
-        bidirectional = len(edges) > 0 and all((e[1], e[0]) in edge_set for e in edges)
-
-        # Build adjacency list
-        adjacency_list = _build_adjacency_list(edges, num_qubits)
-
-        return {
-            "status": "success",
-            "backend_name": backend.name,
-            "num_qubits": num_qubits,
-            "num_edges": len(edges),
-            "edges": edges,
-            "bidirectional": bidirectional,
-            "adjacency_list": adjacency_list,
-        }
+        return _process_coupling_map(edges, num_qubits, backend.name)
 
     except Exception as e:
         logger.error(f"Failed to get coupling map: {e}")
@@ -525,7 +547,7 @@ async def get_coupling_map(backend_name: str) -> dict[str, Any]:
         }
 
 
-async def _get_fake_backend_coupling_map(backend_name: str) -> dict[str, Any]:
+def _get_fake_backend_coupling_map(backend_name: str) -> dict[str, Any]:
     """
     Get coupling map from a fake backend (no credentials needed).
 
@@ -547,23 +569,7 @@ async def _get_fake_backend_coupling_map(backend_name: str) -> dict[str, Any]:
     edges = [[int(e[0]), int(e[1])] for e in coupling_map.get_edges()]
     num_qubits = coupling_map.size()
 
-    # Check if bidirectional
-    edge_set = {(e[0], e[1]) for e in edges}
-    bidirectional = len(edges) > 0 and all((e[1], e[0]) in edge_set for e in edges)
-
-    # Build adjacency list
-    adjacency_list = _build_adjacency_list(edges, num_qubits)
-
-    return {
-        "status": "success",
-        "backend_name": backend.name,
-        "num_qubits": num_qubits,
-        "num_edges": len(edges),
-        "edges": edges,
-        "bidirectional": bidirectional,
-        "adjacency_list": adjacency_list,
-        "source": "fake_backend",
-    }
+    return _process_coupling_map(edges, num_qubits, backend.name, source="fake_backend")
 
 
 def _get_qubit_calibration_data(
