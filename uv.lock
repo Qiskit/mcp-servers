@@ -3111,7 +3111,7 @@ wheels = [
 
 [[package]]
 name = "qiskit-ibm-runtime-mcp-server"
-version = "0.1.2"
+version = "0.2.0"
 source = { editable = "qiskit-ibm-runtime-mcp-server" }
 dependencies = [
     { name = "fastmcp" },
@@ -3232,7 +3232,7 @@ wheels = [
 
 [[package]]
 name = "qiskit-ibm-transpiler-mcp-server"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "qiskit-ibm-transpiler-mcp-server" }
 dependencies = [
     { name = "fastmcp" },
@@ -3415,7 +3415,7 @@ test = [
 
 [[package]]
 name = "qiskit-mcp-servers"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "qiskit-code-assistant-mcp-server" },
