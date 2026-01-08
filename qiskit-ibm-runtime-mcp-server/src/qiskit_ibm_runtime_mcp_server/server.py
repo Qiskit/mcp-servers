@@ -32,10 +32,10 @@ from fastmcp import FastMCP
 from qiskit_mcp_server.circuit_serialization import CircuitFormat
 
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
+    DDSequenceType,
     active_account_info,
     active_instance_info,
     available_instances,
-    DDSequenceType,
     cancel_job,
     delete_saved_account,
     get_backend_calibration,
