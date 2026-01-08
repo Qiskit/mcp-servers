@@ -424,6 +424,74 @@ When developing MCP servers that handle quantum computing resources:
    - Test error paths and edge cases
    - Verify credential handling doesn't expose sensitive data
 
+
+### Testing Strategy
+
+Comprehensive testing ensures MCP server reliability:
+
+1. **Test Organization**:
+   ```
+   tests/
+   ├── conftest.py           # Shared fixtures and mocks
+   ├── unit/                  # Fast, isolated unit tests
+   ├── integration/           # Tests with mocked external services
+   └── test_*.py              # Test files (pytest auto-discovery)
+   ```
+
+2. **Unit Tests**:
+   - Test individual functions in isolation
+   - Mock all external dependencies
+   - Fast execution (no network calls)
+   - Target 65%+ code coverage
+
+3. **Integration Tests** (marked with `@pytest.mark.integration`):
+   - Test tool and resource interactions
+   - Use mocked IBM Quantum services
+   - Verify end-to-end data flow
+   - Can be skipped with `pytest -m "not integration"`
+
+4. **Common Fixtures** (in `conftest.py`):
+   ```python
+   @pytest.fixture
+   def mock_runtime_service():
+       """Mock QiskitRuntimeService with fake backends and jobs."""
+       ...
+
+   @pytest.fixture
+   def mock_env_vars():
+       """Set test environment variables."""
+       ...
+
+   @pytest.fixture(autouse=True)
+   def reset_service():
+       """Reset global service state between tests."""
+       ...
+   ```
+
+5. **Async Testing Pattern**:
+   ```python
+   @pytest.mark.asyncio
+   async def test_async_tool(mock_service):
+       """Test async MCP tool."""
+       result = await my_tool_function(params)
+       assert result["status"] == "success"
+   ```
+
+6. **Running Tests**:
+   ```bash
+   # All tests
+   ./run_tests.sh
+
+   # Unit tests only
+   uv run pytest -m "not integration"
+
+   # With coverage
+   uv run pytest --cov=src --cov-report=html
+
+   # Specific test file
+   uv run pytest tests/test_server.py -v
+   ```
+
 ### Adding New Features
 
 1. **Adding a New Tool**:
