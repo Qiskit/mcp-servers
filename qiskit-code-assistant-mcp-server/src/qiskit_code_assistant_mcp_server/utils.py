@@ -20,13 +20,13 @@ Synchronous Execution
 All async functions decorated with `@with_sync` can be called synchronously
 via the `.sync` attribute:
 
-    from qiskit_code_assistant_mcp_server.qca import qca_list_models
+    from qiskit_code_assistant_mcp_server.qca import list_models
 
     # Async usage (in async context)
-    result = await qca_list_models()
+    result = await list_models()
 
     # Sync usage (in sync context, Jupyter notebooks, DSPy, etc.)
-    result = qca_list_models.sync()
+    result = list_models.sync()
 
 The sync wrapper handles event loop management automatically, including
 nested event loops in Jupyter notebooks (via nest_asyncio).
