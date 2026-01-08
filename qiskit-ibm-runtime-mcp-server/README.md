@@ -148,6 +148,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     list_backends,
     least_busy_backend,
     get_backend_properties,
+    get_coupling_map,
     list_my_jobs,
     get_job_status,
     cancel_job
@@ -179,7 +180,8 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     setup_ibm_quantum_account,
     list_backends,
     least_busy_backend,
-    get_backend_properties
+    get_backend_properties,
+    get_coupling_map
 )
 
 # Load environment variables (includes QISKIT_IBM_TOKEN)
@@ -192,7 +194,8 @@ agent = dspy.ReAct(
         setup_ibm_quantum_account.sync,  # Optional - only if you need to verify setup
         list_backends.sync,
         least_busy_backend.sync,
-        get_backend_properties.sync
+        get_backend_properties.sync,
+        get_coupling_map.sync  # Works with fake backends too (no credentials needed)
     ]
 )
 
@@ -237,6 +240,26 @@ Get detailed properties of specific backend.
 - Gate set and coupling map
 - Current operational status
 - Queue information
+
+#### `get_coupling_map(backend_name: str)`
+Get the coupling map (qubit connectivity) for a backend with detailed analysis.
+
+Supports both real backends (requires credentials) and fake backends (no credentials needed).
+Use `fake_` prefix for offline testing (e.g., `fake_sherbrooke`, `fake_brisbane`).
+
+**Parameters:**
+- `backend_name`: Name of the backend (e.g., `ibm_brisbane` or `fake_sherbrooke`)
+
+**Returns:** Connectivity information including:
+- `edges`: List of [control, target] qubit connection pairs
+- `adjacency_list`: Neighbor mapping for each qubit
+- `bidirectional`: Whether all connections work in both directions
+- `num_qubits`: Total qubit count
+
+**Use cases:**
+- Circuit optimization and qubit mapping
+- SWAP gate minimization planning
+- Offline testing with fake backends
 
 #### `list_my_jobs(limit: int = 10)`
 Get list of recent jobs from your account.
