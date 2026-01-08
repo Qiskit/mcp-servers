@@ -156,8 +156,6 @@ Each MCP server follows this standard structure:
 - `constants.py`: API endpoints and configuration
 - `utils.py`: HTTP client management and utilities
 
-**Note**: This server uses `mcp.tool()(function)` syntax instead of `@mcp.tool()` decorators, with tools defined in `qca.py` and registered in `server.py`.
-
 **Tools Provided**:
 | Tool | Description |
 |------|-------------|
@@ -370,8 +368,8 @@ AI Assistant → MCP Client → ai_routing_tool / ai_*_synthesis_tool
 
 3. **MCP Server Patterns**:
    - All servers use FastMCP framework
-   - Tools defined with `@mcp.tool()` decorator or `mcp.tool()(function)` syntax
-   - Resources defined with `@mcp.resource()` decorator or `mcp.resource()(function)` syntax
+   - Tools defined with `@mcp.tool()` decorator
+   - Resources defined with `@mcp.resource()` decorator
    - Async functions for all MCP handlers
    - Tool functions should delegate to core module functions
    - Tool function names typically end with `_tool` suffix
