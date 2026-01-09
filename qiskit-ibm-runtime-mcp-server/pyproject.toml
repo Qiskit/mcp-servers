@@ -103,3 +103,7 @@ examples = [
 [tool.bandit]
 skips = ["B101"]  # Skip assert_used check in tests
 exclude_dirs = ["tests", ".venv", "build", "dist"]
+
+# Ruff configuration
+[tool.ruff.lint.pylint]
+max-returns = 7  # Allow complex validation functions with multiple early returns
