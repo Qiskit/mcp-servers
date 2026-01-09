@@ -18,6 +18,7 @@ import os
 from typing import Any, Literal
 
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
 from qiskit_ibm_runtime.options import SamplerOptions
 from qiskit_mcp_server.circuit_serialization import CircuitFormat, load_circuit
 
@@ -91,6 +92,51 @@ logger = logging.getLogger(__name__)
 
 # Global service instance
 service: QiskitRuntimeService | None = None
+
+
+def _build_adjacency_list(edges: list[list[int]], num_qubits: int) -> dict[str, list[int]]:
+    """Build adjacency list from edges."""
+    adjacency: dict[str, list[int]] = {str(i): [] for i in range(num_qubits)}
+    for edge in edges:
+        adjacency[str(edge[0])].append(edge[1])
+    return adjacency
+
+
+def _process_coupling_map(
+    edges: list[list[int]], num_qubits: int, backend_name: str, source: str | None = None
+) -> dict[str, Any]:
+    """Process coupling map data into standardized response format.
+
+    Args:
+        edges: List of [control, target] qubit connection pairs
+        num_qubits: Total number of qubits
+        backend_name: Name of the backend
+        source: Optional source identifier (e.g., "fake_backend")
+
+    Returns:
+        Standardized coupling map response dict
+    """
+    # Check if bidirectional (both [i,j] and [j,i] exist for all edges)
+    edge_set = {(e[0], e[1]) for e in edges}
+    bidirectional = len(edges) > 0 and all((e[1], e[0]) in edge_set for e in edges)
+
+    # Build adjacency list
+    adjacency_list = _build_adjacency_list(edges, num_qubits)
+
+    result: dict[str, Any] = {
+        "status": "success",
+        "backend_name": backend_name,
+        "num_qubits": num_qubits,
+        "num_edges": len(edges),
+        "edges": edges,
+        "bidirectional": bidirectional,
+        "adjacency_list": adjacency_list,
+    }
+
+    if source:
+        result["source"] = source
+
+    return result
 
 
 def _create_runtime_service(channel: str, instance: str | None) -> QiskitRuntimeService:
@@ -425,6 +471,105 @@ async def get_backend_properties(backend_name: str) -> dict[str, Any]:
             "status": "error",
             "message": f"Failed to get backend properties: {e!s}",
         }
+
+
+def _get_fake_backend(backend_name: str) -> Any:
+    """
+    Get a fake backend by name from the FakeProviderForBackendV2.
+
+    Args:
+        backend_name: Name of the fake backend (e.g., 'fake_brisbane')
+
+    Returns:
+        Fake backend instance
+
+    Raises:
+        ValueError: If the fake backend is not found
+    """
+    provider = FakeProviderForBackendV2()
+    backends = provider.backends()
+
+    for backend in backends:
+        if backend.name == backend_name:
+            return backend
+
+    # Only build available list for error message
+    available = sorted(b.name for b in backends)[:10]
+    raise ValueError(
+        f"Fake backend '{backend_name}' not found. "
+        f"Available fake backends: {', '.join(available)}..."
+    )
+
+
+@with_sync
+async def get_coupling_map(backend_name: str) -> dict[str, Any]:
+    """
+    Get the coupling map (qubit connectivity) for a specific backend.
+
+    Supports both real IBM Quantum backends and fake backends (no credentials needed).
+    Use 'fake_' prefix for fake backends (e.g., 'fake_brisbane', 'fake_sherbrooke').
+
+    Args:
+        backend_name: Name of the backend. Use 'fake_' prefix for fake backends.
+
+    Returns:
+        Coupling map details including edges and adjacency list
+    """
+    try:
+        # Check if this is a fake backend request
+        if backend_name.startswith("fake_"):
+            return _get_fake_backend_coupling_map(backend_name)
+
+        # Real backend - requires credentials
+        global service
+        if service is None:
+            service = initialize_service()
+
+        backend = service.backend(backend_name)
+        num_qubits = getattr(backend, "num_qubits", 0)
+
+        # Get configuration
+        edges: list[list[int]] = []
+        try:
+            config = backend.configuration()
+            coupling_map_raw = getattr(config, "coupling_map", []) or []
+            edges = [[int(e[0]), int(e[1])] for e in coupling_map_raw]
+        except Exception:
+            pass  # nosec B110 - Config errors are acceptable; defaults used
+
+        return _process_coupling_map(edges, num_qubits, backend.name)
+
+    except Exception as e:
+        logger.error(f"Failed to get coupling map: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to get coupling map: {e!s}",
+        }
+
+
+def _get_fake_backend_coupling_map(backend_name: str) -> dict[str, Any]:
+    """
+    Get coupling map from a fake backend (no credentials needed).
+
+    Args:
+        backend_name: Name of the fake backend (e.g., 'fake_brisbane')
+
+    Returns:
+        Coupling map details
+    """
+    backend = _get_fake_backend(backend_name)
+    coupling_map = backend.coupling_map
+
+    if coupling_map is None:
+        return {
+            "status": "error",
+            "message": f"Backend '{backend_name}' has no coupling map (fully connected)",
+        }
+
+    edges = [[int(e[0]), int(e[1])] for e in coupling_map.get_edges()]
+    num_qubits = coupling_map.size()
+
+    return _process_coupling_map(edges, num_qubits, backend.name, source="fake_backend")
 
 
 def _get_qubit_calibration_data(

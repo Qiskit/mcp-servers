@@ -128,6 +128,146 @@ class TestToolIntegration:
                 assert cancel_result["status"] == "success"
 
 
+class TestCouplingMapTool:
+    """Test coupling map tool functionality."""
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_success(self, mock_env_vars, mock_runtime_service):
+        """Test getting coupling map for a backend."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            # Mock backend with coupling map
+            mock_backend = Mock()
+            mock_backend.name = "ibm_brisbane"
+            mock_backend.num_qubits = 5
+            mock_config = Mock()
+            mock_config.coupling_map = [
+                [0, 1],
+                [1, 0],
+                [1, 2],
+                [2, 1],
+                [2, 3],
+                [3, 2],
+                [3, 4],
+                [4, 3],
+            ]
+            mock_backend.configuration.return_value = mock_config
+            mock_runtime_service.backend.return_value = mock_backend
+
+            result = await get_coupling_map("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert result["backend_name"] == "ibm_brisbane"
+            assert result["num_qubits"] == 5
+            assert result["num_edges"] == 8
+            assert len(result["edges"]) == 8
+            assert result["bidirectional"] is True
+            assert "adjacency_list" in result
+            assert result["adjacency_list"]["0"] == [1]
+            assert result["adjacency_list"]["1"] == [0, 2]
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_unidirectional(self, mock_env_vars, mock_runtime_service):
+        """Test coupling map with unidirectional edges."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_backend = Mock()
+            mock_backend.name = "test_backend"
+            mock_backend.num_qubits = 3
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1], [1, 2]]  # Only one direction
+            mock_backend.configuration.return_value = mock_config
+            mock_runtime_service.backend.return_value = mock_backend
+
+            result = await get_coupling_map("test_backend")
+
+            assert result["status"] == "success"
+            assert result["bidirectional"] is False
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_error(self, mock_env_vars, mock_runtime_service):
+        """Test coupling map with backend error."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.backend.side_effect = Exception("Backend not found")
+
+            result = await get_coupling_map("nonexistent_backend")
+
+            assert result["status"] == "error"
+            assert "Backend not found" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_fake_backend(self):
+        """Test getting coupling map from a fake backend (no credentials needed)."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        # This test uses the real fake provider - no mocking needed
+        result = await get_coupling_map("fake_sherbrooke")
+
+        assert result["status"] == "success"
+        assert result["backend_name"] == "fake_sherbrooke"
+        assert result["num_qubits"] > 0
+        assert result["num_edges"] > 0
+        assert len(result["edges"]) > 0
+        assert "bidirectional" in result
+        assert "adjacency_list" in result
+        assert result["source"] == "fake_backend"
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_fake_backend_not_found(self):
+        """Test fake backend not found error."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        result = await get_coupling_map("fake_nonexistent_backend")
+
+        assert result["status"] == "error"
+        assert "not found" in result["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_get_coupling_map_fake_nighthawk(self):
+        """Test getting coupling map from FakeNighthawk backend.
+
+        FakeNighthawk uses a rectangular grid topology unlike other IBM processors
+        which use heavy-hex topology. This test verifies the tool works with
+        different processor architectures.
+
+        Note: FakeNighthawk was added in qiskit-ibm-runtime 0.44.0.
+        """
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import get_coupling_map
+
+        # Check if FakeNighthawk is available in the current version
+        try:
+            from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
+
+            provider = FakeProviderForBackendV2()
+            available = [b.name for b in provider.backends()]
+            has_nighthawk = "fake_nighthawk" in available
+        except ImportError:
+            has_nighthawk = False
+
+        if not has_nighthawk:
+            pytest.skip("FakeNighthawk not available (requires qiskit-ibm-runtime >= 0.44.0)")
+
+        result = await get_coupling_map("fake_nighthawk")
+
+        assert result["status"] == "success"
+        assert result["backend_name"] == "fake_nighthawk"
+        assert result["num_qubits"] > 0
+        assert result["num_edges"] > 0
+        assert len(result["edges"]) > 0
+        assert "bidirectional" in result
+        assert "adjacency_list" in result
+        assert result["source"] == "fake_backend"
+
+
 class TestResourceIntegration:
     """Test MCP resource integration."""
 

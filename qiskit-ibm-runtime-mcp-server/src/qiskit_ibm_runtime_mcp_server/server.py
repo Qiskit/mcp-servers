@@ -37,6 +37,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     get_backend_calibration,
     get_backend_properties,
     get_bell_state_circuit,
+    get_coupling_map,
     get_ghz_state_circuit,
     get_job_status,
     get_quantum_random_circuit,
@@ -106,6 +107,8 @@ async def get_backend_properties_tool(backend_name: str) -> dict[str, Any]:
     Note:
         For time-varying calibration data (T1, T2, gate errors, faulty qubits),
         use get_backend_calibration_tool instead.
+        For detailed connectivity analysis (adjacency list, bidirectional check)
+        or fake backend support, use get_coupling_map_tool instead.
     """
     return await get_backend_properties(backend_name)
 
@@ -136,6 +139,38 @@ async def get_backend_calibration_tool(
         use get_backend_properties_tool instead.
     """
     return await get_backend_calibration(backend_name, qubit_indices)
+
+
+@mcp.tool()
+async def get_coupling_map_tool(backend_name: str) -> dict[str, Any]:
+    """Get the coupling map (qubit connectivity) for an IBM Quantum backend.
+
+    Supports both real backends (requires credentials) and fake backends (no credentials).
+    Use 'fake_' prefix for offline testing without IBM Quantum credentials.
+
+    Args:
+        backend_name: Name of the backend. Examples:
+            - Real backends: 'ibm_brisbane', 'ibm_fez' (requires credentials)
+            - Fake backends: 'fake_brisbane', 'fake_sherbrooke' (no credentials needed)
+
+    Returns:
+        Coupling map details including:
+        - num_qubits: Total qubit count
+        - edges: List of [control, target] qubit connection pairs
+        - bidirectional: Whether all connections work in both directions
+        - adjacency_list: Neighbor mapping for each qubit (key: qubit index as string)
+        - source: 'fake_backend' if using a fake backend (only present for fake backends)
+
+    Use cases:
+        - Identify physically connected qubits for circuit optimization
+        - Plan qubit assignments to minimize SWAP gates
+        - Understand backend architecture for advanced optimization
+        - Test circuit routing offline with fake backends
+
+    Note:
+        For processor type and other backend info, use get_backend_properties_tool.
+    """
+    return await get_coupling_map(backend_name)
 
 
 @mcp.tool()
