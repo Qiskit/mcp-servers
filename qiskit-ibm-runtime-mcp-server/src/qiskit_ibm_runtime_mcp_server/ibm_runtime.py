@@ -750,8 +750,7 @@ def _score_chain(
             sum(qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in chain)
         )
 
-    # metric == "combined"
-    # Weighted combination: gate_errors + readout + inverse coherence
+    # Combined metric: gate_errors + readout + inverse coherence
     gate_score = 0.0
     for i in range(len(chain) - 1):
         edge = (chain[i], chain[i + 1])
