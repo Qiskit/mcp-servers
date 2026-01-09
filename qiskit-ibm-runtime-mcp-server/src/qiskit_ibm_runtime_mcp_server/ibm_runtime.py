@@ -746,30 +746,28 @@ def _score_chain(
 
     elif metric == "readout_error":
         # Sum of readout errors for all qubits
-        return sum(
-            qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in chain
+        return float(
+            sum(qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in chain)
         )
 
-    elif metric == "combined":
-        # Weighted combination: gate_errors + readout + inverse coherence
-        gate_score = 0.0
-        for i in range(len(chain) - 1):
-            edge = (chain[i], chain[i + 1])
-            reverse_edge = (chain[i + 1], chain[i])
-            gate_score += gate_errors.get(edge, gate_errors.get(reverse_edge, 0.01))
+    # metric == "combined"
+    # Weighted combination: gate_errors + readout + inverse coherence
+    gate_score = 0.0
+    for i in range(len(chain) - 1):
+        edge = (chain[i], chain[i + 1])
+        reverse_edge = (chain[i + 1], chain[i])
+        gate_score += gate_errors.get(edge, gate_errors.get(reverse_edge, 0.01))
 
-        readout_score = sum(
-            qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in chain
-        )
+    readout_score = float(
+        sum(qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in chain)
+    )
 
-        # Lower T1/T2 is worse, so use inverse (capped to avoid division issues)
-        coherence_score = sum(
-            1.0 / max(qubit_calibration.get(q, {}).get("t1_us", 100), 1) for q in chain
-        )
+    # Lower T1/T2 is worse, so use inverse (capped to avoid division issues)
+    coherence_score = float(
+        sum(1.0 / max(qubit_calibration.get(q, {}).get("t1_us", 100), 1) for q in chain)
+    )
 
-        return gate_score + readout_score + 0.01 * coherence_score
-
-    return 0.0
+    return gate_score + readout_score + 0.01 * coherence_score
 
 
 def _build_qubit_calibration(
@@ -1089,9 +1087,7 @@ def _score_qv_subgraph(
 
     # Readout errors
     readout_sum = float(
-        sum(
-            qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in subgraph
-        )
+        sum(qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in subgraph)
     )
 
     # Coherence factor (inverse of T1 average, penalize low coherence)
