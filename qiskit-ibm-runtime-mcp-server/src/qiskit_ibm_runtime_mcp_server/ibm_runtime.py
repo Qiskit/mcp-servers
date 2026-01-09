@@ -28,6 +28,9 @@ from qiskit_ibm_runtime_mcp_server.utils import with_sync
 # Type alias for dynamical decoupling sequence types
 DDSequenceType = Literal["XX", "XpXm", "XY4"]
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
 
 def get_instance_from_env() -> str | None:
     """
@@ -89,8 +92,6 @@ def get_token_from_env() -> str | None:
         return token.strip()
     return None
 
-
-logger = logging.getLogger(__name__)
 
 # Global service instance
 service: QiskitRuntimeService | None = None
