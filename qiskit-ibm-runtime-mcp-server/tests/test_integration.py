@@ -268,6 +268,209 @@ class TestCouplingMapTool:
         assert result["source"] == "fake_backend"
 
 
+class TestOptimalQubitChainsTool:
+    """Test optimal qubit chains tool functionality."""
+
+    @pytest.mark.asyncio
+    async def test_find_optimal_chains_success(self, mock_env_vars, mock_runtime_service):
+        """Test finding optimal chains successfully."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import find_optimal_qubit_chains
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            # Mock backend with coupling map
+            mock_backend = Mock()
+            mock_backend.name = "ibm_test"
+            mock_backend.num_qubits = 5
+
+            # Create a simple linear coupling map: 0-1-2-3-4
+            mock_config = Mock()
+            mock_config.coupling_map = [
+                [0, 1],
+                [1, 0],
+                [1, 2],
+                [2, 1],
+                [2, 3],
+                [3, 2],
+                [3, 4],
+                [4, 3],
+            ]
+            mock_backend.configuration.return_value = mock_config
+
+            # Mock properties with calibration data
+            mock_properties = Mock()
+            mock_properties.faulty_qubits.return_value = []
+            mock_properties.t1.return_value = 100e-6  # 100 microseconds
+            mock_properties.t2.return_value = 50e-6  # 50 microseconds
+            mock_properties.readout_error.return_value = 0.01
+            mock_properties.gate_error.return_value = 0.005
+            mock_backend.properties.return_value = mock_properties
+
+            mock_runtime_service.backend.return_value = mock_backend
+
+            result = await find_optimal_qubit_chains("ibm_test", chain_length=3, num_results=3)
+
+            assert result["status"] == "success"
+            assert result["backend_name"] == "ibm_test"
+            assert result["chain_length"] == 3
+            assert result["metric"] == "two_qubit_error"
+            assert result["total_chains_found"] > 0
+            assert len(result["chains"]) <= 3
+            assert result["chains"][0]["rank"] == 1
+            assert len(result["chains"][0]["qubits"]) == 3
+            assert "qubit_details" in result["chains"][0]
+            assert "edge_errors" in result["chains"][0]
+
+    @pytest.mark.asyncio
+    async def test_find_optimal_chains_no_valid_chains(self, mock_env_vars, mock_runtime_service):
+        """Test when no valid chains exist."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import find_optimal_qubit_chains
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            # Mock backend with disconnected qubits (no chains possible)
+            mock_backend = Mock()
+            mock_backend.name = "ibm_test"
+            mock_backend.num_qubits = 3
+
+            mock_config = Mock()
+            mock_config.coupling_map = []  # No connections
+            mock_backend.configuration.return_value = mock_config
+
+            mock_properties = Mock()
+            mock_properties.faulty_qubits.return_value = []
+            mock_backend.properties.return_value = mock_properties
+
+            mock_runtime_service.backend.return_value = mock_backend
+
+            result = await find_optimal_qubit_chains("ibm_test", chain_length=3)
+
+            assert result["status"] == "error"
+            assert "No valid chains" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_find_optimal_chains_excludes_faulty_qubits(
+        self, mock_env_vars, mock_runtime_service
+    ):
+        """Test that faulty qubits are excluded from chains."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import find_optimal_qubit_chains
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_backend = Mock()
+            mock_backend.name = "ibm_test"
+            mock_backend.num_qubits = 6
+
+            # Branching topology allowing chains even with qubit 2 faulty:
+            #   0 - 1 - 2 - 3
+            #       |
+            #       4 - 5
+            mock_config = Mock()
+            mock_config.coupling_map = [
+                [0, 1],
+                [1, 0],
+                [1, 2],
+                [2, 1],
+                [2, 3],
+                [3, 2],
+                [1, 4],
+                [4, 1],
+                [4, 5],
+                [5, 4],
+            ]
+            mock_backend.configuration.return_value = mock_config
+
+            mock_properties = Mock()
+            mock_properties.faulty_qubits.return_value = [2]  # Qubit 2 is faulty
+            mock_properties.t1.return_value = 100e-6
+            mock_properties.t2.return_value = 50e-6
+            mock_properties.readout_error.return_value = 0.01
+            mock_properties.gate_error.return_value = 0.005
+            mock_backend.properties.return_value = mock_properties
+
+            mock_runtime_service.backend.return_value = mock_backend
+
+            result = await find_optimal_qubit_chains("ibm_test", chain_length=3)
+
+            assert result["status"] == "success"
+            assert 2 in result["faulty_qubits"]
+            # Verify no chain contains the faulty qubit
+            for chain in result["chains"]:
+                assert 2 not in chain["qubits"]
+
+    @pytest.mark.asyncio
+    async def test_find_optimal_chains_different_metrics(self, mock_env_vars, mock_runtime_service):
+        """Test different scoring metrics."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import find_optimal_qubit_chains
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_backend = Mock()
+            mock_backend.name = "ibm_test"
+            mock_backend.num_qubits = 5
+
+            mock_config = Mock()
+            mock_config.coupling_map = [
+                [0, 1],
+                [1, 0],
+                [1, 2],
+                [2, 1],
+                [2, 3],
+                [3, 2],
+                [3, 4],
+                [4, 3],
+            ]
+            mock_backend.configuration.return_value = mock_config
+
+            mock_properties = Mock()
+            mock_properties.faulty_qubits.return_value = []
+            mock_properties.t1.return_value = 100e-6
+            mock_properties.t2.return_value = 50e-6
+            mock_properties.readout_error.return_value = 0.01
+            mock_properties.gate_error.return_value = 0.005
+            mock_backend.properties.return_value = mock_properties
+
+            mock_runtime_service.backend.return_value = mock_backend
+
+            # Test each metric
+            for metric in ["two_qubit_error", "readout_error", "combined"]:
+                result = await find_optimal_qubit_chains("ibm_test", chain_length=3, metric=metric)
+
+                assert result["status"] == "success"
+                assert result["metric"] == metric
+                assert len(result["chains"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_find_optimal_chains_no_calibration_data(
+        self, mock_env_vars, mock_runtime_service
+    ):
+        """Test error when backend has no calibration data."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import find_optimal_qubit_chains
+
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service") as mock_init:
+            mock_init.return_value = mock_runtime_service
+
+            mock_backend = Mock()
+            mock_backend.name = "ibm_test"
+            mock_backend.num_qubits = 5
+
+            mock_config = Mock()
+            mock_config.coupling_map = [[0, 1], [1, 0]]
+            mock_backend.configuration.return_value = mock_config
+            mock_backend.properties.return_value = None  # No calibration data
+
+            mock_runtime_service.backend.return_value = mock_backend
+
+            result = await find_optimal_qubit_chains("ibm_test", chain_length=2)
+
+            assert result["status"] == "error"
+            assert "calibration" in result["message"].lower()
+
+
 class TestResourceIntegration:
     """Test MCP resource integration."""
 

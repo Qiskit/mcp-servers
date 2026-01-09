@@ -45,10 +45,10 @@ jobs:
 
     - name: Run type checking
       run: |
-        cd qiskit-code-assistant-mcp-server && uv run mypy src
-        cd ../qiskit-ibm-runtime-mcp-server && uv run mypy src
-        cd ../qiskit-ibm-transpiler-mcp-server && uv run mypy src
-        cd ../qiskit-mcp-server && uv run mypy src
+        cd qiskit-code-assistant-mcp-server && uv run mypy --config-file ../mypy.ini src
+        cd ../qiskit-ibm-runtime-mcp-server && uv run mypy --config-file ../mypy.ini src
+        cd ../qiskit-ibm-transpiler-mcp-server && uv run mypy --config-file ../mypy.ini src
+        cd ../qiskit-mcp-server && uv run mypy --config-file ../mypy.ini src
 
     - name: Run security checks
       run: |

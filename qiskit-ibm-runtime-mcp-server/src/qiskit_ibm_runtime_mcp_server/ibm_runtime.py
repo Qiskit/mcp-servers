@@ -652,6 +652,201 @@ def _get_gate_errors(
     return gate_errors
 
 
+# Type alias for chain scoring metrics
+ScoringMetric = Literal["two_qubit_error", "readout_error", "combined"]
+
+
+def _find_all_linear_chains(
+    adjacency_list: dict[str, list[int]],
+    chain_length: int,
+    faulty_qubits: set[int],
+) -> list[list[int]]:
+    """Find all valid linear chains of specified length using DFS.
+
+    Args:
+        adjacency_list: Mapping from qubit index (as string) to list of connected qubits
+        chain_length: Number of qubits in each chain
+        faulty_qubits: Set of qubit indices to exclude from chains
+
+    Returns:
+        List of chains, where each chain is a list of qubit indices
+    """
+    chains: list[list[int]] = []
+    num_qubits = len(adjacency_list)
+
+    def dfs(current: int, path: list[int], visited: set[int]) -> None:
+        if len(path) == chain_length:
+            chains.append(path.copy())
+            return
+
+        for neighbor in adjacency_list.get(str(current), []):
+            if neighbor not in visited and neighbor not in faulty_qubits:
+                visited.add(neighbor)
+                path.append(neighbor)
+                dfs(neighbor, path, visited)
+                path.pop()
+                visited.remove(neighbor)
+
+    # Start DFS from each non-faulty qubit
+    for start in range(num_qubits):
+        if start not in faulty_qubits:
+            dfs(start, [start], {start})
+
+    return chains
+
+
+def _score_chain(
+    chain: list[int],
+    qubit_calibration: dict[int, dict[str, Any]],
+    gate_errors: dict[tuple[int, int], float],
+    metric: ScoringMetric,
+) -> float:
+    """Score a chain based on selected metric. Lower is better.
+
+    Args:
+        chain: List of qubit indices forming the chain
+        qubit_calibration: Per-qubit calibration data (t1_us, t2_us, readout_error)
+        gate_errors: Two-qubit gate errors keyed by (control, target) tuple
+        metric: Scoring metric to use
+
+    Returns:
+        Score value (lower is better)
+    """
+    if metric == "two_qubit_error":
+        # Sum of two-qubit gate errors between consecutive qubits
+        total = 0.0
+        for i in range(len(chain) - 1):
+            edge = (chain[i], chain[i + 1])
+            reverse_edge = (chain[i + 1], chain[i])
+            total += gate_errors.get(edge, gate_errors.get(reverse_edge, 0.1))
+        return total
+
+    elif metric == "readout_error":
+        # Sum of readout errors for all qubits
+        return float(sum(qubit_calibration.get(q, {}).get("readout_error", 0.1) for q in chain))
+
+    # Combined metric: gate_errors + readout + inverse coherence
+    gate_score = 0.0
+    for i in range(len(chain) - 1):
+        edge = (chain[i], chain[i + 1])
+        reverse_edge = (chain[i + 1], chain[i])
+        gate_score += gate_errors.get(edge, gate_errors.get(reverse_edge, 0.1))
+
+    readout_score = float(
+        sum(qubit_calibration.get(q, {}).get("readout_error", 0.1) for q in chain)
+    )
+
+    # Lower T1/T2 is worse, so use inverse (capped to avoid division issues)
+    coherence_score = float(
+        sum(1.0 / max(qubit_calibration.get(q, {}).get("t1_us", 100), 1) for q in chain)
+    )
+
+    return gate_score + readout_score + 0.01 * coherence_score
+
+
+def _build_qubit_calibration(
+    properties: Any, num_qubits: int, faulty_qubits: set[int]
+) -> dict[int, dict[str, Any]]:
+    """Build qubit calibration dictionary from backend properties.
+
+    Args:
+        properties: Backend properties object
+        num_qubits: Total number of qubits
+        faulty_qubits: Set of faulty qubit indices to skip
+
+    Returns:
+        Dictionary mapping qubit index to calibration data
+    """
+    qubit_calibration: dict[int, dict[str, Any]] = {}
+    for q in range(num_qubits):
+        if q in faulty_qubits:
+            continue
+        qubit_data: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            t1 = properties.t1(q)
+            if t1 is not None:
+                qubit_data["t1_us"] = t1 * 1e6 if t1 < 1 else t1
+        with contextlib.suppress(Exception):
+            t2 = properties.t2(q)
+            if t2 is not None:
+                qubit_data["t2_us"] = t2 * 1e6 if t2 < 1 else t2
+        with contextlib.suppress(Exception):
+            readout_err = properties.readout_error(q)
+            if readout_err is not None:
+                qubit_data["readout_error"] = readout_err
+        qubit_calibration[q] = qubit_data
+    return qubit_calibration
+
+
+def _build_gate_errors(properties: Any, edges: list[list[int]]) -> dict[tuple[int, int], float]:
+    """Build gate error dictionary from backend properties.
+
+    Args:
+        properties: Backend properties object
+        edges: List of coupling map edges
+
+    Returns:
+        Dictionary mapping (control, target) tuples to gate error rates
+    """
+    gate_errors: dict[tuple[int, int], float] = {}
+    for edge in edges:
+        for gate in ["cx", "ecr", "cz"]:
+            with contextlib.suppress(Exception):
+                error = properties.gate_error(gate, edge)
+                if error is not None:
+                    gate_errors[(edge[0], edge[1])] = error
+                    break
+    return gate_errors
+
+
+def _build_chain_result(
+    rank: int,
+    chain: list[int],
+    score: float,
+    qubit_calibration: dict[int, dict[str, Any]],
+    gate_errors: dict[tuple[int, int], float],
+) -> dict[str, Any]:
+    """Build result dictionary for a single chain.
+
+    Args:
+        rank: Ranking position (1 = best)
+        chain: List of qubit indices in the chain
+        score: Chain score
+        qubit_calibration: Per-qubit calibration data
+        gate_errors: Two-qubit gate errors
+
+    Returns:
+        Dictionary with chain metrics
+    """
+    return {
+        "rank": rank,
+        "qubits": chain,
+        "score": round(score, 6),
+        "qubit_details": [
+            {
+                "qubit": q,
+                "t1_us": round(qubit_calibration.get(q, {}).get("t1_us") or 0, 2),
+                "t2_us": round(qubit_calibration.get(q, {}).get("t2_us") or 0, 2),
+                "readout_error": round(qubit_calibration.get(q, {}).get("readout_error") or 0, 6),
+            }
+            for q in chain
+        ],
+        "edge_errors": [
+            {
+                "edge": [chain[i], chain[i + 1]],
+                "error": round(
+                    gate_errors.get(
+                        (chain[i], chain[i + 1]),
+                        gate_errors.get((chain[i + 1], chain[i]), 0),
+                    ),
+                    6,
+                ),
+            }
+            for i in range(len(chain) - 1)
+        ],
+    }
+
+
 @with_sync
 async def get_backend_calibration(
     backend_name: str, qubit_indices: list[int] | None = None
@@ -902,6 +1097,154 @@ async def get_service_status() -> str:
         logger.error(f"Failed to check service status: {e}")
         status_info = {"connected": False, "error": str(e), "service": "IBM Quantum"}
         return f"IBM Quantum Service Status: {status_info}"
+
+
+def _clamp(value: int, min_val: int, max_val: int) -> int:
+    """Clamp value to range [min_val, max_val]."""
+    return max(min_val, min(value, max_val))
+
+
+@with_sync
+async def find_optimal_qubit_chains(
+    backend_name: str,
+    chain_length: int = 5,
+    num_results: int = 5,
+    metric: ScoringMetric = "two_qubit_error",
+) -> dict[str, Any]:
+    """
+    Find optimal linear qubit chains for experiments based on connectivity and calibration.
+
+    Uses coupling map connectivity to find all valid linear chains of the specified length,
+    then scores each chain based on calibration data (gate errors, readout errors, coherence
+    times). Returns the top N chains ranked by the selected metric.
+
+    Args:
+        backend_name: Name of the backend (e.g., 'ibm_brisbane')
+        chain_length: Number of qubits in each chain (default: 5, range: 2-20)
+        num_results: Number of top chains to return (default: 5, max: 20)
+        metric: Scoring metric to optimize:
+            - "two_qubit_error": Minimize sum of CX/ECR gate errors (default)
+            - "readout_error": Minimize sum of measurement errors
+            - "combined": Weighted combination of gate errors, readout, and coherence
+
+    Returns:
+        Ranked chains with detailed metrics including:
+        - qubits: Ordered list of qubit indices in the chain
+        - score: Total score (lower is better)
+        - qubit_details: T1, T2, readout_error for each qubit
+        - edge_errors: Two-qubit gate error for each connection
+    """
+    global service
+
+    try:
+        # Validate inputs
+        chain_length = _clamp(chain_length, 2, 20)
+        num_results = _clamp(num_results, 1, 20)
+
+        # Check for fake backends early - they don't have calibration data
+        if backend_name.startswith("fake_"):
+            return {
+                "status": "error",
+                "message": f"Fake backends like '{backend_name}' are not supported. "
+                "This tool requires real-time calibration data from IBM Quantum backends. "
+                "Use get_coupling_map_tool for connectivity information on fake backends.",
+            }
+
+        # Initialize service if needed
+        if service is None:
+            service = initialize_service()
+
+        # Get coupling map
+        coupling_result = await get_coupling_map(backend_name)
+        if coupling_result["status"] == "error":
+            return coupling_result
+
+        adjacency_list = coupling_result["adjacency_list"]
+        num_qubits = coupling_result["num_qubits"]
+
+        # Get backend properties
+        backend = service.backend(backend_name)
+        properties = _get_backend_properties_for_chains(backend, backend_name)
+        if isinstance(properties, dict):
+            return properties  # Error response
+
+        # Extract faulty qubits
+        faulty_qubits: set[int] = set()
+        with contextlib.suppress(Exception):
+            faulty_qubits = set(properties.faulty_qubits())
+
+        # Build calibration data
+        qubit_calibration = _build_qubit_calibration(properties, num_qubits, faulty_qubits)
+        gate_errors = _build_gate_errors(properties, coupling_result["edges"])
+
+        # Find all chains
+        chains = _find_all_linear_chains(adjacency_list, chain_length, faulty_qubits)
+
+        if not chains:
+            return {
+                "status": "error",
+                "message": f"No valid chains of length {chain_length} found on {backend_name}. "
+                f"The backend has {num_qubits} qubits and {len(faulty_qubits)} faulty qubits.",
+            }
+
+        # Score, rank, and build results
+        scored_chains = [
+            (c, _score_chain(c, qubit_calibration, gate_errors, metric)) for c in chains
+        ]
+        scored_chains.sort(key=lambda x: x[1])
+        top_chains = scored_chains[:num_results]
+
+        results = [
+            _build_chain_result(rank, chain, score, qubit_calibration, gate_errors)
+            for rank, (chain, score) in enumerate(top_chains, 1)
+        ]
+
+        return {
+            "status": "success",
+            "backend_name": backend_name,
+            "chain_length": chain_length,
+            "metric": metric,
+            "total_chains_found": len(chains),
+            "faulty_qubits": list(faulty_qubits),
+            "chains": results,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to find optimal chains: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to find optimal chains: {e!s}",
+        }
+
+
+def _get_backend_properties_for_chains(backend: Any, backend_name: str) -> Any | dict[str, Any]:
+    """Get backend properties or return error dict if unavailable.
+
+    Args:
+        backend: Backend object
+        backend_name: Name of the backend for error messages
+
+    Returns:
+        Properties object if available, or error dict
+    """
+    try:
+        properties = backend.properties()
+    except Exception as e:
+        logger.warning(f"Could not get properties for {backend_name}: {e}")
+        return {
+            "status": "error",
+            "message": f"Calibration data not available for {backend_name}. "
+            "This tool requires calibration data to score chains.",
+        }
+
+    if properties is None:
+        return {
+            "status": "error",
+            "message": f"No calibration data available for {backend_name}. "
+            "This is likely a simulator backend.",
+        }
+
+    return properties
 
 
 def _get_sampler_backend(
