@@ -59,9 +59,9 @@ class TestResourceHandlers:
     @pytest.mark.asyncio
     async def test_models_resource(self, mock_env_vars, mock_http_responses):
         """Test qca://models resource handler."""
-        from qiskit_code_assistant_mcp_server.qca import qca_list_models
+        from qiskit_code_assistant_mcp_server.qca import list_models
 
-        result = await qca_list_models()
+        result = await list_models()
 
         assert result["status"] == "success"
         assert "models" in result
@@ -70,9 +70,9 @@ class TestResourceHandlers:
     @pytest.mark.asyncio
     async def test_model_resource(self, mock_env_vars, mock_http_responses):
         """Test qca://model/{model_id} resource handler."""
-        from qiskit_code_assistant_mcp_server.qca import qca_get_model
+        from qiskit_code_assistant_mcp_server.qca import get_model
 
-        result = await qca_get_model("mistral-small-3.2-24b-qiskit")
+        result = await get_model("mistral-small-3.2-24b-qiskit")
 
         assert result["status"] == "success"
         assert "model" in result
@@ -81,9 +81,9 @@ class TestResourceHandlers:
     @pytest.mark.asyncio
     async def test_disclaimer_resource(self, mock_env_vars, mock_http_responses):
         """Test qca://disclaimer/{model_id} resource handler."""
-        from qiskit_code_assistant_mcp_server.qca import qca_get_model_disclaimer
+        from qiskit_code_assistant_mcp_server.qca import get_model_disclaimer
 
-        result = await qca_get_model_disclaimer("mistral-small-3.2-24b-qiskit")
+        result = await get_model_disclaimer("mistral-small-3.2-24b-qiskit")
 
         assert result["status"] == "success"
         assert "disclaimer" in result
@@ -91,9 +91,9 @@ class TestResourceHandlers:
     @pytest.mark.asyncio
     async def test_status_resource(self, mock_env_vars, mock_http_responses):
         """Test qca://status resource handler."""
-        from qiskit_code_assistant_mcp_server.qca import qca_get_service_status
+        from qiskit_code_assistant_mcp_server.qca import get_service_status
 
-        result = await qca_get_service_status()
+        result = await get_service_status()
 
         assert "Qiskit Code Assistant Service Status" in result
 
@@ -103,42 +103,42 @@ class TestToolHandlers:
 
     @pytest.mark.asyncio
     async def test_completion_tool(self, mock_env_vars, mock_http_responses):
-        """Test qca_get_completion tool."""
-        from qiskit_code_assistant_mcp_server.qca import qca_get_completion
+        """Test get_completion tool."""
+        from qiskit_code_assistant_mcp_server.qca import get_completion
 
-        result = await qca_get_completion("Create a quantum circuit")
+        result = await get_completion("Create a quantum circuit")
 
         assert result["status"] == "success"
         assert "completion_id" in result
-        assert "choices" in result
+        assert "code" in result
 
     @pytest.mark.asyncio
     async def test_rag_completion_tool(self, mock_env_vars, mock_http_responses):
-        """Test qca_get_rag_completion tool."""
-        from qiskit_code_assistant_mcp_server.qca import qca_get_rag_completion
+        """Test get_rag_completion tool."""
+        from qiskit_code_assistant_mcp_server.qca import get_rag_completion
 
-        result = await qca_get_rag_completion("What is quantum entanglement?")
+        result = await get_rag_completion("What is quantum entanglement?")
 
         assert result["status"] == "success"
         assert "completion_id" in result
-        assert "choices" in result
+        assert "answer" in result
 
     @pytest.mark.asyncio
     async def test_accept_disclaimer_tool(self, mock_env_vars, mock_http_responses):
-        """Test qca_accept_model_disclaimer tool."""
-        from qiskit_code_assistant_mcp_server.qca import qca_accept_model_disclaimer
+        """Test accept_model_disclaimer tool."""
+        from qiskit_code_assistant_mcp_server.qca import accept_model_disclaimer
 
-        result = await qca_accept_model_disclaimer("mistral-small-3.2-24b-qiskit", "disclaimer_123")
+        result = await accept_model_disclaimer("mistral-small-3.2-24b-qiskit", "disclaimer_123")
 
         assert result["status"] == "success"
         assert "result" in result
 
     @pytest.mark.asyncio
     async def test_accept_completion_tool(self, mock_env_vars, mock_http_responses):
-        """Test qca_accept_completion tool."""
-        from qiskit_code_assistant_mcp_server.qca import qca_accept_completion
+        """Test accept_completion tool."""
+        from qiskit_code_assistant_mcp_server.qca import accept_completion
 
-        result = await qca_accept_completion("completion_456")
+        result = await accept_completion("completion_456")
 
         assert result["status"] == "success"
         assert "result" in result
@@ -155,9 +155,9 @@ class TestErrorHandling:
                 side_effect=httpx.TimeoutException("Request timeout")
             )
 
-            from qiskit_code_assistant_mcp_server.qca import qca_list_models
+            from qiskit_code_assistant_mcp_server.qca import list_models
 
-            result = await qca_list_models()
+            result = await list_models()
 
             assert result["status"] == "error"
             assert "timeout" in result["message"].lower() or "failed" in result["message"].lower()
@@ -170,9 +170,9 @@ class TestErrorHandling:
                 return_value=httpx.Response(401, json={"detail": "Invalid token"})
             )
 
-            from qiskit_code_assistant_mcp_server.qca import qca_list_models
+            from qiskit_code_assistant_mcp_server.qca import list_models
 
-            result = await qca_list_models()
+            result = await list_models()
 
             assert result["status"] == "error"
 
@@ -184,9 +184,9 @@ class TestErrorHandling:
                 return_value=httpx.Response(500, json={"detail": "Internal server error"})
             )
 
-            from qiskit_code_assistant_mcp_server.qca import qca_get_completion
+            from qiskit_code_assistant_mcp_server.qca import get_completion
 
-            result = await qca_get_completion("test prompt")
+            result = await get_completion("test prompt")
 
             assert result["status"] == "error"
 
@@ -198,41 +198,39 @@ class TestEndToEndScenarios:
     async def test_complete_workflow(self, mock_env_vars, mock_http_responses):
         """Test complete workflow: list models -> get completion -> accept."""
         from qiskit_code_assistant_mcp_server.qca import (
-            qca_accept_completion,
-            qca_get_completion,
-            qca_list_models,
+            accept_completion,
+            get_completion,
+            list_models,
         )
 
         # 1. List models
-        models_result = await qca_list_models()
+        models_result = await list_models()
         assert models_result["status"] == "success"
 
         # 2. Get completion
-        completion_result = await qca_get_completion("Create a quantum circuit")
+        completion_result = await get_completion("Create a quantum circuit")
         assert completion_result["status"] == "success"
         completion_id = completion_result["completion_id"]
 
         # 3. Accept completion
-        accept_result = await qca_accept_completion(completion_id)
+        accept_result = await accept_completion(completion_id)
         assert accept_result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_disclaimer_workflow(self, mock_env_vars, mock_http_responses):
         """Test disclaimer workflow: get disclaimer -> accept disclaimer."""
         from qiskit_code_assistant_mcp_server.qca import (
-            qca_accept_model_disclaimer,
-            qca_get_model_disclaimer,
+            accept_model_disclaimer,
+            get_model_disclaimer,
         )
 
         # 1. Get disclaimer
-        disclaimer_result = await qca_get_model_disclaimer("mistral-small-3.2-24b-qiskit")
+        disclaimer_result = await get_model_disclaimer("mistral-small-3.2-24b-qiskit")
         assert disclaimer_result["status"] == "success"
         disclaimer_id = disclaimer_result["disclaimer"]["id"]
 
         # 2. Accept disclaimer
-        accept_result = await qca_accept_model_disclaimer(
-            "mistral-small-3.2-24b-qiskit", disclaimer_id
-        )
+        accept_result = await accept_model_disclaimer("mistral-small-3.2-24b-qiskit", disclaimer_id)
         assert accept_result["status"] == "success"
 
 

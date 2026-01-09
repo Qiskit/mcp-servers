@@ -15,47 +15,47 @@
 from unittest.mock import patch
 
 from qiskit_code_assistant_mcp_server.qca import (
-    qca_accept_completion,
-    qca_get_completion,
-    qca_get_model,
-    qca_get_rag_completion,
-    qca_get_service_status,
-    qca_list_models,
+    accept_completion,
+    get_completion,
+    get_model,
+    get_rag_completion,
+    get_service_status,
+    list_models,
 )
 
 
 class TestWithSyncDecorator:
     """Test that async functions have .sync attribute."""
 
-    def test_qca_list_models_has_sync(self):
-        """Test qca_list_models has .sync attribute."""
-        assert hasattr(qca_list_models, "sync")
-        assert callable(qca_list_models.sync)
+    def test_list_models_has_sync(self):
+        """Test list_models has .sync attribute."""
+        assert hasattr(list_models, "sync")
+        assert callable(list_models.sync)
 
-    def test_qca_get_model_has_sync(self):
-        """Test qca_get_model has .sync attribute."""
-        assert hasattr(qca_get_model, "sync")
-        assert callable(qca_get_model.sync)
+    def test_get_model_has_sync(self):
+        """Test get_model has .sync attribute."""
+        assert hasattr(get_model, "sync")
+        assert callable(get_model.sync)
 
-    def test_qca_get_completion_has_sync(self):
-        """Test qca_get_completion has .sync attribute."""
-        assert hasattr(qca_get_completion, "sync")
-        assert callable(qca_get_completion.sync)
+    def test_get_completion_has_sync(self):
+        """Test get_completion has .sync attribute."""
+        assert hasattr(get_completion, "sync")
+        assert callable(get_completion.sync)
 
-    def test_qca_get_rag_completion_has_sync(self):
-        """Test qca_get_rag_completion has .sync attribute."""
-        assert hasattr(qca_get_rag_completion, "sync")
-        assert callable(qca_get_rag_completion.sync)
+    def test_get_rag_completion_has_sync(self):
+        """Test get_rag_completion has .sync attribute."""
+        assert hasattr(get_rag_completion, "sync")
+        assert callable(get_rag_completion.sync)
 
-    def test_qca_accept_completion_has_sync(self):
-        """Test qca_accept_completion has .sync attribute."""
-        assert hasattr(qca_accept_completion, "sync")
-        assert callable(qca_accept_completion.sync)
+    def test_accept_completion_has_sync(self):
+        """Test accept_completion has .sync attribute."""
+        assert hasattr(accept_completion, "sync")
+        assert callable(accept_completion.sync)
 
-    def test_qca_get_service_status_has_sync(self):
-        """Test qca_get_service_status has .sync attribute."""
-        assert hasattr(qca_get_service_status, "sync")
-        assert callable(qca_get_service_status.sync)
+    def test_get_service_status_has_sync(self):
+        """Test get_service_status has .sync attribute."""
+        assert hasattr(get_service_status, "sync")
+        assert callable(get_service_status.sync)
 
 
 class TestSyncMethodExecution:
@@ -74,7 +74,7 @@ class TestSyncMethodExecution:
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
 
-            result = qca_list_models.sync()
+            result = list_models.sync()
 
             assert result["status"] == "success"
             assert "models" in result
@@ -87,7 +87,7 @@ class TestSyncMethodExecution:
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
 
-            result = qca_list_models.sync()
+            result = list_models.sync()
 
             assert result["status"] == "error"
             assert "Authentication failed" in result["message"]
@@ -102,7 +102,7 @@ class TestSyncMethodExecution:
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
 
-            result = qca_get_model.sync("mistral-small-3.2-24b-qiskit")
+            result = get_model.sync("mistral-small-3.2-24b-qiskit")
 
             assert result["status"] == "success"
             assert result["model"]["id"] == "mistral-small-3.2-24b-qiskit"
@@ -118,7 +118,7 @@ class TestSyncMethodExecution:
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
 
-            result = qca_get_completion.sync("Create a quantum circuit")
+            result = get_completion.sync("Create a quantum circuit")
 
             assert result["status"] == "success"
             assert "completion_id" in result
@@ -135,7 +135,7 @@ class TestSyncMethodExecution:
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
 
-            result = qca_get_rag_completion.sync("What is quantum entanglement?")
+            result = get_rag_completion.sync("What is quantum entanglement?")
 
             assert result["status"] == "success"
             assert "choices" in result
@@ -147,7 +147,7 @@ class TestSyncMethodExecution:
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
 
-            result = qca_accept_completion.sync("comp_123")
+            result = accept_completion.sync("comp_123")
 
             assert result["status"] == "success"
             assert result["result"] == "accepted"
@@ -159,6 +159,6 @@ class TestSyncMethodExecution:
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
 
-            result = qca_get_service_status.sync()
+            result = get_service_status.sync()
 
             assert "connected" in result

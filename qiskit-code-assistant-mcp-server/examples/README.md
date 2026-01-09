@@ -190,10 +190,10 @@ The agent has access to these tools provided by the MCP server:
 
 | Tool | Description |
 |------|-------------|
-| `qca_get_completion` | Generate Qiskit code completions based on prompts |
-| `qca_get_rag_completion` | Answer questions about Qiskit and quantum computing using RAG |
-| `qca_accept_model_disclaimer` | Accept the disclaimer for a model |
-| `qca_accept_completion` | Accept/acknowledge a generated completion |
+| `get_completion_tool` | Generate Qiskit code completions based on prompts |
+| `get_rag_completion_tool` | Answer questions about Qiskit and quantum computing using RAG |
+| `accept_model_disclaimer_tool` | Accept the disclaimer for a model |
+| `accept_completion_tool` | Accept/acknowledge a generated completion |
 
 ### Using as a Library
 
@@ -276,5 +276,5 @@ asyncio.run(create_custom_agent())
 - Check your network connection to IBM Quantum services
 
 **"Model disclaimer required"**
-- The agent will automatically use `qca_accept_model_disclaimer` when needed
+- The agent will automatically use `accept_model_disclaimer_tool` when needed
 - You can also manually accept the disclaimer through the tool

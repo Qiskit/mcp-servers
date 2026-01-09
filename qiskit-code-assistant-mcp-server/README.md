@@ -8,10 +8,11 @@ MCP server for Qiskit Code Assistant
 
 ### Tools
 
-The server implements one tool:
-- `qca_completion`: Get completion for a given prompt
-  - Takes a "prompt" as a required string argument
-  - Connects to a Qiskit Code Assistant service and returns a code completion based on the prompt
+The server implements four tools:
+- `accept_model_disclaimer_tool`: Accept the disclaimer for a given model
+- `get_completion_tool`: Get completion for a given prompt
+- `get_rag_completion_tool`: Get RAG completion for answering conceptual or descriptive questions about Qiskit or Quantum
+- `accept_completion_tool`: Accept a given completion
 
 
 ## Prerequisites
@@ -91,31 +92,31 @@ For frameworks that don't support async operations (DSPy, traditional scripts, e
 
 ```python
 from qiskit_code_assistant_mcp_server.qca import (
-    qca_get_completion,
-    qca_get_rag_completion,
-    qca_list_models
+    get_completion,
+    get_rag_completion,
+    list_models
 )
 
 # Use .sync for synchronous execution
-result = qca_get_completion.sync("Write a quantum circuit for a Bell state")
+result = get_completion.sync("Write a quantum circuit for a Bell state")
 print(result)
 
 # Works in Jupyter notebooks (handles nested event loops automatically)
-rag_result = qca_get_rag_completion.sync("What is quantum entanglement?")
+rag_result = get_rag_completion.sync("What is quantum entanglement?")
 print(rag_result)
 
 # List available models
-models = qca_list_models.sync()
+models = list_models.sync()
 print(models)
 ```
 
 **Available functions (all support `.sync`):**
-- `qca_list_models()` - List available models
-- `qca_get_model(model_id)` - Get model info
-- `qca_get_completion(prompt)` - Get code completion
-- `qca_get_rag_completion(prompt)` - Get RAG-based completion
-- `qca_accept_completion(completion_id)` - Accept a completion
-- `qca_get_service_status()` - Get service status
+- `list_models()` - List available models
+- `get_model(model_id)` - Get model info
+- `get_completion(prompt)` - Get code completion
+- `get_rag_completion(prompt)` - Get RAG-based completion
+- `accept_completion(completion_id)` - Accept a completion
+- `get_service_status()` - Get service status
 
 
 ### Testing and debugging the server
