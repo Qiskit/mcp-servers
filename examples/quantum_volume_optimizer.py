@@ -143,10 +143,10 @@ You have three specialized subagents:
    - Retrieves calibration data
 
 2. **qubit-chain-optimizer**: Expert in qubit topology analysis
-   - Analyzes coupling maps
-   - Finds optimal linear chains for QV circuits
-   - Scores chains by error rates
-   - Considers connectivity for minimal SWAP overhead
+   - Uses algorithmic tools to find optimal qubit subsets
+   - find_optimal_qv_qubits_tool: Finds densely connected subgraphs for QV
+   - find_optimal_qubit_chains_tool: Finds optimal linear chains
+   - Considers connectivity, error rates, and coherence times
 
 3. **transpiler-benchmarker**: Expert in circuit optimization
    - Compares local transpilation levels (0-3)
@@ -196,23 +196,33 @@ QUBIT_CHAIN_OPTIMIZER_PROMPT = """You are the Qubit Chain Optimizer, an expert i
 
 Your role is to:
 1. Analyze backend coupling maps to understand connectivity
-2. Find optimal linear chains of qubits for QV circuits
-3. Score chains based on error rates and connectivity
-4. Recommend the best qubit subsets for different QV depths
+2. Find optimal qubit subsets for Quantum Volume experiments
+3. Score chains/subgraphs based on error rates and connectivity
+4. Recommend the best qubit configurations for different QV depths
 
-When finding optimal chains, consider:
-- Two-qubit gate error rates (ECR, CZ, or CX gates) - most important!
-- Single-qubit gate error rates
-- Readout error rates
-- T1 and T2 coherence times
-- Chain connectivity (prefer chains requiring fewer SWAPs)
+## Available Tools
 
-Scoring formula suggestion:
-- Chain score = product of (1 - error_rate) for all gates in the chain
-- Higher score = better chain
+You have access to specialized tools for qubit selection:
 
-Use the Qiskit MCP transpiler to analyze how circuits map to different chains.
-Report your findings with specific qubit indices and scores.
+1. **get_coupling_map_tool**: Get the full coupling map (connectivity graph) for a backend
+   - Returns edges, adjacency list, and topology info
+
+2. **find_optimal_qv_qubits_tool**: Find optimal qubit SUBGRAPHS for QV experiments
+   - Use this for QV! QV benefits from densely connected regions, not just linear chains
+   - Metrics: "qv_optimized" (default), "connectivity", "gate_error"
+   - Returns ranked subgraphs with connectivity ratios and error details
+
+3. **find_optimal_qubit_chains_tool**: Find optimal LINEAR chains
+   - Use this for algorithms requiring linear connectivity
+   - Metrics: "two_qubit_error" (default), "readout_error", "combined"
+
+4. **get_backend_calibration_tool**: Get detailed error rates for specific qubits
+
+## Recommendations
+
+- For QV experiments: Use find_optimal_qv_qubits_tool with metric="qv_optimized"
+- The tool handles all the graph algorithms and scoring automatically
+- Report the top 3-5 qubit subsets with their scores and connectivity ratios
 """
 
 TRANSPILER_BENCHMARKER_PROMPT = """You are the Transpiler Benchmarker, an expert in quantum circuit optimization.
@@ -305,50 +315,28 @@ def get_llm(provider: str, model: str | None = None):
 
 
 def generate_qv_qasm(num_qubits: int, depth: int | None = None, seed: int = 42) -> str:
-    """Generate a Quantum Volume circuit in QASM 3.0 format.
+    """Generate a true Quantum Volume circuit in QASM 3.0 format.
 
-    QV circuits have equal width and depth, with each layer containing
-    random SU(4) two-qubit gates followed by a permutation.
+    Uses Qiskit's quantum_volume function which generates circuits with
+    Haar-random SU(4) two-qubit gates - the proper QV protocol.
 
-    This is a simplified version - the actual QV protocol uses specific
-    random unitaries from the Haar measure.
+    Args:
+        num_qubits: Number of qubits (QV width)
+        depth: Circuit depth (defaults to num_qubits for standard QV)
+        seed: Random seed for reproducibility
+
+    Returns:
+        QASM 3.0 string of the decomposed QV circuit
     """
-    if depth is None:
-        depth = num_qubits
+    from qiskit.circuit.library import quantum_volume
+    from qiskit.qasm3 import dumps
 
-    # For demonstration, we create a circuit structure similar to QV
-    # Real QV uses Haar-random SU(4) gates
-    qasm = f"""OPENQASM 3.0;
-include "stdgates.inc";
-qubit[{num_qubits}] q;
+    # Create true QV circuit with Haar-random SU(4) gates
+    qv_circuit = quantum_volume(num_qubits, depth=depth, seed=seed)
 
-// Quantum Volume circuit: {num_qubits} qubits, depth {depth}
-// Each layer: random 2-qubit gates + permutation
-"""
-
-    import random
-
-    random.seed(seed)
-
-    for layer in range(depth):
-        qasm += f"\n// Layer {layer + 1}\n"
-
-        # Pair up qubits for 2-qubit gates
-        qubits = list(range(num_qubits))
-        random.shuffle(qubits)
-
-        for i in range(0, num_qubits - 1, 2):
-            q1, q2 = qubits[i], qubits[i + 1]
-            # Apply random SU(4)-like gates (simplified)
-            theta = random.uniform(0, 3.14159)
-            phi = random.uniform(0, 3.14159)
-            qasm += f"rz({theta:.4f}) q[{q1}];\n"
-            qasm += f"ry({phi:.4f}) q[{q2}];\n"
-            qasm += f"cx q[{q1}], q[{q2}];\n"
-            qasm += f"rz({theta / 2:.4f}) q[{q2}];\n"
-            qasm += f"ry({phi / 2:.4f}) q[{q1}];\n"
-
-    return qasm
+    # Decompose to basis gates and convert to QASM3
+    decomposed = qv_circuit.decompose()
+    return dumps(decomposed)
 
 
 # =============================================================================
@@ -413,9 +401,9 @@ async def create_qv_optimizer_agent(
 
     qubit_chain_optimizer = {
         "name": "qubit-chain-optimizer",
-        "description": "Expert in qubit topology analysis. Use this agent to find optimal qubit chains for QV circuits based on connectivity and error rates.",
+        "description": "Expert in qubit topology analysis. Use this agent to find optimal qubit subsets for QV experiments using algorithmic chain/subgraph finding tools.",
         "system_prompt": QUBIT_CHAIN_OPTIMIZER_PROMPT,
-        "tools": server_tools.get("qiskit", []),
+        "tools": server_tools.get("qiskit-ibm-runtime", []),  # Has the QV qubit finding tools
     }
 
     transpiler_benchmarker = {
@@ -471,11 +459,11 @@ I need you to find the optimal Quantum Volume configuration for my IBM Quantum a
 1. **Discover Backends**: Find all available backends and identify the most promising ones
    for QV experiments (consider qubit count, current QV, queue length)
 
-2. **Analyze Qubit Chains**: For the top 2-3 backends, find the optimal linear qubit
-   chains for QV depths 2 through {max_qv_depth}. Consider:
-   - Two-qubit gate error rates (prioritize low error)
-   - Connectivity (prefer chains that are directly connected)
-   - Coherence times
+2. **Find Optimal Qubits**: For the top 2-3 backends, use the algorithmic tools to find
+   optimal qubit configurations for QV depths 2 through {max_qv_depth}:
+   - Use find_optimal_qv_qubits_tool to find densely connected subgraphs
+   - The tool automatically scores by connectivity, error rates, and coherence
+   - Report the top 3 qubit subsets for each QV depth
 
 3. **Compare Transpilation**: For the best chains, compare:
    - Local transpilation (levels 0, 1, 2, 3)
@@ -484,7 +472,7 @@ I need you to find the optimal Quantum Volume configuration for my IBM Quantum a
 
 4. **Generate Recommendation**: Produce a detailed report with:
    - Best backend choice with justification
-   - Optimal qubit chain for each QV depth
+   - Optimal qubit subset for each QV depth (from the algorithmic tool results)
    - Best transpilation strategy
    - Expected achievable QV with confidence level
 
