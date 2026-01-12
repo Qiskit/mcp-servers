@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-from . import server
+from qiskit_code_assistant_mcp_server import server
 
 
 def main() -> None:

@@ -157,15 +157,13 @@ Each MCP server follows this standard structure:
 - `constants.py`: API endpoints and configuration
 - `utils.py`: HTTP client management and utilities
 
-**Note**: This server uses `mcp.tool()(function)` syntax instead of `@mcp.tool()` decorators, with tools defined in `qca.py` and registered in `server.py`.
-
 **Tools Provided**:
 | Tool | Description |
 |------|-------------|
-| `qca_get_completion` | Get code completion for quantum code prompts |
-| `qca_get_rag_completion` | RAG-based completion with documentation context |
-| `qca_accept_completion` | Mark a completion as accepted (telemetry) |
-| `qca_accept_model_disclaimer` | Accept disclaimer for a model |
+| `get_completion_tool` | Get code completion for quantum code prompts |
+| `get_rag_completion_tool` | RAG-based completion with documentation context |
+| `accept_completion_tool` | Mark a completion as accepted (telemetry) |
+| `accept_model_disclaimer_tool` | Accept disclaimer for a model |
 
 **Resources Provided**:
 | Resource URI | Description |
@@ -266,7 +264,7 @@ AI Assistant → MCP Client → transpile_circuit_tool
 
 ### Qiskit Code Assistant Server
 ```
-AI Assistant → MCP Client → qca_get_completion tool
+AI Assistant → MCP Client → get_completion_tool
                                   ↓
                             qca.py (async functions)
                                   ↓
@@ -371,11 +369,11 @@ AI Assistant → MCP Client → ai_routing_tool / ai_*_synthesis_tool
 
 3. **MCP Server Patterns**:
    - All servers use FastMCP framework
-   - Tools defined with `@mcp.tool()` decorator or `mcp.tool()(function)` syntax
-   - Resources defined with `@mcp.resource()` decorator or `mcp.resource()(function)` syntax
+   - Tools defined with `@mcp.tool()` decorator
+   - Resources defined with `@mcp.resource()` decorator
    - Async functions for all MCP handlers
    - Tool functions should delegate to core module functions
-   - Tool function names typically end with `_tool` suffix (exception: Code Assistant uses `qca_` prefix)
+   - Tool function names end with `_tool` suffix
    - Return type is `dict[str, Any]`
 
 4. **Error Handling**:

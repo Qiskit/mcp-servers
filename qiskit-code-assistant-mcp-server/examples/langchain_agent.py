@@ -70,23 +70,23 @@ SYSTEM_PROMPT = """You are a helpful quantum computing coding assistant with acc
 through the MCP server.
 
 You can help users:
-- Generate quantum code using Qiskit (qca_get_completion tool)
-- Answer questions about Qiskit and quantum computing concepts (qca_get_rag_completion tool)
-- Accept model disclaimers when required (qca_accept_model_disclaimer tool)
-- Track completion acceptance for feedback (qca_accept_completion tool)
+- Generate quantum code using Qiskit (get_completion_tool)
+- Answer questions about Qiskit and quantum computing concepts (get_rag_completion_tool)
+- Accept model disclaimers when required (accept_model_disclaimer_tool)
+- Track completion acceptance for feedback (accept_completion_tool)
 
 When generating code:
-- Use the qca_get_completion tool to generate Qiskit code based on user prompts
+- Use the get_completion_tool to generate Qiskit code based on user prompts
 - Provide clear explanations of the generated code
 - Suggest improvements or alternatives when appropriate
 
 When answering questions:
-- Use the qca_get_rag_completion tool for conceptual questions about quantum computing
+- Use the get_rag_completion_tool for conceptual questions about quantum computing
 - Provide accurate and educational explanations
 - Reference Qiskit documentation when relevant
 
-If you encounter a disclaimer requirement, use qca_accept_model_disclaimer to accept it.
-After using a completion, use qca_accept_completion to provide feedback."""
+Always provide clear explanations about quantum computing concepts when relevant.
+If an operation fails, explain the error and suggest possible solutions."""
 
 
 def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
