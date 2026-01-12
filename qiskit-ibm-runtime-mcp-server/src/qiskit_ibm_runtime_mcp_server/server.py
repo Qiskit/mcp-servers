@@ -36,7 +36,6 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     active_account_info,
     active_instance_info,
     available_instances,
-    cancel_job,
     delete_saved_account,
     QVScoringMetric,
     ScoringMetric,

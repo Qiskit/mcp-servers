@@ -2232,7 +2232,9 @@ async def available_instances() -> dict[str, Any]:
         }
         return instance_data
     except Exception as e:
-        logger.error(f"Failed to collect available instances for the active account: {e}")
+        logger.error(
+            f"Failed to collect available instances for the active account: {e}"
+        )
         return {"status": "error", "error": str(e)}
 
 
