@@ -79,10 +79,26 @@ A QV of 2^n means the device can reliably execute n-qubit circuits of depth n.
 
 ## Usage
 
-    python quantum_volume_optimizer.py [--provider PROVIDER] [--depth DEPTH]
+    python quantum_volume_optimizer.py [--provider PROVIDER] [--depth DEPTH] [--backend BACKEND]
 
     --provider: LLM provider (anthropic, openai, google) - default: anthropic
-    --depth: Maximum QV depth to evaluate (2-10) - default: 5
+    --depth: Maximum QV depth to evaluate (2-20) - default: 5
+    --backend: Specific backend to optimize (e.g., ibm_brisbane, fake_sherbrooke)
+    --interactive: Run in interactive mode for follow-up questions
+
+## Examples
+
+    # Auto-discover best backend, optimize for QV up to depth 5
+    python quantum_volume_optimizer.py
+
+    # Optimize specifically for ibm_brisbane, QV up to depth 12
+    python quantum_volume_optimizer.py --backend ibm_brisbane --depth 12
+
+    # Use fake backend for testing (no credentials needed)
+    python quantum_volume_optimizer.py --backend fake_sherbrooke --depth 8
+
+    # Interactive mode to ask follow-up questions
+    python quantum_volume_optimizer.py --interactive --backend ibm_fez
 """
 
 from __future__ import annotations
@@ -432,13 +448,15 @@ async def run_qv_optimization(
     provider: str = "anthropic",
     model: str | None = None,
     max_qv_depth: int = 5,
+    backend: str | None = None,
 ) -> str:
     """Run the full Quantum Volume optimization workflow.
 
     Args:
         provider: LLM provider to use
         model: Optional model name override
-        max_qv_depth: Maximum QV depth to evaluate
+        max_qv_depth: Maximum QV depth to evaluate (2-20)
+        backend: Specific backend to optimize for (optional)
 
     Returns:
         The final optimization report
@@ -450,29 +468,56 @@ async def run_qv_optimization(
     for depth in range(2, min(max_qv_depth + 1, 6)):
         qv_circuits[depth] = generate_qv_qasm(depth)
 
+    # Build backend-specific or discovery request
+    if backend:
+        backend_instruction = f"""
+## Target Backend: {backend}
+
+Optimize Quantum Volume configuration specifically for **{backend}**.
+First verify the backend exists and get its properties, then proceed with optimization.
+"""
+    else:
+        backend_instruction = """
+## Backend Discovery
+
+Find all available backends and identify the most promising ones for QV experiments
+(consider qubit count, current QV, queue length). Focus on the top 2-3 backends.
+"""
+
+    # Tool guidance based on depth
+    if max_qv_depth <= 10:
+        tool_guidance = f"""
+- Use **find_optimal_qv_qubits_tool** to find densely connected subgraphs (best for QV)
+- The tool automatically scores by connectivity, error rates, and coherence
+- Report the top 3 qubit subsets for each QV depth from 2 to {max_qv_depth}
+"""
+    else:
+        tool_guidance = f"""
+- For QV depth 2-10: Use **find_optimal_qv_qubits_tool** (dense subgraphs)
+- For QV depth 11-{max_qv_depth}: Use **find_optimal_qubit_chains_tool** (linear chains)
+  Note: Subgraph enumeration is expensive for >10 qubits, so we use optimized linear chains
+- Report the top 3 qubit configurations for each QV depth
+"""
+
     # Construct the optimization request
     request = f"""
-I need you to find the optimal Quantum Volume configuration for my IBM Quantum account.
-
+I need you to find the optimal Quantum Volume configuration.
+{backend_instruction}
 ## Objectives
 
-1. **Discover Backends**: Find all available backends and identify the most promising ones
-   for QV experiments (consider qubit count, current QV, queue length)
+1. **Verify Backend**: Get backend properties and calibration data
 
-2. **Find Optimal Qubits**: For the top 2-3 backends, use the algorithmic tools to find
-   optimal qubit configurations for QV depths 2 through {max_qv_depth}:
-   - Use find_optimal_qv_qubits_tool to find densely connected subgraphs
-   - The tool automatically scores by connectivity, error rates, and coherence
-   - Report the top 3 qubit subsets for each QV depth
-
-3. **Compare Transpilation**: For the best chains, compare:
+2. **Find Optimal Qubits**: Use algorithmic tools to find optimal qubit configurations
+   for QV depths 2 through {max_qv_depth}:
+{tool_guidance}
+3. **Compare Transpilation**: For the best qubit configurations, compare:
    - Local transpilation (levels 0, 1, 2, 3)
    - AI-powered routing and synthesis
    - Focus on minimizing two-qubit gate count and circuit depth
 
 4. **Generate Recommendation**: Produce a detailed report with:
-   - Best backend choice with justification
-   - Optimal qubit subset for each QV depth (from the algorithmic tool results)
+   - Backend analysis with key metrics
+   - Optimal qubit subset for each QV depth (with scores from the tools)
    - Best transpilation strategy
    - Expected achievable QV with confidence level
 
@@ -501,7 +546,8 @@ Please proceed with the analysis and provide your comprehensive recommendation.
     print("=" * 70)
     print("  STARTING QUANTUM VOLUME OPTIMIZATION")
     print("=" * 70)
-    print(f"\nTarget QV depth: up to {max_qv_depth}")
+    print(f"\nTarget backend: {backend or 'Auto-discover best'}")
+    print(f"Target QV depth: up to {max_qv_depth}")
     print("\nThis may take several minutes as the agents analyze your backends...\n")
     print("-" * 70)
 
@@ -522,14 +568,16 @@ Please proceed with the analysis and provide your comprehensive recommendation.
     return final_response
 
 
-async def interactive_mode(provider: str, model: str | None) -> None:
+async def interactive_mode(provider: str, model: str | None, backend: str | None = None) -> None:
     """Run interactive mode where users can ask follow-up questions."""
     from langchain_core.messages import HumanMessage
 
-    agent, mcp_client = await create_qv_optimizer_agent(provider, model, 5)
+    agent, mcp_client = await create_qv_optimizer_agent(provider, model, 20)
 
     print("\n" + "-" * 70)
     print("Interactive Mode - Ask questions about Quantum Volume optimization")
+    if backend:
+        print(f"Target backend: {backend}")
     print("Type 'quit' to exit, 'clear' to reset history, 'optimize' to run full optimization")
     print("-" * 70 + "\n")
 
@@ -553,11 +601,18 @@ async def interactive_mode(provider: str, model: str | None) -> None:
                 continue
 
             if query.lower() == "optimize":
-                query = """Run the full Quantum Volume optimization workflow:
-                1. List available backends
-                2. Find optimal qubit chains
-                3. Compare transpilation strategies
-                4. Generate recommendation report"""
+                if backend:
+                    query = f"""Run the full Quantum Volume optimization for {backend}:
+                    1. Get {backend} properties and calibration
+                    2. Find optimal qubit subsets using find_optimal_qv_qubits_tool
+                    3. Compare transpilation strategies
+                    4. Generate recommendation report"""
+                else:
+                    query = """Run the full Quantum Volume optimization workflow:
+                    1. List available backends and pick the best ones
+                    2. Find optimal qubit subsets using find_optimal_qv_qubits_tool
+                    3. Compare transpilation strategies
+                    4. Generate recommendation report"""
 
             # Build messages with history
             messages = list(history) if history else []
@@ -588,9 +643,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Auto-discover best backend
   python quantum_volume_optimizer.py
-  python quantum_volume_optimizer.py --provider openai --depth 6
-  python quantum_volume_optimizer.py --interactive
+
+  # Optimize for a specific backend with higher QV depth
+  python quantum_volume_optimizer.py --backend ibm_brisbane --depth 15
+
+  # Test with fake backend (no credentials needed)
+  python quantum_volume_optimizer.py --backend fake_sherbrooke --depth 8
+
+  # Interactive mode for follow-up questions
+  python quantum_volume_optimizer.py --interactive --backend ibm_fez
         """,
     )
     parser.add_argument(
@@ -609,9 +672,15 @@ Examples:
         "--depth",
         type=int,
         default=5,
-        choices=range(2, 11),
-        metavar="[2-10]",
-        help="Maximum QV depth to evaluate (default: 5)",
+        choices=range(2, 21),
+        metavar="[2-20]",
+        help="Maximum QV depth to evaluate (default: 5, max: 20)",
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        default=None,
+        help="Specific backend to optimize for (e.g., 'ibm_brisbane', 'fake_sherbrooke')",
     )
     parser.add_argument(
         "--interactive",
@@ -640,9 +709,11 @@ Examples:
 
     # Run the appropriate mode
     if args.interactive:
-        asyncio.run(interactive_mode(args.provider, args.model))
+        asyncio.run(interactive_mode(args.provider, args.model, args.backend))
     else:
-        result = asyncio.run(run_qv_optimization(args.provider, args.model, args.depth))
+        result = asyncio.run(
+            run_qv_optimization(args.provider, args.model, args.depth, args.backend)
+        )
         print(result)
 
 
