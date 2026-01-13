@@ -19,6 +19,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     find_optimal_qubit_chains,
     find_optimal_qv_qubits,
     get_backend_properties,
+    get_job_results,
     get_job_status,
     get_service_status,
     least_busy_backend,
@@ -60,6 +61,11 @@ class TestWithSyncDecorator:
         """Test get_job_status has .sync attribute."""
         assert hasattr(get_job_status, "sync")
         assert callable(get_job_status.sync)
+
+    def test_get_job_results_has_sync(self):
+        """Test get_job_results has .sync attribute."""
+        assert hasattr(get_job_results, "sync")
+        assert callable(get_job_results.sync)
 
     def test_cancel_job_has_sync(self):
         """Test cancel_job has .sync attribute."""
@@ -182,6 +188,26 @@ class TestSyncMethodExecution:
 
             assert result["status"] == "success"
             assert result["job_status"] == "COMPLETED"
+
+    def test_get_job_results_sync_success(self):
+        """Test successful job results retrieval with .sync method."""
+        mock_response = {
+            "status": "success",
+            "job_id": "job_123",
+            "job_status": "DONE",
+            "counts": {"00": 2048, "11": 2048},
+            "shots": 4096,
+            "backend": "ibm_brisbane",
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = get_job_results.sync("job_123")
+
+            assert result["status"] == "success"
+            assert result["counts"] == {"00": 2048, "11": 2048}
+            assert result["shots"] == 4096
 
     def test_cancel_job_sync_success(self):
         """Test successful job cancellation with .sync method."""
