@@ -18,6 +18,7 @@ import os
 from typing import Any, Literal
 
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
 from qiskit_ibm_runtime.options import SamplerOptions
 from qiskit_mcp_server.circuit_serialization import CircuitFormat, load_circuit
 
@@ -26,6 +27,9 @@ from qiskit_ibm_runtime_mcp_server.utils import with_sync
 
 # Type alias for dynamical decoupling sequence types
 DDSequenceType = Literal["XX", "XpXm", "XY4"]
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 def get_instance_from_env() -> str | None:
@@ -59,7 +63,9 @@ def least_busy(backends: list[Any]) -> Any | None:
                 if status.operational:
                     operational_backends.append((b, status.pending_jobs))
         except Exception as e:
-            logger.warning(f"Skipping backend {getattr(b, 'name', 'unknown')} in least_busy: {e}")
+            logger.warning(
+                f"Skipping backend {getattr(b, 'name', 'unknown')} in least_busy: {e}"
+            )
             continue
 
     if not operational_backends:
@@ -87,10 +93,58 @@ def get_token_from_env() -> str | None:
     return None
 
 
-logger = logging.getLogger(__name__)
-
 # Global service instance
 service: QiskitRuntimeService | None = None
+
+
+def _build_adjacency_list(
+    edges: list[list[int]], num_qubits: int
+) -> dict[str, list[int]]:
+    """Build adjacency list from edges."""
+    adjacency: dict[str, list[int]] = {str(i): [] for i in range(num_qubits)}
+    for edge in edges:
+        adjacency[str(edge[0])].append(edge[1])
+    return adjacency
+
+
+def _process_coupling_map(
+    edges: list[list[int]],
+    num_qubits: int,
+    backend_name: str,
+    source: str | None = None,
+) -> dict[str, Any]:
+    """Process coupling map data into standardized response format.
+
+    Args:
+        edges: List of [control, target] qubit connection pairs
+        num_qubits: Total number of qubits
+        backend_name: Name of the backend
+        source: Optional source identifier (e.g., "fake_backend")
+
+    Returns:
+        Standardized coupling map response dict
+    """
+    # Check if bidirectional (both [i,j] and [j,i] exist for all edges)
+    edge_set = {(e[0], e[1]) for e in edges}
+    bidirectional = len(edges) > 0 and all((e[1], e[0]) in edge_set for e in edges)
+
+    # Build adjacency list
+    adjacency_list = _build_adjacency_list(edges, num_qubits)
+
+    result: dict[str, Any] = {
+        "status": "success",
+        "backend_name": backend_name,
+        "num_qubits": num_qubits,
+        "num_edges": len(edges),
+        "edges": edges,
+        "bidirectional": bidirectional,
+        "adjacency_list": adjacency_list,
+    }
+
+    if source:
+        result["source"] = source
+
+    return result
 
 
 def _create_runtime_service(channel: str, instance: str | None) -> QiskitRuntimeService:
@@ -178,7 +232,9 @@ def initialize_service(
             # Initialize service with the new token
             try:
                 service = _create_runtime_service(channel, instance)
-                logger.info(f"Successfully initialized IBM Runtime service on channel: {channel}")
+                logger.info(
+                    f"Successfully initialized IBM Runtime service on channel: {channel}"
+                )
                 return service
             except Exception as e:
                 logger.error(f"Failed to initialize IBM Runtime service: {e}")
@@ -276,7 +332,9 @@ async def list_backends() -> dict[str, Any]:
                     "status_msg": status.status_msg,
                 }
             except Exception as status_err:
-                logger.warning(f"Failed to get status for backend {backend_name}: {status_err}")
+                logger.warning(
+                    f"Failed to get status for backend {backend_name}: {status_err}"
+                )
                 backend_info = {
                     "name": backend_name,
                     "num_qubits": num_qubits,
@@ -342,7 +400,9 @@ async def least_busy_backend() -> dict[str, Any]:
                 "status_msg": status.status_msg,
             }
         except Exception as status_err:
-            logger.warning(f"Could not get final status for {backend.name}: {status_err}")
+            logger.warning(
+                f"Could not get final status for {backend.name}: {status_err}"
+            )
             return {
                 "status": "success",
                 "backend_name": backend.name,
@@ -427,6 +487,105 @@ async def get_backend_properties(backend_name: str) -> dict[str, Any]:
         }
 
 
+def _get_fake_backend(backend_name: str) -> Any:
+    """
+    Get a fake backend by name from the FakeProviderForBackendV2.
+
+    Args:
+        backend_name: Name of the fake backend (e.g., 'fake_brisbane')
+
+    Returns:
+        Fake backend instance
+
+    Raises:
+        ValueError: If the fake backend is not found
+    """
+    provider = FakeProviderForBackendV2()
+    backends = provider.backends()
+
+    for backend in backends:
+        if backend.name == backend_name:
+            return backend
+
+    # Only build available list for error message
+    available = sorted(b.name for b in backends)[:10]
+    raise ValueError(
+        f"Fake backend '{backend_name}' not found. "
+        f"Available fake backends: {', '.join(available)}..."
+    )
+
+
+@with_sync
+async def get_coupling_map(backend_name: str) -> dict[str, Any]:
+    """
+    Get the coupling map (qubit connectivity) for a specific backend.
+
+    Supports both real IBM Quantum backends and fake backends (no credentials needed).
+    Use 'fake_' prefix for fake backends (e.g., 'fake_brisbane', 'fake_sherbrooke').
+
+    Args:
+        backend_name: Name of the backend. Use 'fake_' prefix for fake backends.
+
+    Returns:
+        Coupling map details including edges and adjacency list
+    """
+    try:
+        # Check if this is a fake backend request
+        if backend_name.startswith("fake_"):
+            return _get_fake_backend_coupling_map(backend_name)
+
+        # Real backend - requires credentials
+        global service
+        if service is None:
+            service = initialize_service()
+
+        backend = service.backend(backend_name)
+        num_qubits = getattr(backend, "num_qubits", 0)
+
+        # Get configuration
+        edges: list[list[int]] = []
+        try:
+            config = backend.configuration()
+            coupling_map_raw = getattr(config, "coupling_map", []) or []
+            edges = [[int(e[0]), int(e[1])] for e in coupling_map_raw]
+        except Exception:
+            pass  # nosec B110 - Config errors are acceptable; defaults used
+
+        return _process_coupling_map(edges, num_qubits, backend.name)
+
+    except Exception as e:
+        logger.error(f"Failed to get coupling map: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to get coupling map: {e!s}",
+        }
+
+
+def _get_fake_backend_coupling_map(backend_name: str) -> dict[str, Any]:
+    """
+    Get coupling map from a fake backend (no credentials needed).
+
+    Args:
+        backend_name: Name of the fake backend (e.g., 'fake_brisbane')
+
+    Returns:
+        Coupling map details
+    """
+    backend = _get_fake_backend(backend_name)
+    coupling_map = backend.coupling_map
+
+    if coupling_map is None:
+        return {
+            "status": "error",
+            "message": f"Backend '{backend_name}' has no coupling map (fully connected)",
+        }
+
+    edges = [[int(e[0]), int(e[1])] for e in coupling_map.get_edges()]
+    num_qubits = coupling_map.size()
+
+    return _process_coupling_map(edges, num_qubits, backend.name, source="fake_backend")
+
+
 def _get_qubit_calibration_data(
     properties: Any, qubit: int, faulty_qubits: list[int]
 ) -> dict[str, Any]:
@@ -494,7 +653,9 @@ def _get_gate_errors(
             with contextlib.suppress(Exception):
                 error = properties.gate_error(gate, [qubit])
                 if error is not None:
-                    gate_errors.append({"gate": gate, "qubits": [qubit], "error": round(error, 6)})
+                    gate_errors.append(
+                        {"gate": gate, "qubits": [qubit], "error": round(error, 6)}
+                    )
 
     # Two-qubit gates
     for gate in two_qubit_gates:
@@ -502,9 +663,512 @@ def _get_gate_errors(
             with contextlib.suppress(Exception):
                 error = properties.gate_error(gate, edge)
                 if error is not None:
-                    gate_errors.append({"gate": gate, "qubits": edge, "error": round(error, 6)})
+                    gate_errors.append(
+                        {"gate": gate, "qubits": edge, "error": round(error, 6)}
+                    )
 
     return gate_errors
+
+
+# Type alias for chain scoring metrics
+ScoringMetric = Literal["two_qubit_error", "readout_error", "combined"]
+
+# Type alias for QV subgraph scoring metrics
+QVScoringMetric = Literal["qv_optimized", "connectivity", "gate_error"]
+
+
+def _find_all_linear_chains(
+    adjacency_list: dict[str, list[int]],
+    chain_length: int,
+    faulty_qubits: set[int],
+) -> list[list[int]]:
+    """Find all valid linear chains of specified length using DFS.
+
+    Args:
+        adjacency_list: Mapping from qubit index (as string) to list of connected qubits
+        chain_length: Number of qubits in each chain
+        faulty_qubits: Set of qubit indices to exclude from chains
+
+    Returns:
+        List of chains, where each chain is a list of qubit indices
+    """
+    chains: list[list[int]] = []
+    num_qubits = len(adjacency_list)
+
+    def dfs(current: int, path: list[int], visited: set[int]) -> None:
+        if len(path) == chain_length:
+            chains.append(path.copy())
+            return
+
+        for neighbor in adjacency_list.get(str(current), []):
+            if neighbor not in visited and neighbor not in faulty_qubits:
+                visited.add(neighbor)
+                path.append(neighbor)
+                dfs(neighbor, path, visited)
+                path.pop()
+                visited.remove(neighbor)
+
+    # Start DFS from each non-faulty qubit
+    for start in range(num_qubits):
+        if start not in faulty_qubits:
+            dfs(start, [start], {start})
+
+    return chains
+
+
+def _score_chain(
+    chain: list[int],
+    qubit_calibration: dict[int, dict[str, Any]],
+    gate_errors: dict[tuple[int, int], float],
+    metric: ScoringMetric,
+) -> float:
+    """Score a chain based on selected metric. Lower is better.
+
+    Args:
+        chain: List of qubit indices forming the chain
+        qubit_calibration: Per-qubit calibration data (t1_us, t2_us, readout_error)
+        gate_errors: Two-qubit gate errors keyed by (control, target) tuple
+        metric: Scoring metric to use
+
+    Returns:
+        Score value (lower is better)
+    """
+    if metric == "two_qubit_error":
+        # Sum of two-qubit gate errors between consecutive qubits
+        total = 0.0
+        for i in range(len(chain) - 1):
+            edge = (chain[i], chain[i + 1])
+            reverse_edge = (chain[i + 1], chain[i])
+            # Look up gate error for this edge; try both directions since coupling
+            # maps may store edges in either order. Fall back to 1% if not found.
+            total += gate_errors.get(edge, gate_errors.get(reverse_edge, 0.01))
+        return total
+
+    elif metric == "readout_error":
+        # Sum of readout errors for all qubits
+        return float(
+            sum(qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in chain)
+        )
+
+    # Combined metric: gate_errors + readout + inverse coherence
+    gate_score = 0.0
+    for i in range(len(chain) - 1):
+        edge = (chain[i], chain[i + 1])
+        reverse_edge = (chain[i + 1], chain[i])
+        gate_score += gate_errors.get(edge, gate_errors.get(reverse_edge, 0.01))
+
+    readout_score = float(
+        sum(qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in chain)
+    )
+
+    # Lower T1/T2 is worse, so use inverse (capped to avoid division issues)
+    coherence_score = float(
+        sum(1.0 / max(qubit_calibration.get(q, {}).get("t1_us", 100), 1) for q in chain)
+    )
+
+    return gate_score + readout_score + 0.01 * coherence_score
+
+
+def _build_qubit_calibration(
+    properties: Any, num_qubits: int, faulty_qubits: set[int]
+) -> dict[int, dict[str, Any]]:
+    """Build qubit calibration dictionary from backend properties.
+
+    Args:
+        properties: Backend properties object
+        num_qubits: Total number of qubits
+        faulty_qubits: Set of faulty qubit indices to skip
+
+    Returns:
+        Dictionary mapping qubit index to calibration data
+    """
+    qubit_calibration: dict[int, dict[str, Any]] = {}
+    for q in range(num_qubits):
+        if q in faulty_qubits:
+            continue
+        qubit_data: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            t1 = properties.t1(q)
+            if t1 is not None:
+                qubit_data["t1_us"] = t1 * 1e6 if t1 < 1 else t1
+        with contextlib.suppress(Exception):
+            t2 = properties.t2(q)
+            if t2 is not None:
+                qubit_data["t2_us"] = t2 * 1e6 if t2 < 1 else t2
+        with contextlib.suppress(Exception):
+            readout_err = properties.readout_error(q)
+            if readout_err is not None:
+                qubit_data["readout_error"] = readout_err
+        qubit_calibration[q] = qubit_data
+    return qubit_calibration
+
+
+def _build_gate_errors(
+    properties: Any, edges: list[list[int]]
+) -> dict[tuple[int, int], float]:
+    """Build gate error dictionary from backend properties.
+
+    Args:
+        properties: Backend properties object
+        edges: List of coupling map edges
+
+    Returns:
+        Dictionary mapping (control, target) tuples to gate error rates
+    """
+    gate_errors: dict[tuple[int, int], float] = {}
+    for edge in edges:
+        for gate in ["cx", "ecr", "cz"]:
+            with contextlib.suppress(Exception):
+                error = properties.gate_error(gate, edge)
+                if error is not None:
+                    gate_errors[(edge[0], edge[1])] = error
+                    break
+    return gate_errors
+
+
+def _build_chain_result(
+    rank: int,
+    chain: list[int],
+    score: float,
+    qubit_calibration: dict[int, dict[str, Any]],
+    gate_errors: dict[tuple[int, int], float],
+) -> dict[str, Any]:
+    """Build result dictionary for a single chain.
+
+    Args:
+        rank: Ranking position (1 = best)
+        chain: List of qubit indices in the chain
+        score: Chain score
+        qubit_calibration: Per-qubit calibration data
+        gate_errors: Two-qubit gate errors
+
+    Returns:
+        Dictionary with chain metrics
+    """
+    return {
+        "rank": rank,
+        "qubits": chain,
+        "score": round(score, 6),
+        "qubit_details": [
+            {
+                "qubit": q,
+                "t1_us": round(qubit_calibration.get(q, {}).get("t1_us") or 0, 2),
+                "t2_us": round(qubit_calibration.get(q, {}).get("t2_us") or 0, 2),
+                "readout_error": round(
+                    qubit_calibration.get(q, {}).get("readout_error") or 0, 6
+                ),
+            }
+            for q in chain
+        ],
+        "edge_errors": [
+            {
+                "edge": [chain[i], chain[i + 1]],
+                "error": round(
+                    gate_errors.get(
+                        (chain[i], chain[i + 1]),
+                        gate_errors.get((chain[i + 1], chain[i]), 0),
+                    ),
+                    6,
+                ),
+            }
+            for i in range(len(chain) - 1)
+        ],
+    }
+
+
+def _find_connected_subgraphs(
+    adjacency_list: dict[str, list[int]],
+    subgraph_size: int,
+    faulty_qubits: set[int],
+    qubit_calibration: dict[int, dict[str, Any]] | None = None,
+) -> list[set[int]]:
+    """Find connected subgraphs of specified size using DFS exploration.
+
+    Unlike linear chains, these subgraphs can have any internal connectivity structure
+    as long as all qubits are connected. This is essential for Quantum Volume which
+    benefits from densely connected qubit sets.
+
+    Args:
+        adjacency_list: Mapping from qubit index (as string) to list of connected qubits
+        subgraph_size: Number of qubits in each subgraph
+        faulty_qubits: Set of qubit indices to exclude
+        qubit_calibration: Optional calibration data to prioritize better qubits
+
+    Returns:
+        List of subgraphs, where each subgraph is a set of qubit indices
+    """
+    subgraphs: list[set[int]] = []
+    seen: set[frozenset[int]] = set()
+    num_qubits = len(adjacency_list)
+
+    def get_neighbors(qubit: int) -> list[int]:
+        """Get non-faulty neighbors of a qubit."""
+        return [n for n in adjacency_list.get(str(qubit), []) if n not in faulty_qubits]
+
+    def dfs_expand(current_set: set[int], frontier: set[int]) -> None:
+        """Expand current set by adding connected qubits."""
+        if len(current_set) == subgraph_size:
+            frozen = frozenset(current_set)
+            if frozen not in seen:
+                seen.add(frozen)
+                subgraphs.append(current_set.copy())
+            return
+
+        # Sort frontier by qubit quality if calibration available
+        if qubit_calibration:
+            sorted_frontier = sorted(
+                frontier,
+                key=lambda q: qubit_calibration.get(q, {}).get("readout_error", 1.0),
+            )
+        else:
+            sorted_frontier = sorted(frontier)
+
+        # Try adding each frontier qubit
+        for next_qubit in sorted_frontier:
+            new_set = current_set | {next_qubit}
+            # New frontier: neighbors of next_qubit not already in set
+            new_frontier = frontier.copy()
+            new_frontier.discard(next_qubit)
+            for neighbor in get_neighbors(next_qubit):
+                if neighbor not in new_set:
+                    new_frontier.add(neighbor)
+
+            dfs_expand(new_set, new_frontier)
+
+    # Get starting qubits, sorted by quality if calibration available
+    valid_qubits = [q for q in range(num_qubits) if q not in faulty_qubits]
+    if qubit_calibration:
+        # Sort by readout error (lower is better)
+        valid_qubits.sort(
+            key=lambda q: qubit_calibration.get(q, {}).get("readout_error", 1.0)
+        )
+
+    # Start from each valid qubit (prioritizing better qubits)
+    for start in valid_qubits:
+        initial_frontier = set(get_neighbors(start))
+        dfs_expand({start}, initial_frontier)
+
+    return subgraphs
+
+
+def _count_internal_edges(
+    subgraph: set[int],
+    adjacency_list: dict[str, list[int]],
+) -> int:
+    """Count the number of edges within a subgraph.
+
+    For Quantum Volume, more internal edges mean more direct connectivity
+    and fewer SWAP gates needed.
+
+    Args:
+        subgraph: Set of qubit indices
+        adjacency_list: Full adjacency list of the backend
+
+    Returns:
+        Number of edges connecting qubits within the subgraph
+    """
+    edge_count = 0
+    for qubit in subgraph:
+        for neighbor in adjacency_list.get(str(qubit), []):
+            if neighbor in subgraph and neighbor > qubit:  # Count each edge once
+                edge_count += 1
+    return edge_count
+
+
+def _compute_average_path_length(
+    subgraph: set[int],
+    adjacency_list: dict[str, list[int]],
+) -> float:
+    """Compute average shortest path length between all qubit pairs in subgraph.
+
+    Uses BFS to find shortest paths. Lower average path length means qubits
+    can interact with fewer SWAP operations, which is beneficial for QV.
+
+    Args:
+        subgraph: Set of qubit indices
+        adjacency_list: Full adjacency list of the backend
+
+    Returns:
+        Average shortest path length (1.0 for fully connected, higher for sparse)
+    """
+    if len(subgraph) < 2:
+        return 0.0
+
+    qubits = list(subgraph)
+    total_distance = 0
+    num_pairs = 0
+
+    for i, source in enumerate(qubits):
+        # BFS from source
+        distances: dict[int, int] = {source: 0}
+        queue = [source]
+        head = 0
+
+        while head < len(queue):
+            current = queue[head]
+            head += 1
+
+            for neighbor in adjacency_list.get(str(current), []):
+                if neighbor in subgraph and neighbor not in distances:
+                    distances[neighbor] = distances[current] + 1
+                    queue.append(neighbor)
+
+        # Sum distances to qubits we haven't counted yet (avoid double counting)
+        for j in range(i + 1, len(qubits)):
+            target = qubits[j]
+            if target in distances:
+                total_distance += distances[target]
+                num_pairs += 1
+
+    return total_distance / num_pairs if num_pairs > 0 else float("inf")
+
+
+def _score_qv_subgraph(
+    subgraph: set[int],
+    adjacency_list: dict[str, list[int]],
+    qubit_calibration: dict[int, dict[str, Any]],
+    gate_errors: dict[tuple[int, int], float],
+    metric: QVScoringMetric,
+) -> float:
+    """Score a subgraph for Quantum Volume. Lower is better.
+
+    Args:
+        subgraph: Set of qubit indices
+        adjacency_list: Full adjacency list of the backend
+        qubit_calibration: Per-qubit calibration data
+        gate_errors: Two-qubit gate errors
+        metric: Scoring metric to use
+
+    Returns:
+        Score value (lower is better)
+    """
+    n = len(subgraph)
+    max_edges = n * (n - 1) // 2  # Complete graph edges
+
+    # Compute common metrics
+    internal_edges = _count_internal_edges(subgraph, adjacency_list)
+    avg_path_length = _compute_average_path_length(subgraph, adjacency_list)
+
+    if metric == "connectivity":
+        # Maximize connectivity: score = (max_edges - internal_edges) + avg_path_length
+        # Lower score = more edges and shorter paths
+        connectivity_penalty = max_edges - internal_edges
+        return connectivity_penalty + avg_path_length
+
+    elif metric == "gate_error":
+        # Minimize total gate error on internal edges
+        total_error = 0.0
+        for qubit in subgraph:
+            for neighbor in adjacency_list.get(str(qubit), []):
+                if neighbor in subgraph and neighbor > qubit:
+                    edge = (qubit, neighbor)
+                    reverse_edge = (neighbor, qubit)
+                    total_error += gate_errors.get(
+                        edge, gate_errors.get(reverse_edge, 0.01)
+                    )
+        return total_error
+
+    # metric == "qv_optimized"
+    # Balanced: connectivity + gate errors + readout errors
+    # Weight connectivity heavily since it's crucial for QV
+    connectivity_score = (max_edges - internal_edges) * 0.5 + avg_path_length * 0.3
+
+    # Gate errors on internal edges
+    gate_error_sum = 0.0
+    for qubit in subgraph:
+        for neighbor in adjacency_list.get(str(qubit), []):
+            if neighbor in subgraph and neighbor > qubit:
+                edge = (qubit, neighbor)
+                reverse_edge = (neighbor, qubit)
+                gate_error_sum += gate_errors.get(
+                    edge, gate_errors.get(reverse_edge, 0.01)
+                )
+
+    # Readout errors
+    readout_sum = float(
+        sum(qubit_calibration.get(q, {}).get("readout_error", 0.01) for q in subgraph)
+    )
+
+    # Coherence factor (inverse of T1 average, penalize low coherence)
+    coherence_penalty = float(
+        sum(
+            1.0 / max(qubit_calibration.get(q, {}).get("t1_us", 100), 1)
+            for q in subgraph
+        )
+    )
+
+    return (
+        connectivity_score
+        + gate_error_sum * 10
+        + readout_sum
+        + coherence_penalty * 0.01
+    )
+
+
+def _build_qv_subgraph_result(
+    rank: int,
+    subgraph: set[int],
+    score: float,
+    adjacency_list: dict[str, list[int]],
+    qubit_calibration: dict[int, dict[str, Any]],
+    gate_errors: dict[tuple[int, int], float],
+) -> dict[str, Any]:
+    """Build result dictionary for a QV subgraph.
+
+    Args:
+        rank: Ranking position (1 = best)
+        subgraph: Set of qubit indices
+        score: Subgraph score
+        adjacency_list: Full adjacency list
+        qubit_calibration: Per-qubit calibration data
+        gate_errors: Two-qubit gate errors
+
+    Returns:
+        Dictionary with subgraph metrics
+    """
+    qubits = sorted(subgraph)
+    internal_edges = _count_internal_edges(subgraph, adjacency_list)
+    avg_path_length = _compute_average_path_length(subgraph, adjacency_list)
+    max_edges = len(subgraph) * (len(subgraph) - 1) // 2
+
+    # Find actual internal edge pairs
+    edge_list = []
+    for qubit in subgraph:
+        for neighbor in adjacency_list.get(str(qubit), []):
+            if neighbor in subgraph and neighbor > qubit:
+                edge = (qubit, neighbor)
+                reverse_edge = (neighbor, qubit)
+                error = gate_errors.get(edge, gate_errors.get(reverse_edge, 0))
+                edge_list.append(
+                    {
+                        "edge": [qubit, neighbor],
+                        "error": round(error, 6),
+                    }
+                )
+
+    return {
+        "rank": rank,
+        "qubits": qubits,
+        "score": round(score, 6),
+        "internal_edges": internal_edges,
+        "max_possible_edges": max_edges,
+        "connectivity_ratio": round(internal_edges / max_edges, 3)
+        if max_edges > 0
+        else 0,
+        "average_path_length": round(avg_path_length, 3),
+        "qubit_details": [
+            {
+                "qubit": q,
+                "t1_us": round(qubit_calibration.get(q, {}).get("t1_us") or 0, 2),
+                "t2_us": round(qubit_calibration.get(q, {}).get("t2_us") or 0, 2),
+                "readout_error": round(
+                    qubit_calibration.get(q, {}).get("readout_error") or 0, 6
+                ),
+            }
+            for q in qubits
+        ],
+        "edge_errors": edge_list,
+    }
 
 
 @with_sync
@@ -565,7 +1229,9 @@ async def get_backend_calibration(
             faulty_gates_raw = properties.faulty_gates()
             for gate in faulty_gates_raw:
                 with contextlib.suppress(Exception):
-                    faulty_gates.append({"gate": gate.gate, "qubits": list(gate.qubits)})
+                    faulty_gates.append(
+                        {"gate": gate.gate, "qubits": list(gate.qubits)}
+                    )
 
         # Determine which qubits to report on
         if qubit_indices is None:
@@ -577,7 +1243,9 @@ async def get_backend_calibration(
         qubit_data: list[dict[str, Any]] = []
         for qubit in qubit_indices:
             try:
-                qubit_data.append(_get_qubit_calibration_data(properties, qubit, faulty_qubits))
+                qubit_data.append(
+                    _get_qubit_calibration_data(properties, qubit, faulty_qubits)
+                )
             except Exception as qe:
                 logger.warning(f"Failed to get calibration for qubit {qubit}: {qe}")
                 qubit_data.append({"qubit": qubit, "error": str(qe)})
@@ -640,9 +1308,9 @@ async def list_my_jobs(limit: int = 10) -> dict[str, Any]:
                     "creation_date": getattr(job, "creation_date", "Unknown"),
                     "backend": job.backend().name if job.backend() else "Unknown",
                     "tags": getattr(job, "tags", []),
-                    "error_message": (
-                        job.error_message() if hasattr(job, "error_message") else None
-                    ),
+                    "error_message": job.error_message()
+                    if hasattr(job, "error_message")
+                    else None,
                 }
                 job_list.append(job_info)
             except Exception as je:
@@ -685,7 +1353,9 @@ async def get_job_status(job_id: str) -> dict[str, Any]:
             "creation_date": getattr(job, "creation_date", "Unknown"),
             "backend": job.backend().name if job.backend() else "Unknown",
             "tags": getattr(job, "tags", []),
-            "error_message": (job.error_message() if hasattr(job, "error_message") else None),
+            "error_message": job.error_message()
+            if hasattr(job, "error_message")
+            else None,
         }
 
         return job_info
@@ -759,6 +1429,303 @@ async def get_service_status() -> str:
         logger.error(f"Failed to check service status: {e}")
         status_info = {"connected": False, "error": str(e), "service": "IBM Quantum"}
         return f"IBM Quantum Service Status: {status_info}"
+
+
+def _clamp(value: int, min_val: int, max_val: int) -> int:
+    """Clamp value to range [min_val, max_val]."""
+    return max(min_val, min(value, max_val))
+
+
+@with_sync
+async def find_optimal_qubit_chains(
+    backend_name: str,
+    chain_length: int = 5,
+    num_results: int = 5,
+    metric: ScoringMetric = "two_qubit_error",
+) -> dict[str, Any]:
+    """
+    Find optimal linear qubit chains for experiments based on connectivity and calibration.
+
+    Uses coupling map connectivity to find all valid linear chains of the specified length,
+    then scores each chain based on calibration data (gate errors, readout errors, coherence
+    times). Returns the top N chains ranked by the selected metric.
+
+    Args:
+        backend_name: Name of the backend (e.g., 'ibm_brisbane')
+        chain_length: Number of qubits in each chain (default: 5, range: 2-20)
+        num_results: Number of top chains to return (default: 5, max: 20)
+        metric: Scoring metric to optimize:
+            - "two_qubit_error": Minimize sum of CX/ECR gate errors (default)
+            - "readout_error": Minimize sum of measurement errors
+            - "combined": Weighted combination of gate errors, readout, and coherence
+
+    Returns:
+        Ranked chains with detailed metrics including:
+        - qubits: Ordered list of qubit indices in the chain
+        - score: Total score (lower is better)
+        - qubit_details: T1, T2, readout_error for each qubit
+        - edge_errors: Two-qubit gate error for each connection
+    """
+    global service
+
+    try:
+        # Validate inputs
+        chain_length = _clamp(chain_length, 2, 20)
+        num_results = _clamp(num_results, 1, 20)
+
+        # Check for fake backends early - they don't have calibration data
+        if backend_name.startswith("fake_"):
+            return {
+                "status": "error",
+                "message": f"Fake backends like '{backend_name}' are not supported. "
+                "This tool requires real-time calibration data from IBM Quantum backends. "
+                "Use get_coupling_map_tool for connectivity information on fake backends.",
+            }
+
+        # Initialize service if needed
+        if service is None:
+            service = initialize_service()
+
+        # Get coupling map
+        coupling_result = await get_coupling_map(backend_name)
+        if coupling_result["status"] == "error":
+            return coupling_result
+
+        adjacency_list = coupling_result["adjacency_list"]
+        backend_num_qubits = coupling_result["num_qubits"]
+
+        # Validate requested size against backend capacity
+        if chain_length > backend_num_qubits:
+            return {
+                "status": "error",
+                "message": f"Requested chain_length={chain_length}, but {backend_name} only has "
+                f"{backend_num_qubits} qubits. Please reduce chain_length.",
+            }
+
+        # Get backend properties
+        backend = service.backend(backend_name)
+        properties = _get_backend_properties_for_chains(backend, backend_name)
+        if isinstance(properties, dict):
+            return properties  # Error response
+
+        # Extract faulty qubits
+        faulty_qubits: set[int] = set()
+        with contextlib.suppress(Exception):
+            faulty_qubits = set(properties.faulty_qubits())
+
+        # Build calibration data
+        qubit_calibration = _build_qubit_calibration(
+            properties, backend_num_qubits, faulty_qubits
+        )
+        gate_errors = _build_gate_errors(properties, coupling_result["edges"])
+
+        # Find all chains
+        chains = _find_all_linear_chains(adjacency_list, chain_length, faulty_qubits)
+
+        if not chains:
+            return {
+                "status": "error",
+                "message": f"No valid chains of length {chain_length} found on {backend_name}. "
+                f"The backend has {backend_num_qubits} qubits and {len(faulty_qubits)} faulty qubits.",
+            }
+
+        # Score, rank, and build results
+        scored_chains = [
+            (c, _score_chain(c, qubit_calibration, gate_errors, metric)) for c in chains
+        ]
+        scored_chains.sort(key=lambda x: x[1])
+        top_chains = scored_chains[:num_results]
+
+        results = [
+            _build_chain_result(rank, chain, score, qubit_calibration, gate_errors)
+            for rank, (chain, score) in enumerate(top_chains, 1)
+        ]
+
+        return {
+            "status": "success",
+            "backend_name": backend_name,
+            "chain_length": chain_length,
+            "metric": metric,
+            "total_chains_found": len(chains),
+            "faulty_qubits": list(faulty_qubits),
+            "chains": results,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to find optimal chains: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to find optimal chains: {e!s}",
+        }
+
+
+def _get_backend_properties_for_chains(
+    backend: Any, backend_name: str
+) -> Any | dict[str, Any]:
+    """Get backend properties or return error dict if unavailable.
+
+    Args:
+        backend: Backend object
+        backend_name: Name of the backend for error messages
+
+    Returns:
+        Properties object if available, or error dict
+    """
+    try:
+        properties = backend.properties()
+    except Exception as e:
+        logger.warning(f"Could not get properties for {backend_name}: {e}")
+        return {
+            "status": "error",
+            "message": f"Calibration data not available for {backend_name}. "
+            "This tool requires calibration data to score chains.",
+        }
+
+    if properties is None:
+        return {
+            "status": "error",
+            "message": f"No calibration data available for {backend_name}. "
+            "This is likely a simulator backend.",
+        }
+
+    return properties
+
+
+@with_sync
+async def find_optimal_qv_qubits(
+    backend_name: str,
+    num_qubits: int = 5,
+    num_results: int = 5,
+    metric: QVScoringMetric = "qv_optimized",
+) -> dict[str, Any]:
+    """
+    Find optimal qubit subgraphs for Quantum Volume experiments.
+
+    Unlike linear chains, Quantum Volume benefits from densely connected qubit sets
+    where any qubit can interact with any other with minimal SWAP operations.
+    This tool finds connected subgraphs and ranks them by connectivity and
+    calibration quality.
+
+    Args:
+        backend_name: Name of the backend (e.g., 'ibm_brisbane')
+        num_qubits: Number of qubits in the subgraph (default: 5, range: 2-10)
+        num_results: Number of top subgraphs to return (default: 5, max: 20)
+        metric: Scoring metric to optimize:
+            - "qv_optimized": Balanced scoring for QV (connectivity + errors + coherence)
+            - "connectivity": Maximize internal edges and minimize path lengths
+            - "gate_error": Minimize total two-qubit gate errors on internal edges
+
+    Returns:
+        Ranked subgraphs with detailed metrics including:
+        - qubits: List of qubit indices in the subgraph (sorted)
+        - score: Total score (lower is better)
+        - internal_edges: Number of edges within the subgraph
+        - connectivity_ratio: internal_edges / max_possible_edges
+        - average_path_length: Mean shortest path between qubit pairs
+        - qubit_details: T1, T2, readout_error for each qubit
+        - edge_errors: Two-qubit gate error for each internal edge
+    """
+    global service
+
+    try:
+        # Validate inputs - limit num_qubits to 10 for performance
+        num_qubits = _clamp(num_qubits, 2, 10)
+        num_results = _clamp(num_results, 1, 20)
+
+        # Check for fake backends early
+        if backend_name.startswith("fake_"):
+            return {
+                "status": "error",
+                "message": f"Fake backends like '{backend_name}' are not supported. "
+                "This tool requires real-time calibration data from IBM Quantum backends.",
+            }
+
+        # Initialize service if needed
+        if service is None:
+            service = initialize_service()
+
+        # Get coupling map
+        coupling_result = await get_coupling_map(backend_name)
+        if coupling_result["status"] == "error":
+            return coupling_result
+
+        adjacency_list = coupling_result["adjacency_list"]
+        backend_num_qubits = coupling_result["num_qubits"]
+
+        # Validate requested size against backend capacity
+        if num_qubits > backend_num_qubits:
+            return {
+                "status": "error",
+                "message": f"Requested {num_qubits} qubits, but {backend_name} only has "
+                f"{backend_num_qubits} qubits. Please reduce num_qubits.",
+            }
+
+        # Get backend properties
+        backend = service.backend(backend_name)
+        properties = _get_backend_properties_for_chains(backend, backend_name)
+        if isinstance(properties, dict):
+            return properties  # Error response
+
+        # Extract faulty qubits
+        faulty_qubits: set[int] = set()
+        with contextlib.suppress(Exception):
+            faulty_qubits = set(properties.faulty_qubits())
+
+        # Build calibration data
+        qubit_calibration = _build_qubit_calibration(
+            properties, backend_num_qubits, faulty_qubits
+        )
+        gate_errors = _build_gate_errors(properties, coupling_result["edges"])
+
+        # Find all connected subgraphs (prioritizing qubits with better calibration)
+        subgraphs = _find_connected_subgraphs(
+            adjacency_list, num_qubits, faulty_qubits, qubit_calibration
+        )
+
+        if not subgraphs:
+            return {
+                "status": "error",
+                "message": f"No valid connected subgraphs of size {num_qubits} found on {backend_name}. "
+                f"The backend has {backend_num_qubits} qubits and {len(faulty_qubits)} faulty qubits.",
+            }
+
+        # Score and rank subgraphs
+        scored_subgraphs = [
+            (
+                sg,
+                _score_qv_subgraph(
+                    sg, adjacency_list, qubit_calibration, gate_errors, metric
+                ),
+            )
+            for sg in subgraphs
+        ]
+        scored_subgraphs.sort(key=lambda x: x[1])
+        top_subgraphs = scored_subgraphs[:num_results]
+
+        # Build detailed results
+        results = [
+            _build_qv_subgraph_result(
+                rank, sg, score, adjacency_list, qubit_calibration, gate_errors
+            )
+            for rank, (sg, score) in enumerate(top_subgraphs, 1)
+        ]
+
+        return {
+            "status": "success",
+            "backend_name": backend_name,
+            "num_qubits": num_qubits,
+            "metric": metric,
+            "total_subgraphs_found": len(subgraphs),
+            "faulty_qubits": list(faulty_qubits),
+            "subgraphs": results,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to find optimal QV qubits: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to find optimal QV qubits: {e!s}",
+        }
 
 
 def _get_sampler_backend(
@@ -992,7 +1959,8 @@ def get_ghz_state_circuit(num_qubits: int = 3) -> dict[str, Any]:
 
     # Add CNOT cascade
     lines.extend(
-        f"cx q[{i}], q[{i + 1}];  // Entangle qubit {i} with {i + 1}" for i in range(num_qubits - 1)
+        f"cx q[{i}], q[{i + 1}];  // Entangle qubit {i} with {i + 1}"
+        for i in range(num_qubits - 1)
     )
 
     lines.extend(["", "c = measure q;", ""])
@@ -1264,7 +2232,9 @@ async def available_instances() -> dict[str, Any]:
         }
         return instance_data
     except Exception as e:
-        logger.error(f"Failed to collect available instances for the active account: {e}")
+        logger.error(
+            f"Failed to collect available instances for the active account: {e}"
+        )
         return {"status": "error", "error": str(e)}
 
 

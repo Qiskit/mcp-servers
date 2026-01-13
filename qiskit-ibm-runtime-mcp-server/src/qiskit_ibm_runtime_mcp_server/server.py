@@ -36,11 +36,16 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     active_account_info,
     active_instance_info,
     available_instances,
-    cancel_job,
     delete_saved_account,
+    QVScoringMetric,
+    ScoringMetric,
+    cancel_job,
+    find_optimal_qubit_chains,
+    find_optimal_qv_qubits,
     get_backend_calibration,
     get_backend_properties,
     get_bell_state_circuit,
+    get_coupling_map,
     get_ghz_state_circuit,
     get_job_status,
     get_quantum_random_circuit,
@@ -112,6 +117,8 @@ async def get_backend_properties_tool(backend_name: str) -> dict[str, Any]:
     Note:
         For time-varying calibration data (T1, T2, gate errors, faulty qubits),
         use get_backend_calibration_tool instead.
+        For detailed connectivity analysis (adjacency list, bidirectional check)
+        or fake backend support, use get_coupling_map_tool instead.
     """
     return await get_backend_properties(backend_name)
 
@@ -142,6 +149,127 @@ async def get_backend_calibration_tool(
         use get_backend_properties_tool instead.
     """
     return await get_backend_calibration(backend_name, qubit_indices)
+
+
+@mcp.tool()
+async def get_coupling_map_tool(backend_name: str) -> dict[str, Any]:
+    """Get the coupling map (qubit connectivity) for an IBM Quantum backend.
+
+    Supports both real backends (requires credentials) and fake backends (no credentials).
+    Use 'fake_' prefix for offline testing without IBM Quantum credentials.
+
+    Args:
+        backend_name: Name of the backend. Examples:
+            - Real backends: 'ibm_brisbane', 'ibm_fez' (requires credentials)
+            - Fake backends: 'fake_brisbane', 'fake_sherbrooke' (no credentials needed)
+
+    Returns:
+        Coupling map details including:
+        - num_qubits: Total qubit count
+        - edges: List of [control, target] qubit connection pairs
+        - bidirectional: Whether all connections work in both directions
+        - adjacency_list: Neighbor mapping for each qubit (key: qubit index as string)
+        - source: 'fake_backend' if using a fake backend (only present for fake backends)
+
+    Use cases:
+        - Identify physically connected qubits for circuit optimization
+        - Plan qubit assignments to minimize SWAP gates
+        - Understand backend architecture for advanced optimization
+        - Test circuit routing offline with fake backends
+
+    Note:
+        For processor type and other backend info, use get_backend_properties_tool.
+    """
+    return await get_coupling_map(backend_name)
+
+
+@mcp.tool()
+async def find_optimal_qubit_chains_tool(
+    backend_name: str,
+    chain_length: int = 5,
+    num_results: int = 5,
+    metric: ScoringMetric = "two_qubit_error",
+) -> dict[str, Any]:
+    """Find optimal linear qubit chains for quantum experiments.
+
+    Algorithmically identifies the best qubit chains based on coupling map
+    connectivity and calibration data. Essential for experiments requiring
+    linear qubit arrangements (e.g., variational algorithms, error correction).
+
+    Args:
+        backend_name: Name of the backend (e.g., 'ibm_brisbane')
+        chain_length: Number of qubits in the chain (default: 5, range: 2-20)
+        num_results: Number of top chains to return (default: 5, max: 20)
+        metric: Scoring metric to optimize:
+            - "two_qubit_error": Minimize sum of CX/ECR gate errors (default)
+            - "readout_error": Minimize sum of measurement errors
+            - "combined": Weighted combination of gate errors, readout, and coherence
+
+    Returns:
+        Ranked chains with detailed metrics:
+        - chains: List of chain results, each containing:
+            - rank: Position in ranking (1 = best)
+            - qubits: Ordered list of qubit indices in the chain
+            - score: Total score (lower is better)
+            - qubit_details: T1, T2, readout_error for each qubit
+            - edge_errors: Two-qubit gate error for each connection
+        - total_chains_found: Total number of valid chains discovered
+        - faulty_qubits: List of qubit indices excluded from chains
+
+    Use cases:
+        - Select qubits for variational quantum algorithms (VQE, QAOA)
+        - Plan linear qubit layouts for error correction experiments
+        - Identify high-fidelity qubit paths for state transfer
+        - Optimize qubit selection for 1D physics simulations
+    """
+    return await find_optimal_qubit_chains(
+        backend_name, chain_length, num_results, metric
+    )
+
+
+@mcp.tool()
+async def find_optimal_qv_qubits_tool(
+    backend_name: str,
+    num_qubits: int = 5,
+    num_results: int = 5,
+    metric: QVScoringMetric = "qv_optimized",
+) -> dict[str, Any]:
+    """Find optimal qubit subgraphs for Quantum Volume experiments.
+
+    Unlike linear chains, Quantum Volume benefits from densely connected qubit sets
+    where qubits can interact with minimal SWAP operations. This tool finds
+    connected subgraphs and ranks them by connectivity and calibration quality.
+
+    Args:
+        backend_name: Name of the backend (e.g., 'ibm_brisbane')
+        num_qubits: Number of qubits in the subgraph (default: 5, range: 2-10)
+        num_results: Number of top subgraphs to return (default: 5, max: 20)
+        metric: Scoring metric to optimize:
+            - "qv_optimized": Balanced scoring for QV (connectivity + errors + coherence)
+            - "connectivity": Maximize internal edges and minimize path lengths
+            - "gate_error": Minimize total two-qubit gate errors on internal edges
+
+    Returns:
+        Ranked subgraphs with detailed metrics:
+        - subgraphs: List of subgraph results, each containing:
+            - rank: Position in ranking (1 = best)
+            - qubits: List of qubit indices in the subgraph (sorted)
+            - score: Total score (lower is better)
+            - internal_edges: Number of edges within the subgraph
+            - connectivity_ratio: internal_edges / max_possible_edges
+            - average_path_length: Mean shortest path between qubit pairs
+            - qubit_details: T1, T2, readout_error for each qubit
+            - edge_errors: Two-qubit gate error for each internal edge
+        - total_subgraphs_found: Total number of connected subgraphs discovered
+        - faulty_qubits: List of qubit indices excluded from subgraphs
+
+    Use cases:
+        - Select optimal qubits for Quantum Volume experiments
+        - Find densely connected regions for random circuit sampling
+        - Identify high-quality qubit clusters for variational algorithms
+        - Plan qubit allocation for algorithms requiring all-to-all connectivity
+    """
+    return await find_optimal_qv_qubits(backend_name, num_qubits, num_results, metric)
 
 
 @mcp.tool()

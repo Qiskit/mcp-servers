@@ -16,6 +16,8 @@ from unittest.mock import patch
 
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     cancel_job,
+    find_optimal_qubit_chains,
+    find_optimal_qv_qubits,
     get_backend_properties,
     get_job_status,
     get_service_status,
@@ -68,6 +70,16 @@ class TestWithSyncDecorator:
         """Test get_service_status has .sync attribute."""
         assert hasattr(get_service_status, "sync")
         assert callable(get_service_status.sync)
+
+    def test_find_optimal_qubit_chains_has_sync(self):
+        """Test find_optimal_qubit_chains has .sync attribute."""
+        assert hasattr(find_optimal_qubit_chains, "sync")
+        assert callable(find_optimal_qubit_chains.sync)
+
+    def test_find_optimal_qv_qubits_has_sync(self):
+        """Test find_optimal_qv_qubits has .sync attribute."""
+        assert hasattr(find_optimal_qv_qubits, "sync")
+        assert callable(find_optimal_qv_qubits.sync)
 
 
 class TestSyncMethodExecution:
@@ -214,3 +226,65 @@ class TestSyncMethodExecution:
 
             assert result["status"] == "success"
             assert result["available_backends"] == 10
+
+    def test_find_optimal_qubit_chains_sync_success(self):
+        """Test successful qubit chain finding with .sync method."""
+        mock_response = {
+            "status": "success",
+            "backend_name": "ibm_brisbane",
+            "chain_length": 5,
+            "metric": "two_qubit_error",
+            "total_chains_found": 100,
+            "faulty_qubits": [],
+            "chains": [
+                {
+                    "rank": 1,
+                    "qubits": [0, 1, 2, 3, 4],
+                    "score": 0.05,
+                    "qubit_details": [],
+                    "edge_errors": [],
+                }
+            ],
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = find_optimal_qubit_chains.sync("ibm_brisbane", chain_length=5)
+
+            assert result["status"] == "success"
+            assert result["chain_length"] == 5
+            assert len(result["chains"]) == 1
+
+    def test_find_optimal_qv_qubits_sync_success(self):
+        """Test successful QV qubit finding with .sync method."""
+        mock_response = {
+            "status": "success",
+            "backend_name": "ibm_brisbane",
+            "num_qubits": 5,
+            "metric": "qv_optimized",
+            "total_subgraphs_found": 50,
+            "faulty_qubits": [],
+            "subgraphs": [
+                {
+                    "rank": 1,
+                    "qubits": [0, 1, 2, 3, 4],
+                    "score": 0.1,
+                    "internal_edges": 6,
+                    "connectivity_ratio": 0.6,
+                    "average_path_length": 1.5,
+                    "qubit_details": [],
+                    "edge_errors": [],
+                }
+            ],
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = find_optimal_qv_qubits.sync("ibm_brisbane", num_qubits=5)
+
+            assert result["status"] == "success"
+            assert result["num_qubits"] == 5
+            assert len(result["subgraphs"]) == 1
+            assert result["subgraphs"][0]["connectivity_ratio"] == 0.6
