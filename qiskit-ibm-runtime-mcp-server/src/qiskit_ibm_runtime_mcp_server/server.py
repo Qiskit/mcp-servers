@@ -43,6 +43,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     get_bell_state_circuit,
     get_coupling_map,
     get_ghz_state_circuit,
+    get_job_results,
     get_job_status,
     get_quantum_random_circuit,
     get_service_status,
@@ -276,6 +277,42 @@ async def list_my_jobs_tool(limit: int = 10) -> dict[str, Any]:
 async def get_job_status_tool(job_id: str) -> dict[str, Any]:
     """Get status of a specific job."""
     return await get_job_status(job_id)
+
+
+@mcp.tool()
+async def get_job_results_tool(job_id: str) -> dict[str, Any]:
+    """Get measurement results from a completed quantum job.
+
+    Retrieves the measurement outcomes (counts) from a job that has finished
+    execution. The job must be in DONE status to retrieve results.
+
+    Use this tool after a job submitted with run_sampler_tool has completed.
+    First check the job status with get_job_status_tool, then retrieve results
+    when the job status is DONE.
+
+    Args:
+        job_id: ID of the completed job (returned by run_sampler_tool)
+
+    Returns:
+        Dictionary containing:
+        - status: "success", "pending", or "error"
+        - job_id: The job ID
+        - job_status: Current status of the job
+        - counts: Dictionary of measurement outcomes and their counts
+                 (e.g., {"00": 2048, "11": 2048} for a Bell state)
+        - shots: Total number of shots executed
+        - backend: Name of the backend used
+        - execution_time: Quantum execution time in seconds (if available)
+        - message: Status message
+
+    Example workflow:
+        1. Submit job: result = run_sampler_tool(circuit, backend_name)
+        2. Get job_id from result
+        3. Check status: status = get_job_status_tool(job_id)
+        4. When DONE: results = get_job_results_tool(job_id)
+        5. Analyze counts in results["counts"]
+    """
+    return await get_job_results(job_id)
 
 
 @mcp.tool()

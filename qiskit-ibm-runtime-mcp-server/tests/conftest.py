@@ -80,6 +80,18 @@ def mock_runtime_service():
     mock_job.error_message.return_value = None
     mock_job.cancel.return_value = None
 
+    # Mock job result (SamplerV2 format)
+    mock_creg_data = Mock()
+    mock_creg_data.get_counts.return_value = {"00": 2048, "11": 2048}
+    mock_data = Mock()
+    mock_data.meas = mock_creg_data
+    mock_pub_result = Mock()
+    mock_pub_result.data = mock_data
+    mock_job.result.return_value = [mock_pub_result]
+
+    # Mock job metrics
+    mock_job.metrics.return_value = {"usage": {"quantum_seconds": 1.5}}
+
     mock_service.jobs.return_value = [mock_job]
     mock_service.job.return_value = mock_job
 

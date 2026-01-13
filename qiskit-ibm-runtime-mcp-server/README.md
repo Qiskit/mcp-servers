@@ -133,7 +133,11 @@ print(f"Last 10 jobs: {jobs}")
 job_status = await get_job_status("job_id")
 print(f"Job status: {job_status}")
 
-# 7. Cancel job
+# 7. Get job results (when job is DONE)
+results = await get_job_results("job_id")
+print(f"Counts: {results['counts']}")
+
+# 8. Cancel job
 cancelled_job = await cancel_job("job_id")
 print(f"Cancelled job: {cancelled_job}")
 ```
@@ -153,6 +157,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     find_optimal_qv_qubits,
     list_my_jobs,
     get_job_status,
+    get_job_results,
     cancel_job
 )
 
@@ -346,6 +351,46 @@ Check status of submitted job.
 - `job_id`: The ID of the job to get its status
 
 **Returns:** Current job status, creation date, backend info
+
+**Job Status Values:**
+- `INITIALIZING`: Job is being prepared
+- `QUEUED`: Job is waiting in the queue
+- `RUNNING`: Job is currently executing
+- `DONE`: Job completed successfully
+- `CANCELLED`: Job was cancelled
+- `ERROR`: Job failed with an error
+
+#### `get_job_results(job_id: str)`
+Retrieve measurement results from a completed quantum job.
+
+**Parameters:**
+- `job_id`: The ID of the completed job
+
+**Returns:** Dictionary containing:
+- `status`: "success", "pending", or "error"
+- `job_id`: The job ID
+- `job_status`: Current status of the job
+- `counts`: Dictionary of measurement outcomes and their counts (e.g., `{"00": 2048, "11": 2048}`)
+- `shots`: Total number of shots executed
+- `backend`: Name of the backend used
+- `execution_time`: Quantum execution time in seconds (if available)
+- `message`: Status message
+
+**Example workflow:**
+```python
+# 1. Submit job
+result = await run_sampler_tool(circuit, backend_name)
+job_id = result["job_id"]
+
+# 2. Check status (poll until DONE)
+status = await get_job_status(job_id)
+print(f"Status: {status['job_status']}")
+
+# 3. When DONE, retrieve results
+if status['job_status'] == 'DONE':
+    results = await get_job_results(job_id)
+    print(f"Counts: {results['counts']}")
+```
 
 #### `cancel_job(job_id: str)`
 Cancel a running or queued job.

@@ -24,6 +24,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     get_bell_state_circuit,
     get_ghz_state_circuit,
     get_instance_from_env,
+    get_job_results,
     get_job_status,
     get_quantum_random_circuit,
     get_service_status,
@@ -616,6 +617,124 @@ class TestGetJobStatus:
 
             assert result["status"] == "error"
             assert "Failed to get job status" in result["message"]
+
+
+class TestGetJobResults:
+    """Test get_job_results function."""
+
+    @pytest.mark.asyncio
+    async def test_get_job_results_success(self, mock_runtime_service):
+        """Test successful job results retrieval."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service", mock_runtime_service
+        ):
+            result = await get_job_results("job_123")
+
+            assert result["status"] == "success"
+            assert result["job_id"] == "job_123"
+            assert result["job_status"] == "DONE"
+            assert result["counts"] == {"00": 2048, "11": 2048}
+            assert result["shots"] == 4096
+            assert result["backend"] == "ibm_brisbane"
+            assert result["execution_time"] == 1.5
+
+    @pytest.mark.asyncio
+    async def test_get_job_results_no_service(self):
+        """Test job results retrieval when service is None."""
+        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None):
+            result = await get_job_results("job_123")
+
+            assert result["status"] == "error"
+            assert "service not initialized" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_job_results_job_pending(self, mock_runtime_service):
+        """Test job results retrieval for pending job."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service", mock_runtime_service
+        ):
+            mock_job = mock_runtime_service.job.return_value
+            mock_job.status.return_value = "RUNNING"
+
+            result = await get_job_results("job_123")
+
+            assert result["status"] == "pending"
+            assert result["job_status"] == "RUNNING"
+            assert "still running" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_job_results_job_queued(self, mock_runtime_service):
+        """Test job results retrieval for queued job."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service", mock_runtime_service
+        ):
+            mock_job = mock_runtime_service.job.return_value
+            mock_job.status.return_value = "QUEUED"
+
+            result = await get_job_results("job_123")
+
+            assert result["status"] == "pending"
+            assert result["job_status"] == "QUEUED"
+            assert "still queued" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_job_results_job_initializing(self, mock_runtime_service):
+        """Test job results retrieval for initializing job."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service", mock_runtime_service
+        ):
+            mock_job = mock_runtime_service.job.return_value
+            mock_job.status.return_value = "INITIALIZING"
+
+            result = await get_job_results("job_123")
+
+            assert result["status"] == "pending"
+            assert result["job_status"] == "INITIALIZING"
+            assert "still initializing" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_job_results_job_failed(self, mock_runtime_service):
+        """Test job results retrieval for failed job."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service", mock_runtime_service
+        ):
+            mock_job = mock_runtime_service.job.return_value
+            mock_job.status.return_value = "ERROR"
+            mock_job.error_message.return_value = "Circuit validation failed"
+
+            result = await get_job_results("job_123")
+
+            assert result["status"] == "error"
+            assert result["job_status"] == "ERROR"
+            assert "Circuit validation failed" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_job_results_job_cancelled(self, mock_runtime_service):
+        """Test job results retrieval for cancelled job."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service", mock_runtime_service
+        ):
+            mock_job = mock_runtime_service.job.return_value
+            mock_job.status.return_value = "CANCELLED"
+
+            result = await get_job_results("job_123")
+
+            assert result["status"] == "error"
+            assert result["job_status"] == "CANCELLED"
+            assert "cancelled" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_get_job_results_job_not_found(self, mock_runtime_service):
+        """Test job results retrieval for non-existent job."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service", mock_runtime_service
+        ):
+            mock_runtime_service.job.side_effect = Exception("Job not found")
+
+            result = await get_job_results("nonexistent_job")
+
+            assert result["status"] == "error"
+            assert "Failed to get job results" in result["message"]
 
 
 class TestCancelJob:

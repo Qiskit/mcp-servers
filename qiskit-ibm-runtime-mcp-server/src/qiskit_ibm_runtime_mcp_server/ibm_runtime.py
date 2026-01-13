@@ -1366,6 +1366,115 @@ async def get_job_status(job_id: str) -> dict[str, Any]:
 
 
 @with_sync
+async def get_job_results(job_id: str) -> dict[str, Any]:
+    """
+    Get measurement results from a completed quantum job.
+
+    Retrieves the measurement outcomes (counts) from a job that has finished
+    execution. The job must be in DONE status to retrieve results.
+
+    Args:
+        job_id: ID of the completed job
+
+    Returns:
+        Dictionary containing:
+        - status: "success", "pending", or "error"
+        - job_id: The job ID
+        - job_status: Current status of the job
+        - counts: Dictionary of measurement outcomes and their counts (if completed)
+        - shots: Total number of shots executed (if completed)
+        - backend: Name of the backend used
+        - execution_time: Time taken to execute (if available)
+        - message: Status message or error description
+    """
+    global service
+
+    try:
+        if service is None:
+            return {
+                "status": "error",
+                "message": "Failed to get job results: service not initialized",
+            }
+
+        job = service.job(job_id)
+        job_status = job.status()
+        backend_name = job.backend().name if job.backend() else "Unknown"
+
+        # Check if job is still running
+        # Official status values: INITIALIZING, QUEUED, RUNNING, CANCELLED, DONE, ERROR
+        if job_status in ["INITIALIZING", "QUEUED", "RUNNING"]:
+            return {
+                "status": "pending",
+                "job_id": job_id,
+                "job_status": job_status,
+                "backend": backend_name,
+                "message": f"Job is still {job_status.lower()}. Please check again later.",
+            }
+
+        # Check if job failed or was cancelled
+        if job_status in ["CANCELLED", "ERROR"]:
+            error_msg = job.error_message() if hasattr(job, "error_message") else None
+            return {
+                "status": "error",
+                "job_id": job_id,
+                "job_status": job_status,
+                "backend": backend_name,
+                "message": f"Job {job_status.lower()}"
+                + (f": {error_msg}" if error_msg else ""),
+            }
+
+        # Job is DONE - retrieve results
+        result = job.result()
+
+        # Extract counts from the result
+        # SamplerV2 results have data attributes for each classical register
+        counts = {}
+        if result and len(result) > 0:
+            pub_result = result[0]
+            # Try common classical register names
+            data = pub_result.data
+            for attr_name in ["meas", "c", "cr", "result"]:
+                if hasattr(data, attr_name):
+                    creg_data = getattr(data, attr_name)
+                    if hasattr(creg_data, "get_counts"):
+                        counts = creg_data.get_counts()
+                        break
+            # If no common name found, try to get any BitArray attribute
+            if not counts:
+                for attr_name in dir(data):
+                    if not attr_name.startswith("_"):
+                        attr = getattr(data, attr_name)
+                        if hasattr(attr, "get_counts"):
+                            counts = attr.get_counts()
+                            break
+
+        # Calculate total shots from counts
+        total_shots = sum(counts.values()) if counts else 0
+
+        # Get execution time if available
+        execution_time = None
+        if hasattr(job, "metrics") and job.metrics():
+            metrics = job.metrics()
+            if "usage" in metrics:
+                execution_time = metrics["usage"].get("quantum_seconds")
+
+        return {
+            "status": "success",
+            "job_id": job_id,
+            "job_status": job_status,
+            "backend": backend_name,
+            "counts": counts,
+            "shots": total_shots,
+            "execution_time": execution_time,
+            "message": "Results retrieved successfully",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get job results: {e}")
+        return {"status": "error", "message": f"Failed to get job results: {e!s}"}
+
+
+@with_sync
 async def cancel_job(job_id: str) -> dict[str, Any]:
     """
     Cancel a specific job.
