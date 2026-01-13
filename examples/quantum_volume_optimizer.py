@@ -65,6 +65,11 @@ A QV of 2^n means the device can reliably execute n-qubit circuits of depth n.
    - AI routing + synthesis passes
 4. **QV Circuit Generation**: Generate and optimize QV circuits
 5. **Final Recommendation**: Synthesize findings into actionable report
+6. **QV Experiment Execution** (optional): Run actual QV experiments on hardware:
+   - Generate QV circuits with heavy outputs
+   - Submit to quantum hardware
+   - Calculate Heavy Output Probability (HOP)
+   - Validate QV achievement (HOP > 2/3 with 97.5% confidence)
 
 ## Prerequisites
 
@@ -150,7 +155,7 @@ Key factors affecting QV:
 
 ## Your Team
 
-You have three specialized subagents:
+You have four specialized subagents:
 
 1. **backend-analyst**: Expert in IBM Quantum backends
    - Lists available backends
@@ -167,8 +172,15 @@ You have three specialized subagents:
 3. **transpiler-benchmarker**: Expert in circuit optimization
    - Compares local transpilation levels (0-3)
    - Uses AI-powered routing and synthesis
-   - Generates QV circuits
    - Analyzes circuit depth and gate counts
+
+4. **qv-experiment-runner**: Expert in running QV experiments on hardware
+   - Submits circuits to hardware (run_sampler_tool)
+   - Monitors job completion (get_job_status_tool, get_job_results_tool)
+   - Reports measurement results for HOP calculation
+
+Note: QV circuit generation with heavy outputs, HOP calculation, and statistical analysis
+are performed locally using helper functions in this script.
 
 ## Workflow
 
@@ -244,10 +256,14 @@ You have access to specialized tools for qubit selection:
 TRANSPILER_BENCHMARKER_PROMPT = """You are the Transpiler Benchmarker, an expert in quantum circuit optimization.
 
 Your role is to:
-1. Generate Quantum Volume circuits for specific qubit counts
-2. Compare different transpilation strategies
-3. Benchmark local vs AI-powered optimization
-4. Find the configuration that minimizes circuit depth and two-qubit gates
+1. Compare different transpilation strategies for QV circuits
+2. Benchmark local vs AI-powered optimization
+3. Find the configuration that minimizes circuit depth and two-qubit gates
+
+## QV Circuit Transpilation
+
+QV circuits are provided to you in QASM format. Your job is to transpile them
+using different strategies and compare the results.
 
 Transpilation strategies to compare:
 1. **Local Level 0**: No optimization (baseline)
@@ -266,6 +282,40 @@ Use both the Qiskit MCP server (local transpilation) and the IBM Transpiler
 MCP server (AI optimization) to compare approaches.
 
 Report your findings with specific metrics for each strategy.
+"""
+
+QV_EXPERIMENT_RUNNER_PROMPT = """You are the QV Experiment Runner, an expert in executing Quantum Volume experiments.
+
+Your role is to:
+1. Run QV circuits on real quantum hardware
+2. Monitor job completion
+3. Report measurement results for HOP calculation
+
+## Quantum Volume Protocol
+
+To validate Quantum Volume 2^n:
+1. QV circuits with heavy outputs are generated locally (not via MCP tools)
+2. For each circuit:
+   - Submit to hardware using run_sampler_tool
+   - Wait for completion using get_job_status_tool (poll until DONE)
+   - Get results using get_job_results_tool
+   - Return the measurement counts for local HOP calculation
+3. HOP calculation and statistical analysis are performed locally
+
+## Available MCP Tools
+
+- **run_sampler_tool**: Submit circuit to hardware
+- **get_job_status_tool**: Check if job is complete (poll until DONE)
+- **get_job_results_tool**: Get measurement counts from completed job
+
+Note: QV circuit generation, HOP calculation, and statistical analysis are performed
+by local helper functions in this script, not via MCP tools.
+
+## Success Criteria
+
+QV 2^n is achieved if:
+- Mean HOP > 2/3 across all circuits
+- 97.5% confidence interval lower bound > 2/3
 """
 
 
@@ -355,6 +405,337 @@ def generate_qv_qasm(num_qubits: int, depth: int | None = None, seed: int = 42) 
     return dumps(decomposed)
 
 
+def generate_qv_circuit_with_ideal_distribution(
+    num_qubits: int,
+    depth: int | None = None,
+    seed: int | None = None,
+) -> dict[str, Any]:
+    """Generate a Quantum Volume circuit and compute its ideal heavy output bitstrings.
+
+    This function creates a random QV circuit using Qiskit's quantum_volume function
+    and simulates it to determine which output bitstrings are "heavy" (have above-median
+    probability in the ideal distribution).
+
+    The heavy outputs are required for calculating the Heavy Output Probability (HOP)
+    when the circuit is run on real hardware.
+
+    Args:
+        num_qubits: Number of qubits for the QV circuit (2-10 recommended)
+        depth: Depth of the QV circuit (number of SU(4) layers). If None, defaults
+               to num_qubits (square QV circuit). Range: 1 to num_qubits.
+        seed: Random seed for reproducible circuit generation. If None, uses
+              a random seed.
+
+    Returns:
+        Dictionary containing:
+        - status: "success" or "error"
+        - circuit_qasm: The QV circuit in QASM3 format
+        - num_qubits: Number of qubits
+        - depth: Depth used
+        - seed: The random seed used (for reproducibility)
+        - heavy_outputs: List of bitstrings with above-median ideal probability
+        - num_heavy_outputs: Number of heavy output bitstrings
+        - ideal_probabilities: Dict of all bitstrings and their ideal probabilities
+          (for analysis, included for circuits with <= 6 qubits)
+
+    Note:
+        This function performs classical simulation which scales as O(2^n).
+        For num_qubits > 10, simulation becomes computationally expensive.
+    """
+    import logging
+
+    import numpy as np
+    from qiskit import QuantumCircuit
+    from qiskit.circuit.library import quantum_volume
+    from qiskit.qasm3 import dumps
+    from qiskit.quantum_info import Statevector
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Validate and set defaults
+        if num_qubits < 2:
+            num_qubits = 2
+        elif num_qubits > 10:
+            # Warn but allow - simulation will be slow
+            logger.warning(
+                f"QV with {num_qubits} qubits will be slow to simulate. "
+                "Consider using <= 10 qubits."
+            )
+
+        if depth is None:
+            depth = num_qubits
+        elif depth < 1:
+            depth = 1
+        elif depth > num_qubits:
+            depth = num_qubits
+
+        # Generate random seed if not provided
+        if seed is None:
+            seed = np.random.randint(0, 2**31)
+
+        # Generate QV circuit
+        qv_circuit = quantum_volume(num_qubits, depth=depth, seed=seed)
+
+        # Get the unitary circuit (without measurements) for simulation
+        # We need to decompose to get standard gates
+        qv_decomposed = qv_circuit.decompose()
+
+        # Simulate to get ideal probabilities
+        # Start with |0...0⟩ state
+        statevector = Statevector.from_label("0" * num_qubits)
+        final_state = statevector.evolve(qv_decomposed)
+
+        # Get probabilities for all computational basis states
+        probabilities = final_state.probabilities()
+
+        # Create mapping from bitstring to probability
+        ideal_probs = {}
+        for i, prob in enumerate(probabilities):
+            # Format as bitstring (little-endian to match Qiskit convention)
+            bitstring = format(i, f"0{num_qubits}b")[::-1]
+            ideal_probs[bitstring] = prob
+
+        # Find median probability
+        median_prob = float(np.median(probabilities))
+
+        # Heavy outputs are those with above-median probability
+        heavy_outputs = [bs for bs, prob in ideal_probs.items() if prob > median_prob]
+
+        # Add measurements to circuit for execution
+        qv_with_meas = QuantumCircuit(num_qubits, num_qubits)
+        qv_with_meas.compose(qv_decomposed, inplace=True)
+        qv_with_meas.measure(range(num_qubits), range(num_qubits))
+
+        # Convert to QASM3
+        qasm3_circuit = dumps(qv_with_meas)
+
+        result = {
+            "status": "success",
+            "circuit_qasm": qasm3_circuit,
+            "num_qubits": num_qubits,
+            "depth": depth,
+            "seed": seed,
+            "heavy_outputs": heavy_outputs,
+            "num_heavy_outputs": len(heavy_outputs),
+            "median_probability": median_prob,
+            "message": f"Generated QV-{num_qubits} circuit with {len(heavy_outputs)} heavy outputs",
+        }
+
+        # Include ideal probabilities for small circuits (useful for analysis)
+        if num_qubits <= 6:
+            result["ideal_probabilities"] = ideal_probs
+
+        return result
+
+    except ImportError as e:
+        logger.error(f"Missing required package for QV generation: {e}")
+        return {
+            "status": "error",
+            "message": f"Missing required package: {e!s}. Ensure qiskit is installed.",
+        }
+    except Exception as e:
+        logger.error(f"Failed to generate QV circuit: {e}")
+        return {"status": "error", "message": f"Failed to generate QV circuit: {e!s}"}
+
+
+def calculate_heavy_output_probability(
+    counts: dict[str, int],
+    heavy_outputs: list[str],
+) -> dict[str, Any]:
+    """Calculate the Heavy Output Probability (HOP) for Quantum Volume validation.
+
+    The Heavy Output Probability is a key metric in Quantum Volume experiments.
+    It measures the fraction of measurement outcomes that correspond to "heavy"
+    bitstrings - those with above-median probability in the ideal distribution.
+
+    For a successful QV experiment:
+    - Generate many random QV circuits
+    - For each circuit, determine the ideal heavy outputs (via simulation)
+    - Run on hardware and calculate HOP
+    - If mean(HOP) > 2/3 with statistical confidence, QV is achieved
+
+    Args:
+        counts: Dictionary of measurement outcomes and their counts
+                (e.g., {"00": 2048, "11": 2048} from get_job_results)
+        heavy_outputs: List of bitstrings that are "heavy" (above-median probability
+                      in ideal simulation). These must be computed from ideal
+                      simulation of the specific QV circuit.
+
+    Returns:
+        Dictionary containing:
+        - status: "success" or "error"
+        - heavy_output_probability: Fraction of shots resulting in heavy outputs (0.0 to 1.0)
+        - total_shots: Total number of measurement shots
+        - heavy_counts: Number of shots that were heavy outputs
+        - threshold: The 2/3 threshold for QV success
+        - above_threshold: Boolean indicating if HOP > 2/3
+        - message: Status message
+
+    Example:
+        # After running a QV circuit and getting results:
+        result = calculate_heavy_output_probability(
+            counts={"00": 1500, "01": 300, "10": 200, "11": 2000},
+            heavy_outputs=["00", "11"]  # From ideal simulation
+        )
+        # result["heavy_output_probability"] = (1500 + 2000) / 4000 = 0.875
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        if not counts:
+            return {
+                "status": "error",
+                "message": "No counts provided",
+            }
+
+        if not heavy_outputs:
+            return {
+                "status": "error",
+                "message": "No heavy outputs provided. Heavy outputs must be computed "
+                "from ideal simulation of the QV circuit.",
+            }
+
+        # Convert heavy_outputs to a set for O(1) lookup
+        heavy_set = set(heavy_outputs)
+
+        # Calculate total shots and heavy counts
+        total_shots = sum(counts.values())
+        heavy_counts = sum(count for bitstring, count in counts.items() if bitstring in heavy_set)
+
+        # Calculate HOP
+        hop = heavy_counts / total_shots if total_shots > 0 else 0.0
+
+        # QV threshold is 2/3
+        threshold = 2 / 3
+        above_threshold = hop > threshold
+
+        return {
+            "status": "success",
+            "heavy_output_probability": hop,
+            "total_shots": total_shots,
+            "heavy_counts": heavy_counts,
+            "num_heavy_bitstrings": len(heavy_outputs),
+            "threshold": threshold,
+            "above_threshold": above_threshold,
+            "message": f"HOP = {hop:.4f} ({'above' if above_threshold else 'below'} threshold of {threshold:.4f})",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to calculate heavy output probability: {e}")
+        return {"status": "error", "message": f"Failed to calculate HOP: {e!s}"}
+
+
+def analyze_qv_experiment_results(
+    hop_values: list[float],
+    confidence_level: float = 0.975,
+) -> dict[str, Any]:
+    """Analyze results from multiple Quantum Volume circuit runs.
+
+    After running multiple QV circuits on hardware and calculating their individual
+    Heavy Output Probabilities (HOP), this function performs statistical analysis
+    to determine if the QV benchmark is achieved.
+
+    QV Success Criteria:
+    - Mean HOP must be > 2/3
+    - The lower bound of the confidence interval must be > 2/3 (with given confidence)
+
+    Args:
+        hop_values: List of Heavy Output Probability values from individual QV circuits.
+                   Should have at least 100 values for statistical significance.
+        confidence_level: Confidence level for the statistical test (default: 0.975
+                         for one-sided 97.5% confidence, matching IBM's QV protocol)
+
+    Returns:
+        Dictionary containing:
+        - status: "success" or "error"
+        - qv_achieved: Boolean indicating if QV benchmark is passed
+        - mean_hop: Mean Heavy Output Probability across all circuits
+        - std_hop: Standard deviation of HOP values
+        - confidence_interval: (lower, upper) bounds
+        - num_circuits: Number of circuits analyzed
+        - threshold: The 2/3 threshold
+        - margin: How far the lower confidence bound is from threshold
+        - message: Human-readable result summary
+    """
+    import logging
+
+    import numpy as np
+    from scipy import stats
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        if not hop_values:
+            return {
+                "status": "error",
+                "message": "No HOP values provided",
+            }
+
+        hop_array = np.array(hop_values)
+        n = len(hop_array)
+
+        if n < 10:
+            logger.warning(
+                f"Only {n} HOP values provided. Recommend at least 100 for statistical significance."
+            )
+
+        # Calculate statistics
+        mean_hop = float(np.mean(hop_array))
+        std_hop = float(np.std(hop_array, ddof=1))  # Sample std dev
+        sem = std_hop / np.sqrt(n)  # Standard error of mean
+
+        # Calculate confidence interval using t-distribution
+        t_critical = stats.t.ppf(confidence_level, df=n - 1)
+        ci_lower = mean_hop - t_critical * sem
+        ci_upper = mean_hop + t_critical * sem
+
+        # QV threshold
+        threshold = 2 / 3
+
+        # QV is achieved if the lower bound of confidence interval > threshold
+        qv_achieved = bool(ci_lower > threshold)
+        margin = float(ci_lower - threshold)
+
+        # Determine result message
+        if qv_achieved:
+            message = (
+                f"QV ACHIEVED! Mean HOP = {mean_hop:.4f}, "
+                f"CI lower bound = {ci_lower:.4f} > threshold {threshold:.4f}"
+            )
+        else:
+            message = (
+                f"QV NOT achieved. Mean HOP = {mean_hop:.4f}, "
+                f"CI lower bound = {ci_lower:.4f} <= threshold {threshold:.4f}"
+            )
+
+        return {
+            "status": "success",
+            "qv_achieved": qv_achieved,
+            "mean_hop": mean_hop,
+            "std_hop": std_hop,
+            "standard_error": sem,
+            "confidence_interval": (ci_lower, ci_upper),
+            "confidence_level": confidence_level,
+            "num_circuits": n,
+            "threshold": threshold,
+            "margin": margin,
+            "message": message,
+        }
+
+    except ImportError as e:
+        logger.error(f"Missing required package for QV analysis: {e}")
+        return {
+            "status": "error",
+            "message": f"Missing scipy for statistical analysis: {e!s}",
+        }
+    except Exception as e:
+        logger.error(f"Failed to analyze QV results: {e}")
+        return {"status": "error", "message": f"Failed to analyze QV results: {e!s}"}
+
+
 # =============================================================================
 # Main Agent Creation
 # =============================================================================
@@ -429,6 +810,13 @@ async def create_qv_optimizer_agent(
         "tools": (server_tools.get("qiskit", []) + server_tools.get("qiskit-ibm-transpiler", [])),
     }
 
+    qv_experiment_runner = {
+        "name": "qv-experiment-runner",
+        "description": "Expert in running QV experiments on hardware. Use this agent to generate QV circuits, submit jobs, retrieve results, calculate HOP, and validate QV achievement.",
+        "system_prompt": QV_EXPERIMENT_RUNNER_PROMPT,
+        "tools": server_tools.get("qiskit-ibm-runtime", []),
+    }
+
     # Create the coordinator agent
     print("\nCreating Quantum Volume Optimizer agent...")
 
@@ -436,7 +824,7 @@ async def create_qv_optimizer_agent(
         model=llm,
         tools=all_tools,
         system_prompt=COORDINATOR_SYSTEM_PROMPT,
-        subagents=[backend_analyst, qubit_chain_optimizer, transpiler_benchmarker],
+        subagents=[backend_analyst, qubit_chain_optimizer, transpiler_benchmarker, qv_experiment_runner],
     )
 
     print("Agent ready!\n")
