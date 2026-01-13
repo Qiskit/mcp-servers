@@ -32,13 +32,11 @@ from fastmcp import FastMCP
 from qiskit_mcp_server.circuit_serialization import CircuitFormat
 
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
-    DDSequenceType,
     active_account_info,
     active_instance_info,
     available_instances,
     delete_saved_account,
-    QVScoringMetric,
-    ScoringMetric,
+    DDSequenceType,
     cancel_job,
     find_optimal_qubit_chains,
     find_optimal_qv_qubits,
@@ -55,8 +53,10 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     list_backends,
     list_my_jobs,
     list_saved_accounts,
+    QVScoringMetric,
     run_sampler,
     setup_ibm_quantum_account,
+    ScoringMetric,
     usage_info,
 )
 
@@ -355,6 +355,7 @@ async def usage_info_tool() -> dict[str, Any]:
     utilization and planning job submissions.
     """
     return await usage_info()
+
 
 @mcp.tool()
 async def run_sampler_tool(
