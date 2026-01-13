@@ -2121,12 +2121,8 @@ async def list_saved_accounts() -> dict[str, Any]:
         - On success with no accounts: {"status": "success", "accounts": [], "message": "No accounts found"}
         - On error: {"status": "error", "error": error_message}
     """
-    global service
-
     try:
-        if service is None:
-            service = initialize_service()
-        accounts_list = service.saved_accounts()
+        accounts_list = QiskitRuntimeService.saved_accounts()
         if len(accounts_list) > 0:
             return {"status": "success", "accounts": accounts_list}
         else:
