@@ -356,7 +356,7 @@ async def usage_info_tool() -> dict[str, Any]:
     """
     return await usage_info()
 
-
+@mcp.tool()
 async def run_sampler_tool(
     circuit: str,
     backend_name: str | None = None,
