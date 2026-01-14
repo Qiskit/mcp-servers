@@ -24,7 +24,10 @@ Features:
 - TensorBoard integration for training visualization
 """
 
+import atexit
 import logging
+import subprocess
+import time
 from typing import Any, Literal
 
 from fastmcp import FastMCP
@@ -441,6 +444,170 @@ async def get_tensorboard_metrics_tool(
         experiment_name=experiment_name,
         tensorboard_path=tensorboard_path,
     )
+
+
+# Module-level variables to track the TensorBoard process
+_tensorboard_process: subprocess.Popen | None = None
+_tensorboard_port: int | None = None
+
+
+def _cleanup_tensorboard() -> None:
+    """Cleanup function to terminate TensorBoard on exit."""
+    global _tensorboard_process
+    if _tensorboard_process is not None and _tensorboard_process.poll() is None:
+        _tensorboard_process.terminate()
+        try:
+            _tensorboard_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            _tensorboard_process.kill()
+
+
+# Register cleanup function to handle orphaned processes
+atexit.register(_cleanup_tensorboard)
+
+
+@mcp.tool()
+async def start_tensorboard_tool(port: int = 6006) -> dict[str, Any]:
+    """Start TensorBoard to visualize training metrics.
+
+    Launches TensorBoard as a background process using the configured
+    QISKIT_GYM_TENSORBOARD_DIR as the log directory.
+
+    Args:
+        port: The port to run TensorBoard on (default: 6006)
+
+    Returns:
+        Dict with status and TensorBoard URL on success.
+
+    Note:
+        Use stop_tensorboard_tool to stop the TensorBoard process when done.
+    """
+    global _tensorboard_process, _tensorboard_port
+
+    if _tensorboard_process is not None and _tensorboard_process.poll() is None:
+        return {
+            "status": "already_running",
+            "message": f"TensorBoard is already running on port {_tensorboard_port}. "
+            "Use stop_tensorboard_tool to stop it first.",
+            "url": f"http://localhost:{_tensorboard_port}",
+        }
+
+    try:
+        _tensorboard_process = subprocess.Popen(
+            ["tensorboard", "--logdir", QISKIT_GYM_TENSORBOARD_DIR, "--port", str(port)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        # Wait briefly and verify TensorBoard actually started
+        time.sleep(1)
+        if _tensorboard_process.poll() is not None:
+            # Process exited - read stderr for error message
+            stderr_output = ""
+            if _tensorboard_process.stderr:
+                stderr_output = _tensorboard_process.stderr.read().decode()
+            _tensorboard_process = None
+            _tensorboard_port = None
+            return {
+                "status": "error",
+                "error": f"TensorBoard failed to start: {stderr_output or 'unknown error'}",
+            }
+
+        _tensorboard_port = port
+        return {
+            "status": "success",
+            "message": "TensorBoard started successfully",
+            "url": f"http://localhost:{port}",
+            "logdir": QISKIT_GYM_TENSORBOARD_DIR,
+        }
+    except FileNotFoundError:
+        return {
+            "status": "error",
+            "error": "TensorBoard is not installed. Install it with: pip install tensorboard",
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": f"Failed to start TensorBoard: {e}",
+        }
+
+
+@mcp.tool()
+async def stop_tensorboard_tool() -> dict[str, Any]:
+    """Stop the running TensorBoard process.
+
+    Terminates the TensorBoard process that was started with start_tensorboard_tool.
+
+    Returns:
+        Dict with status message indicating whether TensorBoard was stopped.
+    """
+    global _tensorboard_process, _tensorboard_port
+
+    if _tensorboard_process is None:
+        return {
+            "status": "not_running",
+            "message": "TensorBoard is not running.",
+        }
+
+    if _tensorboard_process.poll() is not None:
+        _tensorboard_process = None
+        _tensorboard_port = None
+        return {
+            "status": "not_running",
+            "message": "TensorBoard is not running (process already terminated).",
+        }
+
+    _tensorboard_process.terminate()
+    try:
+        _tensorboard_process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        _tensorboard_process.kill()
+        _tensorboard_process.wait()
+
+    _tensorboard_process = None
+    _tensorboard_port = None
+    return {
+        "status": "success",
+        "message": "TensorBoard stopped successfully.",
+    }
+
+
+@mcp.tool()
+async def get_tensorboard_status_tool() -> dict[str, Any]:
+    """Check the status of the TensorBoard process.
+
+    Returns whether TensorBoard is running and on which port.
+
+    Returns:
+        Dict with running status, port, and URL if running.
+    """
+    global _tensorboard_process, _tensorboard_port
+
+    if _tensorboard_process is None:
+        return {
+            "status": "not_running",
+            "running": False,
+            "message": "TensorBoard is not running.",
+        }
+
+    if _tensorboard_process.poll() is not None:
+        # Process has terminated
+        _tensorboard_process = None
+        _tensorboard_port = None
+        return {
+            "status": "not_running",
+            "running": False,
+            "message": "TensorBoard is not running (process terminated).",
+        }
+
+    return {
+        "status": "running",
+        "running": True,
+        "port": _tensorboard_port,
+        "url": f"http://localhost:{_tensorboard_port}",
+        "logdir": QISKIT_GYM_TENSORBOARD_DIR,
+        "message": f"TensorBoard is running on port {_tensorboard_port}.",
+    }
 
 
 # ============================================================================
