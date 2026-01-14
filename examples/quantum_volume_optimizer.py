@@ -250,50 +250,52 @@ Start from the HIGHEST requested depth and work DOWN:
 5. If HOP <= 2/3: FAILED. Try depth N-1.
 6. Repeat until you find the highest depth that passes, or reach depth 2.
 
-## Your Team (call using `task` tool)
+## CRITICAL: How to Call Your Subagents
 
-When calling subagents, you MUST provide both `name` AND `description`:
+You have access to a `task` tool to delegate work to specialized subagents.
+
+**EXACT SYNTAX** - You MUST use this exact format:
+```json
+{
+  "name": "<one of the subagent names below>",
+  "description": "<detailed task description with ALL required data>"
+}
 ```
-task(name="<subagent-name>", description="<detailed instructions including all data>")
+
+**AVAILABLE SUBAGENTS** (use these exact names):
+
+### 1. "backend-analyst"
+Gets backend information. Example call:
+```json
+{
+  "name": "backend-analyst",
+  "description": "Get properties and status for ibm_boston backend"
+}
 ```
 
-1. **backend-analyst**: Gets backend info
-   ```
-   task(name="backend-analyst", description="Get properties for ibm_boston backend")
-   ```
-
-2. **qubit-chain-optimizer**: Finds optimal qubits
-   ```
-   task(name="qubit-chain-optimizer", description="Find 10 optimal qubit subsets for QV depth 5 on ibm_boston")
-   ```
-
-3. **qv-experiment-runner**: Runs QV experiments - MUST include the full circuit QASM!
-   ```
-   task(
-       name="qv-experiment-runner",
-       description="Run QV experiment on ibm_boston.
-       Circuit QASM: OPENQASM 3.0; include 'stdgates.inc'; qubit[5] q; ...
-       Qubits: [47, 57, 66, 67, 68]
-       Depth: 5
-       Transpile with hybrid_ai_transpile_tool, submit with run_sampler_tool,
-       wait for completion, and return the counts."
-   )
-   ```
-
-IMPORTANT: The qv-experiment-runner needs the FULL circuit QASM string in the description!
-
-## Transpilation (done by qv-experiment-runner)
-
-qv-experiment-runner uses hybrid_ai_transpile_tool for transpilation:
+### 2. "qubit-chain-optimizer"
+Finds optimal qubit subsets. Example call:
+```json
+{
+  "name": "qubit-chain-optimizer",
+  "description": "Find 10 optimal qubit subsets for QV depth 5 on ibm_boston using find_optimal_qv_qubits_tool"
+}
 ```
-hybrid_ai_transpile_tool(
-    circuit="<QASM string>",
-    backend_name="<backend>",
-    optimization_level=3,
-    ai_layout_mode="optimize"
-)
+
+### 3. "qv-experiment-runner"
+Runs QV experiments - MUST include the FULL circuit QASM in the description!
+```json
+{
+  "name": "qv-experiment-runner",
+  "description": "Run QV experiment on ibm_boston. CIRCUIT QASM: OPENQASM 3.0; include 'stdgates.inc'; qubit[5] q; ... [full QASM here] ... QUBITS: [47, 57, 66, 67, 68]. DEPTH: 5. Execute these steps: 1) transpile with hybrid_ai_transpile_tool, 2) submit with run_sampler_tool using the circuit_qpy from step 1, 3) poll get_job_status_tool until DONE, 4) get counts with get_job_results_tool, 5) return the measurement counts."
+}
 ```
-This tool accepts backend_name directly - no need for coupling_map.
+
+**COMMON MISTAKES TO AVOID:**
+- Do NOT use `subagent_type` - the parameter is called `name`
+- Do NOT use generic names like "general-purpose" - use the exact names above
+- Do NOT forget the `description` field - it is REQUIRED
+- Do NOT call `task` with empty or missing parameters
 
 ## Output Format
 
@@ -385,66 +387,116 @@ these to run QV experiments, potentially trying multiple if the first fails.
 
 QV_EXPERIMENT_RUNNER_PROMPT = """You are the QV Experiment Runner. You transpile and execute QV circuits.
 
-## CRITICAL: You will receive the circuit (QASM string), backend_name, and qubits from the coordinator.
+## CRITICAL: Read This Carefully
+
+You will receive the circuit (QASM string), backend_name, and qubits from the coordinator.
 You MUST use these exact values - do not search for files or make up circuits.
 
-## Your Workflow (MUST COMPLETE ALL STEPS)
+## Your Workflow - Execute ALL Steps In Order
 
-### Step 1: Transpile Circuit
-Call hybrid_ai_transpile_tool with the QASM circuit from the coordinator:
-```python
-result = hybrid_ai_transpile_tool(
-    circuit="OPENQASM 3.0; ...",  # The QASM string provided by coordinator
-    backend_name="ibm_boston",
-    optimization_level=3,
-    ai_layout_mode="optimize"
-)
-# Response contains: {"status": "success", "circuit_qpy": "<base64 encoded circuit>", ...}
-# SAVE the circuit_qpy value for step 2!
+### STEP 1: TRANSPILE THE CIRCUIT
+
+Call `hybrid_ai_transpile_tool` with the QASM string from the task description:
+
+**Tool call:**
+```json
+{
+  "circuit": "OPENQASM 3.0; include 'stdgates.inc'; qubit[5] q; ...",
+  "backend_name": "ibm_boston",
+  "optimization_level": 3,
+  "ai_layout_mode": "optimize"
+}
 ```
 
-### Step 2: Submit Transpiled Circuit to Hardware
-Use the circuit_qpy from step 1's response. The parameter is named `circuit` (NOT circuit_qasm):
-```python
-result = run_sampler_tool(
-    circuit="<the circuit_qpy value from step 1>",  # REQUIRED - paste the actual value
-    backend_name="ibm_boston",
-    shots=4096
-)
-# Response contains: {"job_id": "xxx", ...}
-# SAVE the job_id for step 3!
+**Response will contain:**
+```json
+{
+  "status": "success",
+  "circuit_qpy": "UUlTS0lUEA...very long base64 string...",
+  "num_qubits": 5,
+  "depth": 42
+}
 ```
 
-### Step 3: Poll Until DONE
-```python
-result = get_job_status_tool(job_id="<job_id from step 2>")
-# Keep calling until job_status is "DONE"
+**IMPORTANT:** Copy the ENTIRE `circuit_qpy` value. It is a long base64 string. You need it for step 2.
+
+### STEP 2: SUBMIT TO HARDWARE
+
+Call `run_sampler_tool` with the `circuit_qpy` from step 1:
+
+**Tool call:**
+```json
+{
+  "circuit": "UUlTS0lUEA...paste the entire circuit_qpy value here...",
+  "backend_name": "ibm_boston",
+  "shots": 4096
+}
 ```
 
-### Step 4: Get Results
-```python
-result = get_job_results_tool(job_id="<job_id from step 2>")
-# Response contains: {"counts": {"00000": 892, ...}, ...}
+**CRITICAL:** The `circuit` parameter MUST contain the `circuit_qpy` value from step 1's response.
+Do NOT leave it empty. Do NOT use a placeholder. Paste the actual base64 string.
+
+**Response will contain:**
+```json
+{
+  "job_id": "d5jm8tivcahs73a0uf70",
+  "status": "QUEUED"
+}
 ```
 
-### Step 5: Report Results
-Return ALL of this information:
+### STEP 3: WAIT FOR COMPLETION
+
+Poll `get_job_status_tool` until the job is DONE:
+
+**Tool call:**
+```json
+{
+  "job_id": "d5jm8tivcahs73a0uf70"
+}
+```
+
+Keep calling until `job_status` is "DONE". May take 1-10 minutes.
+
+### STEP 4: GET MEASUREMENT RESULTS
+
+Call `get_job_results_tool`:
+
+**Tool call:**
+```json
+{
+  "job_id": "d5jm8tivcahs73a0uf70"
+}
+```
+
+**Response will contain:**
+```json
+{
+  "counts": {"00000": 892, "00001": 145, "00010": 234, ...}
+}
+```
+
+### STEP 5: REPORT BACK
+
+Return a summary with ALL this information:
 ```
 EXPERIMENT RESULT:
-- Depth: N
-- Qubits: [list]
-- Job ID: xxx
-- Backend: name
+- Backend: ibm_boston
+- Depth: 5
+- Qubits: [47, 57, 66, 67, 68]
+- Job ID: d5jm8tivcahs73a0uf70
 - Shots: 4096
-- Counts: {"00000": 892, "00001": 145, "00010": 234, ...}
+- Counts: {"00000": 892, "00001": 145, ...}
 ```
 
-## CRITICAL RULES
+## CRITICAL RULES - READ CAREFULLY
 
-1. The `circuit` parameter is REQUIRED - use the exact QASM string from coordinator
-2. You MUST wait for job completion - do NOT just submit and stop
-3. You MUST report the actual counts dictionary
-4. You MUST complete ALL steps before returning
+1. **Step 2 circuit parameter is REQUIRED**: You MUST pass the `circuit_qpy` from step 1.
+   - If you call `run_sampler_tool` with an empty circuit, it will FAIL.
+   - The circuit_qpy is a long base64 string starting with "UUFT..." - use the entire string.
+
+2. **Complete ALL steps**: Do not stop after step 1 or step 2. Run all 5 steps.
+
+3. **Return actual counts**: The coordinator needs the measurement counts to calculate HOP.
 """
 
 
