@@ -1,67 +1,75 @@
 # Qiskit MCP Servers - Advanced Examples
 
-This directory contains world-class examples demonstrating the full power of combining multiple Qiskit MCP servers with advanced AI agent frameworks.
+This directory contains examples demonstrating the full power of combining multiple Qiskit MCP servers with advanced AI agent frameworks.
 
-## Quantum Volume Optimizer
+## Quantum Volume Finder
 
-**A Deep Agent Multi-Server Example**
+**A Deep Agent for Actual QV Measurement**
 
-The Quantum Volume Optimizer is a sophisticated multi-agent system that finds the optimal Quantum Volume (QV) configuration for any IBM Quantum backend. It showcases:
+The Quantum Volume Finder is a multi-agent system that **finds the highest achievable Quantum Volume (QV)** for IBM Quantum backends through **actual hardware execution**.
 
-- **Deep Agents Framework**: Coordinator agent with specialized subagents
-- **Multi-Server Orchestration**: Combines 3 MCP servers working together
-- **Real-World Quantum Optimization**: Finds best qubit chains and transpilation strategies
+Unlike simple analysis tools, this agent:
+- **Runs experiments** on real quantum hardware
+- **Reports actual results** (measurement counts, HOP values)
+- Uses **top-down search**: starts at max depth, works down until success
+- Searches **ALL qubits** on the backend (not just first 10)
+
+### What is Quantum Volume?
+
+Quantum Volume (QV) 2^n is **achieved** when:
+- Running n-qubit, depth-n random circuits
+- Heavy Output Probability (HOP) > 2/3
+- HOP = (shots resulting in heavy outputs) / (total shots)
+
+### Strategy: Top-Down Search
+
+```
+Start at depth 5 (QV-32)
+    │
+    ├─► Find optimal qubits (searches ALL qubits)
+    ├─► Transpile circuit (hybrid_ai_transpile_tool)
+    ├─► Run transpiled circuit on hardware
+    │   Get measurement counts
+    │   Calculate HOP
+    │
+    ├─► HOP > 2/3? ──YES──► SUCCESS! QV-32 achieved
+    │       │
+    │      NO
+    │       │
+    ▼       ▼
+Try depth 4 (QV-16)
+    │
+    ... repeat until success or depth 2
+```
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    QUANTUM VOLUME OPTIMIZER                         │
+│                    QUANTUM VOLUME FINDER                            │
 │                      (Coordinator Agent)                            │
 │                                                                     │
-│  Plans strategy, coordinates subagents, synthesizes final report   │
+│  Implements top-down search: try max depth, work down until PASS   │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
-          ┌────────────────────────┼────────────────────────┐
-          │                        │                        │
-          ▼                        ▼                        ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  BACKEND        │    │  QUBIT CHAIN    │    │  TRANSPILER     │
-│  ANALYST        │    │  OPTIMIZER      │    │  BENCHMARKER    │
-│                 │    │                 │    │                 │
-│  - List backends│    │  - Analyze      │    │  - Compare      │
-│  - Get properties│   │    connectivity │    │    opt levels   │
-│  - Find least   │    │  - Find best    │    │  - AI vs local  │
-│    busy         │    │    chains       │    │    transpilation│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-        │                      │                      │
-        ▼                      ▼               ┌──────┴──────┐
-┌─────────────────┐    ┌─────────────────┐    ▼             ▼
-│ qiskit-ibm-     │    │ qiskit-mcp-     │  qiskit-mcp-  qiskit-ibm-
-│ runtime-mcp     │    │ server          │  server       transpiler-mcp
-│                 │    │                 │  (local)      (AI)
-│ Backend info    │    │ Local circuit   │
-│ & properties    │    │ transpilation   │
-└─────────────────┘    └─────────────────┘
+       ┌───────────────────────────┼───────────────────────────┐
+       │                           │                           │
+       ▼                           ▼                           ▼
+┌─────────────────┐ ┌─────────────────────┐ ┌─────────────────────┐
+│  BACKEND        │ │ QUBIT CHAIN         │ │ QV EXPERIMENT       │
+│  ANALYST        │ │ OPTIMIZER           │ │ RUNNER              │
+│                 │ │                     │ │                     │
+│ Get backend     │ │ Searches ALL qubits │ │ Transpile circuit   │
+│ properties      │ │ on backend          │ │ Submit job          │
+│                 │ │                     │ │ Poll & get counts   │
+└─────────────────┘ └─────────────────────┘ └─────────────────────┘
 ```
-
-**Note:** The Transpiler Benchmarker uses tools from both `qiskit-mcp-server` (local transpilation) and `qiskit-ibm-transpiler-mcp-server` (AI-powered optimization) to compare approaches.
-
-### What is Quantum Volume?
-
-Quantum Volume (QV) is a single-number metric that captures the largest random circuit of equal width and depth that a quantum computer can successfully implement. A QV of 2^n means the device can reliably execute n-qubit circuits of depth n.
-
-Key factors the optimizer analyzes:
-- **Two-qubit gate fidelity** (most important for QV)
-- **Qubit connectivity** (linear chains need SWAP gates)
-- **Coherence times** (T1, T2)
-- **Readout accuracy**
 
 ### Available Examples
 
 | File | Description |
 |------|-------------|
-| `quantum_volume_optimizer.py` | Full-featured command-line deep agent |
+| `quantum_volume_optimizer.py` | Command-line QV finder with iterative experiments |
 | `quantum_volume_optimizer.ipynb` | Interactive Jupyter notebook version |
 
 ### Prerequisites
@@ -70,16 +78,11 @@ Key factors the optimizer analyzes:
 # Install Deep Agents and LangChain
 pip install deepagents langchain langchain-mcp-adapters python-dotenv
 
-# Install your LLM provider (Anthropic recommended for complex reasoning)
+# Install your LLM provider
 pip install langchain-anthropic
 
 # Install all Qiskit MCP servers
 pip install qiskit-mcp-servers
-
-# Or install individually:
-pip install qiskit-mcp-server
-pip install qiskit-ibm-runtime-mcp-server
-pip install qiskit-ibm-transpiler-mcp-server
 ```
 
 ### Environment Variables
@@ -89,161 +92,118 @@ pip install qiskit-ibm-transpiler-mcp-server
 export QISKIT_IBM_TOKEN="your-ibm-quantum-token"
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 
-# Optional (recommended for faster IBM Runtime startup)
-export QISKIT_IBM_RUNTIME_MCP_INSTANCE="your-instance-name"
+# Optional (faster startup)
+export QISKIT_IBM_RUNTIME_MCP_INSTANCE="your-instance-crn"
 ```
 
-Or create a `.env` file in this directory.
+### Running the QV Finder
 
-### Running the Optimizer
-
-**Command-line (full optimization):**
+**Find highest QV (runs experiments by default):**
 
 ```bash
-python quantum_volume_optimizer.py
+# Find highest QV for ibm_brisbane, trying up to depth 5
+python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5
 ```
 
-**With options:**
+**Command-line options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--backend BACKEND` | Backend to test (required for experiments) | Auto-select |
+| `--depth N` | Maximum QV depth to try (2-20) | 5 |
+| `--no-experiment` | Analysis only, no hardware execution | Runs experiments |
+| `--quiet` | Disable verbose activity logging | Verbose on |
+| `--interactive` | Interactive mode for follow-ups | Off |
+| `--provider` | LLM: `anthropic`, `openai`, `google` | `anthropic` |
+
+**Examples:**
 
 ```bash
-# Use OpenAI instead of Anthropic
-python quantum_volume_optimizer.py --provider openai
+# Try up to QV-256 (depth 8)
+python quantum_volume_optimizer.py --backend ibm_brisbane --depth 8
 
-# Evaluate up to QV depth 8
-python quantum_volume_optimizer.py --depth 8
+# Analysis only (no hardware)
+python quantum_volume_optimizer.py --backend ibm_brisbane --no-experiment
 
-# Interactive mode for follow-up questions
-python quantum_volume_optimizer.py --interactive
+# Interactive mode
+python quantum_volume_optimizer.py --backend ibm_brisbane --interactive
 ```
 
-**Jupyter Notebook:**
+### Expected Output
 
-```bash
-jupyter notebook quantum_volume_optimizer.ipynb
-```
-
-### Optimization Workflow
-
-1. **Backend Discovery**: The Backend Analyst subagent discovers all available backends and identifies promising candidates based on qubit count, existing QV, and queue length.
-
-2. **Qubit Chain Analysis**: The Qubit Chain Optimizer analyzes backend coupling maps to find optimal linear chains considering:
-   - Two-qubit gate error rates
-   - Direct connectivity (minimize SWAPs)
-   - Coherence times
-   - Readout fidelity
-
-3. **Transpilation Comparison**: The Transpiler Benchmarker compares:
-   - Local transpilation (optimization levels 0-3)
-   - AI-powered routing
-   - AI synthesis passes (Clifford, Linear Function)
-
-4. **Final Recommendation**: The Coordinator synthesizes all findings into a comprehensive report with actionable recommendations.
-
-### Sample Output
+The agent reports **actual execution results**:
 
 ```
-═══════════════════════════════════════════════════════════════════════
-  QUANTUM VOLUME OPTIMIZATION REPORT
-═══════════════════════════════════════════════════════════════════════
+## QV EXPERIMENT RESULTS
 
-## Executive Summary
+### Depth 5 (First Attempt)
+- Backend: ibm_brisbane
+- Qubits: [45, 46, 47, 52, 53]  (from find_optimal_qv_qubits_tool)
+- Job ID: d5jm8tivcahs73a0uf70
+- Shots: 4096
+- Counts: {"00000": 234, "00001": 156, "00010": 189, ...}
+- Heavy output count: 2456
+- HOP: 0.600
+- Result: FAIL (HOP <= 0.667)
 
-Recommended backend: ibm_brisbane
-Optimal QV-5 configuration: qubits [12, 13, 14, 15, 16]
-Best transpilation: AI Routing + Local Level 2
-Expected achievable QV: 32 (2^5) with high confidence
+### Depth 4 (Second Attempt)
+- Backend: ibm_brisbane
+- Qubits: [45, 46, 47, 52]
+- Job ID: d5jm8tivcahs73a0uf71
+- Shots: 4096
+- Counts: {"0000": 512, "0001": 489, ...}
+- Heavy output count: 2789
+- HOP: 0.681
+- Result: PASS (HOP > 0.667)
 
-## Backend Analysis
-
-| Backend       | Qubits | Current QV | Queue | Status      |
-|--------------|--------|------------|-------|-------------|
-| ibm_brisbane | 127    | 128        | 12    | Operational |
-| ibm_kyiv     | 127    | 64         | 45    | Operational |
-| ibm_sherbrooke| 127   | 32         | 8     | Operational |
-
-## Optimal Qubit Chains
-
-### QV-5 (5 qubits)
-1. [12, 13, 14, 15, 16] - Score: 0.9823
-2. [45, 46, 47, 48, 49] - Score: 0.9756
-3. [89, 90, 91, 92, 93] - Score: 0.9701
-
-### QV-4 (4 qubits)
-1. [12, 13, 14, 15] - Score: 0.9912
-...
-
-## Transpilation Comparison (QV-5 on optimal chain)
-
-| Strategy        | Depth | 2Q Gates | Total Gates |
-|----------------|-------|----------|-------------|
-| Local Level 0  | 47    | 32       | 89          |
-| Local Level 1  | 38    | 28       | 76          |
-| Local Level 2  | 31    | 24       | 64          |
-| Local Level 3  | 29    | 23       | 61          |
-| AI Routing     | 28    | 22       | 58          |
-| AI + Level 2   | 26    | 20       | 54          | ← Best
-
-## Configuration
-
-```python
-from qiskit_ibm_runtime import QiskitRuntimeService
-
-service = QiskitRuntimeService()
-backend = service.backend("ibm_brisbane")
-
-# Use these qubits for QV-5
-optimal_qubits = [12, 13, 14, 15, 16]
-
-# Transpilation settings
-optimization_level = 2
-use_ai_routing = True
-```
+## CONCLUSION
+Highest Achieved QV: 2^4 = 16
+Backend: ibm_brisbane
+Optimal Qubits: [45, 46, 47, 52]
 ```
 
-### MCP Servers Used
+### Key MCP Tools
 
-| Server | Role |
-|--------|------|
-| `qiskit-ibm-runtime-mcp-server` | Backend discovery, properties, calibration data |
-| `qiskit-mcp-server` | Local circuit transpilation and analysis |
-| `qiskit-ibm-transpiler-mcp-server` | AI-powered routing and synthesis |
+| Tool | Purpose |
+|------|---------|
+| `find_optimal_qv_qubits_tool` | Finds best qubit subgraphs (searches ALL qubits) |
+| `hybrid_ai_transpile_tool` | AI-powered circuit transpilation (accepts `backend_name`) |
+| `run_sampler_tool` | Submits transpiled circuit to hardware |
+| `get_job_status_tool` | Polls until job is DONE |
+| `get_job_results_tool` | Retrieves measurement counts |
 
-### Deep Agent Components
+### Local Helper Functions
 
-| Component | Role |
-|-----------|------|
-| **Coordinator** | Plans strategy, delegates tasks, synthesizes final report |
-| **Backend Analyst** | Discovers and analyzes IBM Quantum backends |
-| **Qubit Chain Optimizer** | Finds optimal qubit chains based on error rates |
-| **Transpiler Benchmarker** | Compares local vs AI optimization strategies |
+| Function | Purpose |
+|----------|---------|
+| `generate_qv_circuit_with_ideal_distribution()` | Creates QV circuit + heavy outputs |
+| `calculate_heavy_output_probability()` | Calculates HOP from counts |
+| `analyze_qv_experiment_results()` | Statistical analysis of multiple runs |
 
-### Extending the Example
+### Key Improvements Over Basic Analysis
 
-You can extend this example to:
-
-1. **Add Code Assistant**: Include `qiskit-code-assistant-mcp-server` for code generation
-2. **Custom Metrics**: Modify chain scoring to weight different error sources
-3. **Job Execution**: Actually run QV experiments on the recommended configuration
-4. **Historical Analysis**: Track QV performance over time
+1. **Actual Execution**: Runs circuits on hardware, not just recommendations
+2. **Iterative Search**: Automatically tries lower depths if higher fails
+3. **All Qubits**: `find_optimal_qv_qubits_tool` searches entire backend
+4. **AI Transpilation**: Uses `hybrid_ai_transpile_tool` for optimized circuit mapping
+5. **Complete Results**: Reports actual counts, HOP values, PASS/FAIL
 
 ### Troubleshooting
 
+**"Job stuck in QUEUED"**
+- Quantum jobs can queue for minutes to hours
+- Use least busy backends or wait
+
+**"HOP always below threshold"**
+- Try lower depth (--depth 3 or --depth 2)
+- Hardware noise affects larger circuits more
+
 **"MCP server not found"**
-- Ensure all MCP servers are installed: `pip install qiskit-mcp-servers`
-
-**"Authentication failed"**
-- Verify `QISKIT_IBM_TOKEN` is correct and has access to backends
-
-**"Slow startup"**
-- Set `QISKIT_IBM_RUNTIME_MCP_INSTANCE` for faster IBM Runtime initialization
-
-**"Agent timeout"**
-- Complex optimization may take several minutes
-- Use `--interactive` mode for step-by-step analysis
+- Install servers: `pip install qiskit-mcp-servers`
 
 ## Individual Server Examples
 
-Each MCP server also has its own examples directory with simpler LangChain agent demos:
+Each MCP server has simpler examples in its own directory:
 
 - [`qiskit-mcp-server/examples/`](../qiskit-mcp-server/examples/) - Local transpilation
 - [`qiskit-ibm-runtime-mcp-server/examples/`](../qiskit-ibm-runtime-mcp-server/examples/) - IBM Quantum Runtime

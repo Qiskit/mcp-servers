@@ -1,109 +1,82 @@
 #!/usr/bin/env python3
 """
-Quantum Volume Optimizer - A Deep Agent Example
+Quantum Volume Finder - A Deep Agent Example
 
-This world-class example demonstrates a sophisticated multi-agent system that finds
-the optimal Quantum Volume (QV) configuration for any IBM Quantum backend.
+This example demonstrates a multi-agent system that finds the highest achievable
+Quantum Volume (QV) for IBM Quantum backends through actual hardware execution.
 
-The system uses LangChain's Deep Agents framework to coordinate multiple specialized
-subagents that work together across three Qiskit MCP servers:
-- qiskit-ibm-runtime-mcp-server: Backend discovery and properties
-- qiskit-mcp-server: Local circuit transpilation and analysis
-- qiskit-ibm-transpiler-mcp-server: AI-powered circuit optimization
+Unlike simple analysis tools, this agent RUNS experiments and reports ACTUAL results.
+It uses a top-down strategy: start at the highest requested depth and work down
+until it finds a depth that passes the QV criteria (HOP > 2/3).
 
 ## What is Quantum Volume?
 
-Quantum Volume (QV) is a single-number metric that captures the largest random
-circuit of equal width and depth that a quantum computer can successfully implement.
-A QV of 2^n means the device can reliably execute n-qubit circuits of depth n.
+Quantum Volume (QV) 2^n is achieved when:
+- Running n-qubit, depth-n random circuits
+- Heavy Output Probability (HOP) > 2/3
+- HOP = (shots resulting in heavy outputs) / (total shots)
+
+## Strategy: Top-Down Search
+
+1. Start at max_depth (e.g., 5)
+2. Run QV circuit on hardware
+3. Calculate HOP from measurement results
+4. If HOP > 2/3: SUCCESS! QV 2^n achieved
+5. If HOP <= 2/3: Try depth-1
+6. Repeat until success or depth 2
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    QUANTUM VOLUME OPTIMIZER                         │
+│                    QUANTUM VOLUME FINDER                            │
 │                      (Coordinator Agent)                            │
-│                                                                     │
-│  Plans strategy, coordinates subagents, synthesizes final report   │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
-          ┌────────────────────────┼────────────────────────┐
-          │                        │                        │
-          ▼                        ▼                        ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  BACKEND        │    │  QUBIT CHAIN    │    │  TRANSPILER     │
-│  ANALYST        │    │  OPTIMIZER      │    │  BENCHMARKER    │
-│                 │    │                 │    │                 │
-│  - List backends│    │  - Analyze      │    │  - Compare      │
-│  - Get properties│   │    connectivity │    │    opt levels   │
-│  - Find least   │    │  - Find best    │    │  - AI vs local  │
-│    busy         │    │    chains       │    │    transpilation│
-│  - Check status │    │  - Score by     │    │  - Generate QV  │
-│                 │    │    error rates  │    │    circuits     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-        │                      │                      │
-        ▼                      ▼               ┌──────┴──────┐
-┌─────────────────┐    ┌─────────────────┐    ▼             ▼
-│ qiskit-ibm-     │    │ qiskit-mcp-     │  qiskit-mcp-  qiskit-ibm-
-│ runtime-mcp     │    │ server          │  server       transpiler-mcp
-│                 │    │                 │  (local)      (AI)
-│ Backend info    │    │ Local circuit   │
-│ & properties    │    │ transpilation   │
-└─────────────────┘    └─────────────────┘
-
-## Optimization Strategy
-
-1. **Backend Discovery**: Find all available backends and their properties
-2. **Qubit Chain Analysis**: Identify optimal qubit chains based on:
-   - Connectivity (coupling map)
-   - Two-qubit gate error rates
-   - Single-qubit gate error rates
-   - T1/T2 coherence times
-   - Readout error rates
-3. **Transpilation Comparison**: For each candidate chain, compare:
-   - Local transpilation (optimization levels 0-3)
-   - AI routing + synthesis passes
-4. **QV Circuit Generation**: Generate and optimize QV circuits
-5. **Final Recommendation**: Synthesize findings into actionable report
-6. **QV Experiment Execution** (optional): Run actual QV experiments on hardware:
-   - Generate QV circuits with heavy outputs
-   - Submit to quantum hardware
-   - Calculate Heavy Output Probability (HOP)
-   - Validate QV achievement (HOP > 2/3 with 97.5% confidence)
+       ┌───────────────────────────┼───────────────────────────┐
+       │                           │                           │
+       ▼                           ▼                           ▼
+┌─────────────────┐ ┌─────────────────────┐ ┌─────────────────────┐
+│  BACKEND        │ │ QUBIT CHAIN         │ │ QV EXPERIMENT       │
+│  ANALYST        │ │ OPTIMIZER           │ │ RUNNER              │
+│                 │ │                     │ │                     │
+│ Get backend     │ │ Searches ALL qubits │ │ Transpile circuit   │
+│ properties      │ │ on backend          │ │ Submit job          │
+│                 │ │                     │ │ Poll & get counts   │
+└─────────────────┘ └─────────────────────┘ └─────────────────────┘
+```
 
 ## Prerequisites
 
     pip install deepagents langchain langchain-mcp-adapters python-dotenv
     pip install langchain-anthropic  # or your preferred LLM provider
+    pip install qiskit-mcp-servers
 
 ## Environment Variables
 
     QISKIT_IBM_TOKEN: Your IBM Quantum API token
     ANTHROPIC_API_KEY: Your Anthropic API key (or other LLM provider)
-    QISKIT_IBM_RUNTIME_MCP_INSTANCE: (Optional) IBM Quantum instance for faster startup
 
 ## Usage
 
-    python quantum_volume_optimizer.py [--provider PROVIDER] [--depth DEPTH] [--backend BACKEND]
+    # Find highest QV for a backend (default: runs experiments)
+    python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5
 
-    --provider: LLM provider (anthropic, openai, google) - default: anthropic
-    --depth: Maximum QV depth to evaluate (2-20) - default: 5
-    --backend: Specific backend to optimize (e.g., ibm_brisbane, fake_sherbrooke)
-    --interactive: Run in interactive mode for follow-up questions
+    # Analysis only (no hardware execution)
+    python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5 --no-experiment
 
-## Examples
+    # Interactive mode
+    python quantum_volume_optimizer.py --backend ibm_brisbane --interactive
 
-    # Auto-discover best backend, optimize for QV up to depth 5
-    python quantum_volume_optimizer.py
+## Output
 
-    # Optimize specifically for ibm_brisbane, QV up to depth 12
-    python quantum_volume_optimizer.py --backend ibm_brisbane --depth 12
-
-    # Use fake backend for testing (no credentials needed)
-    python quantum_volume_optimizer.py --backend fake_sherbrooke --depth 8
-
-    # Interactive mode to ask follow-up questions
-    python quantum_volume_optimizer.py --interactive --backend ibm_fez
+The agent reports ACTUAL results:
+- Each depth attempted
+- Qubits used (from find_optimal_qv_qubits_tool)
+- Job ID, measurement counts
+- Calculated HOP
+- PASS/FAIL for each depth
+- Final achieved QV
 """
 
 from __future__ import annotations
@@ -111,11 +84,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import sys
+from datetime import datetime
 from typing import Any
 
 # Deep Agents imports
 from deepagents import create_deep_agent
 from dotenv import load_dotenv
+
+# LangChain imports for callbacks
+from langchain_core.callbacks import BaseCallbackHandler
 
 # LangChain MCP imports
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -126,80 +104,226 @@ load_dotenv()
 
 
 # =============================================================================
+# Callback Handler for Agent Observability
+# =============================================================================
+
+
+class AgentActivityHandler(BaseCallbackHandler):
+    """Callback handler that shows what the agent is doing during execution.
+
+    This handler provides real-time visibility into:
+    - Tool calls (which tool, what arguments)
+    - Tool results (success/failure, key info)
+    - LLM chain starts and completions
+    - Agent actions and reasoning
+    """
+
+    def __init__(self, verbose: bool = True):
+        self.verbose = verbose
+        self.indent_level = 0
+        self.current_tool = None
+
+    def _timestamp(self) -> str:
+        return datetime.now().strftime("%H:%M:%S")
+
+    def _print(self, msg: str, color: str = "") -> None:
+        """Print with optional color and indentation."""
+        indent = "  " * self.indent_level
+        if color and sys.stdout.isatty():
+            colors = {
+                "blue": "\033[94m",
+                "green": "\033[92m",
+                "yellow": "\033[93m",
+                "red": "\033[91m",
+                "cyan": "\033[96m",
+                "magenta": "\033[95m",
+                "reset": "\033[0m",
+            }
+            print(f"{colors.get(color, '')}{indent}{msg}{colors['reset']}", flush=True)
+        else:
+            print(f"{indent}{msg}", flush=True)
+
+    def on_tool_start(self, serialized: dict | None, input_str: str, **kwargs) -> None:
+        """Called when a tool starts running."""
+        tool_name = serialized.get("name", "unknown_tool") if serialized else "unknown_tool"
+        self.current_tool = tool_name
+
+        self._print(f"\n[{self._timestamp()}] 🔧 TOOL: {tool_name}", "cyan")
+        self.indent_level += 1
+
+        # Show input (truncated for readability)
+        if self.verbose and input_str:
+            input_preview = str(input_str)[:200]
+            if len(str(input_str)) > 200:
+                input_preview += "..."
+            self._print(f"Input: {input_preview}", "blue")
+
+    def on_tool_end(self, output: str, **kwargs) -> None:
+        """Called when a tool finishes."""
+        # Show output preview
+        if self.verbose and output:
+            output_preview = str(output)[:300]
+            if len(str(output)) > 300:
+                output_preview += "..."
+            self._print(f"Output: {output_preview}", "green")
+
+        self.indent_level = max(0, self.indent_level - 1)
+        self._print(f"[{self._timestamp()}] ✓ {self.current_tool} complete", "green")
+
+    def on_tool_error(self, error: Exception, **kwargs) -> None:
+        """Called when a tool errors."""
+        self.indent_level = max(0, self.indent_level - 1)
+        self._print(f"[{self._timestamp()}] ✗ {self.current_tool} failed: {error}", "red")
+
+    def on_chain_start(self, serialized: dict | None, inputs: dict, **kwargs) -> None:
+        """Called when a chain starts."""
+        if serialized is None:
+            return
+
+        chain_name = serialized.get("name") or serialized.get("id", ["unknown"])[-1]
+
+        # Only show interesting chains (not internal ones)
+        if chain_name in ["AgentExecutor", "RunnableSequence", "unknown"]:
+            return
+
+        self._print(f"\n[{self._timestamp()}] ⚡ Starting: {chain_name}", "magenta")
+        self.indent_level += 1
+
+    def on_chain_end(self, outputs: dict, **kwargs) -> None:
+        """Called when a chain ends."""
+        self.indent_level = max(0, self.indent_level - 1)
+
+    def on_agent_action(self, action, **kwargs) -> None:
+        """Called when the agent takes an action."""
+        tool = getattr(action, "tool", "unknown")
+        tool_input = getattr(action, "tool_input", {})
+
+        self._print(f"\n[{self._timestamp()}] 🤖 Agent calling: {tool}", "yellow")
+
+        if self.verbose and tool_input and isinstance(tool_input, dict):
+            # Show key info from input
+            for key, value in list(tool_input.items())[:3]:
+                val_preview = str(value)[:100]
+                if len(str(value)) > 100:
+                    val_preview += "..."
+                self._print(f"  {key}: {val_preview}", "blue")
+
+    def on_agent_finish(self, finish, **kwargs) -> None:
+        """Called when the agent finishes."""
+        self._print(f"\n[{self._timestamp()}] ✅ Agent finished", "green")
+
+    def on_llm_start(self, serialized: dict | None, prompts: list, **kwargs) -> None:
+        """Called when LLM starts generating."""
+        if self.verbose:
+            if serialized:
+                model = serialized.get("name") or serialized.get("id", ["LLM"])[-1]
+            else:
+                model = "LLM"
+            self._print(f"[{self._timestamp()}] 💭 {model} thinking...", "blue")
+
+
+# =============================================================================
 # System Prompts for Coordinator and Subagents
 # =============================================================================
 
-COORDINATOR_SYSTEM_PROMPT = """You are the Quantum Volume Optimizer, a world-class quantum computing expert
-coordinating a team of specialized agents to find the optimal Quantum Volume configuration
-for IBM Quantum backends.
+COORDINATOR_SYSTEM_PROMPT = """You are the Quantum Volume Finder, an expert system that determines
+the highest achievable Quantum Volume (QV) for IBM Quantum backends through actual execution.
 
 ## Your Mission
 
-Find the best possible Quantum Volume (QV) configuration by:
-1. Discovering available backends and their properties
-2. Analyzing qubit connectivity and error rates to find optimal chains
-3. Comparing transpilation strategies (local vs AI-powered)
-4. Generating optimized QV circuits
-5. Producing a comprehensive recommendation report
+Find the ACTUAL achievable Quantum Volume by running experiments, NOT by making recommendations.
+You must execute QV circuits on hardware and report real results.
 
-## Quantum Volume Background
+## Quantum Volume Protocol
 
-Quantum Volume (QV) measures a quantum computer's capability as 2^n, where n is the largest
-circuit width/depth that can be executed with heavy output probability > 2/3.
+QV 2^n is ACHIEVED if Heavy Output Probability (HOP) > 2/3.
+- HOP = (shots with heavy outputs) / (total shots)
+- Heavy outputs are pre-computed from ideal simulation
 
-Key factors affecting QV:
-- Two-qubit gate fidelity (most important)
-- Qubit connectivity (linear chains need SWAP gates)
-- Coherence times (T1, T2)
-- Readout accuracy
+## Strategy: Top-Down Search
 
-## Your Team
+Start from the HIGHEST requested depth and work DOWN:
+1. Try depth N (the maximum requested)
+2. Run QV circuit on hardware, get measurement counts
+3. Calculate HOP from the counts
+4. If HOP > 2/3: SUCCESS! QV 2^N is achieved. Stop here.
+5. If HOP <= 2/3: FAILED. Try depth N-1.
+6. Repeat until you find the highest depth that passes, or reach depth 2.
 
-You have four specialized subagents:
+## Your Team (call using `task` tool)
 
-1. **backend-analyst**: Expert in IBM Quantum backends
-   - Lists available backends
-   - Gets detailed backend properties
-   - Finds least busy backends
-   - Retrieves calibration data
+When calling subagents, you MUST provide both `name` AND `description`:
+```
+task(name="<subagent-name>", description="<detailed instructions including all data>")
+```
 
-2. **qubit-chain-optimizer**: Expert in qubit topology analysis
-   - Uses algorithmic tools to find optimal qubit subsets
-   - find_optimal_qv_qubits_tool: Finds densely connected subgraphs for QV
-   - find_optimal_qubit_chains_tool: Finds optimal linear chains
-   - Considers connectivity, error rates, and coherence times
+1. **backend-analyst**: Gets backend info
+   ```
+   task(name="backend-analyst", description="Get properties for ibm_boston backend")
+   ```
 
-3. **transpiler-benchmarker**: Expert in circuit optimization
-   - Compares local transpilation levels (0-3)
-   - Uses AI-powered routing and synthesis
-   - Analyzes circuit depth and gate counts
+2. **qubit-chain-optimizer**: Finds optimal qubits
+   ```
+   task(name="qubit-chain-optimizer", description="Find 10 optimal qubit subsets for QV depth 5 on ibm_boston")
+   ```
 
-4. **qv-experiment-runner**: Expert in running QV experiments on hardware
-   - Submits circuits to hardware (run_sampler_tool)
-   - Monitors job completion (get_job_status_tool, get_job_results_tool)
-   - Reports measurement results for HOP calculation
+3. **qv-experiment-runner**: Runs QV experiments - MUST include the full circuit QASM!
+   ```
+   task(
+       name="qv-experiment-runner",
+       description="Run QV experiment on ibm_boston.
+       Circuit QASM: OPENQASM 3.0; include 'stdgates.inc'; qubit[5] q; ...
+       Qubits: [47, 57, 66, 67, 68]
+       Depth: 5
+       Transpile with hybrid_ai_transpile_tool, submit with run_sampler_tool,
+       wait for completion, and return the counts."
+   )
+   ```
 
-Note: QV circuit generation with heavy outputs, HOP calculation, and statistical analysis
-are performed locally using helper functions in this script.
+IMPORTANT: The qv-experiment-runner needs the FULL circuit QASM string in the description!
 
-## Workflow
+## Transpilation (done by qv-experiment-runner)
 
-1. First, use the backend-analyst to discover backends and get properties
-2. For the best backend(s), use qubit-chain-optimizer to find optimal chains
-3. For top chains, use transpiler-benchmarker to compare optimization strategies
-4. Synthesize all findings into a final recommendation
+qv-experiment-runner uses hybrid_ai_transpile_tool for transpilation:
+```
+hybrid_ai_transpile_tool(
+    circuit="<QASM string>",
+    backend_name="<backend>",
+    optimization_level=3,
+    ai_layout_mode="optimize"
+)
+```
+This tool accepts backend_name directly - no need for coupling_map.
 
 ## Output Format
 
-Your final report should include:
-- **Executive Summary**: Best backend and configuration in 2-3 sentences
-- **Backend Analysis**: Properties of evaluated backends
-- **Optimal Qubit Chains**: Top 3 chains with scores
-- **Transpilation Comparison**: Best optimization strategy
-- **QV Recommendation**: Expected achievable QV with confidence
-- **Detailed Configuration**: Exact qubits, optimization level, basis gates
+Your final report MUST include actual execution results:
 
-Be thorough, data-driven, and provide actionable recommendations.
+```
+## QV EXPERIMENT RESULTS
+
+### Depth N (tried first)
+- Qubits used: [list of qubits]
+- Job ID: xxx
+- Shots: 4096
+- Measurement counts: {"00...": count, ...}
+- HOP: calculated value
+- Result: PASS/FAIL
+
+### Depth N-1 (if N failed)
+...
+
+## CONCLUSION
+Highest achieved QV: 2^M (where M is the highest passing depth)
+```
+
+## Critical Rules
+
+1. DO NOT make recommendations - RUN the experiments
+2. DO NOT stop after one failure - try lower depths
+3. DO NOT limit qubit search - use all qubits on the backend
+4. DO NOT use write_file - return results as text
+5. ALWAYS report actual measurement counts from hardware
 """
 
 BACKEND_ANALYST_PROMPT = """You are the Backend Analyst, an expert in IBM Quantum hardware.
@@ -220,102 +344,107 @@ Use the IBM Runtime MCP tools to gather this information. Report your findings
 in a structured format that the coordinator can use for decision-making.
 """
 
-QUBIT_CHAIN_OPTIMIZER_PROMPT = """You are the Qubit Chain Optimizer, an expert in quantum hardware topology.
+QUBIT_CHAIN_OPTIMIZER_PROMPT = """You are the Qubit Chain Optimizer, finding optimal qubits for QV experiments.
 
-Your role is to:
-1. Analyze backend coupling maps to understand connectivity
-2. Find optimal qubit subsets for Quantum Volume experiments
-3. Score chains/subgraphs based on error rates and connectivity
-4. Recommend the best qubit configurations for different QV depths
+## Primary Tool: find_optimal_qv_qubits_tool
 
-## Available Tools
+This tool searches the ENTIRE backend (all 127+ qubits) to find the best subgraphs.
+It does NOT limit to just the first 10 qubits - it analyzes ALL qubits.
 
-You have access to specialized tools for qubit selection:
+### Usage
+```
+find_optimal_qv_qubits_tool(
+    backend_name="ibm_brisbane",
+    num_qubits=5,       # QV depth
+    num_results=10,     # Get 10 candidates to try
+    metric="qv_optimized"
+)
+```
 
-1. **get_coupling_map_tool**: Get the full coupling map (connectivity graph) for a backend
-   - Returns edges, adjacency list, and topology info
+### Important Parameters
+- **num_qubits**: The QV depth (e.g., 5 for QV-32)
+- **num_results**: Request at least 10 results to have fallback options
+- **metric**: Use "qv_optimized" for best QV performance
 
-2. **find_optimal_qv_qubits_tool**: Find optimal qubit SUBGRAPHS for QV experiments
-   - Use this for QV! QV benefits from densely connected regions, not just linear chains
-   - Metrics: "qv_optimized" (default), "connectivity", "gate_error"
-   - Returns ranked subgraphs with connectivity ratios and error details
+### What It Returns
+- Ranked list of qubit subsets across the ENTIRE backend
+- Each result includes: qubits list, score, connectivity_ratio, edge_errors
+- Lower score = better (combines gate errors, coherence, connectivity)
 
-3. **find_optimal_qubit_chains_tool**: Find optimal LINEAR chains
-   - Use this for algorithms requiring linear connectivity
-   - Metrics: "two_qubit_error" (default), "readout_error", "combined"
+## Secondary Tools
 
-4. **get_backend_calibration_tool**: Get detailed error rates for specific qubits
+- **find_optimal_qubit_chains_tool**: For linear connectivity experiments
+- **get_coupling_map_tool**: To visualize backend topology
+- **get_backend_calibration_tool**: For detailed error analysis
 
-## Recommendations
+## Output
 
-- For QV experiments: Use find_optimal_qv_qubits_tool with metric="qv_optimized"
-- The tool handles all the graph algorithms and scoring automatically
-- Report the top 3-5 qubit subsets with their scores and connectivity ratios
+Return the top 10 qubit subsets with their scores. The coordinator will use
+these to run QV experiments, potentially trying multiple if the first fails.
 """
 
-TRANSPILER_BENCHMARKER_PROMPT = """You are the Transpiler Benchmarker, an expert in quantum circuit optimization.
+QV_EXPERIMENT_RUNNER_PROMPT = """You are the QV Experiment Runner. You transpile and execute QV circuits.
 
-Your role is to:
-1. Compare different transpilation strategies for QV circuits
-2. Benchmark local vs AI-powered optimization
-3. Find the configuration that minimizes circuit depth and two-qubit gates
+## CRITICAL: You will receive the circuit (QASM string), backend_name, and qubits from the coordinator.
+You MUST use these exact values - do not search for files or make up circuits.
 
-## QV Circuit Transpilation
+## Your Workflow (MUST COMPLETE ALL STEPS)
 
-QV circuits are provided to you in QASM format. Your job is to transpile them
-using different strategies and compare the results.
+### Step 1: Transpile Circuit
+Call hybrid_ai_transpile_tool with the QASM circuit from the coordinator:
+```python
+result = hybrid_ai_transpile_tool(
+    circuit="OPENQASM 3.0; ...",  # The QASM string provided by coordinator
+    backend_name="ibm_boston",
+    optimization_level=3,
+    ai_layout_mode="optimize"
+)
+# Response contains: {"status": "success", "circuit_qpy": "<base64 encoded circuit>", ...}
+# SAVE the circuit_qpy value for step 2!
+```
 
-Transpilation strategies to compare:
-1. **Local Level 0**: No optimization (baseline)
-2. **Local Level 1**: Light optimization
-3. **Local Level 2**: Medium optimization (recommended default)
-4. **Local Level 3**: Heavy optimization (best quality, slowest)
-5. **AI Routing**: ML-based qubit routing
-6. **AI Synthesis**: ML-based gate synthesis (Clifford, Linear Function)
+### Step 2: Submit Transpiled Circuit to Hardware
+Use the circuit_qpy from step 1's response. The parameter is named `circuit` (NOT circuit_qasm):
+```python
+result = run_sampler_tool(
+    circuit="<the circuit_qpy value from step 1>",  # REQUIRED - paste the actual value
+    backend_name="ibm_boston",
+    shots=4096
+)
+# Response contains: {"job_id": "xxx", ...}
+# SAVE the job_id for step 3!
+```
 
-For QV circuits, key metrics are:
-- Final circuit depth (lower is better)
-- Two-qubit gate count (lower is better)
-- Total gate count
+### Step 3: Poll Until DONE
+```python
+result = get_job_status_tool(job_id="<job_id from step 2>")
+# Keep calling until job_status is "DONE"
+```
 
-Use both the Qiskit MCP server (local transpilation) and the IBM Transpiler
-MCP server (AI optimization) to compare approaches.
+### Step 4: Get Results
+```python
+result = get_job_results_tool(job_id="<job_id from step 2>")
+# Response contains: {"counts": {"00000": 892, ...}, ...}
+```
 
-Report your findings with specific metrics for each strategy.
-"""
+### Step 5: Report Results
+Return ALL of this information:
+```
+EXPERIMENT RESULT:
+- Depth: N
+- Qubits: [list]
+- Job ID: xxx
+- Backend: name
+- Shots: 4096
+- Counts: {"00000": 892, "00001": 145, "00010": 234, ...}
+```
 
-QV_EXPERIMENT_RUNNER_PROMPT = """You are the QV Experiment Runner, an expert in executing Quantum Volume experiments.
+## CRITICAL RULES
 
-Your role is to:
-1. Run QV circuits on real quantum hardware
-2. Monitor job completion
-3. Report measurement results for HOP calculation
-
-## Quantum Volume Protocol
-
-To validate Quantum Volume 2^n:
-1. QV circuits with heavy outputs are generated locally (not via MCP tools)
-2. For each circuit:
-   - Submit to hardware using run_sampler_tool
-   - Wait for completion using get_job_status_tool (poll until DONE)
-   - Get results using get_job_results_tool
-   - Return the measurement counts for local HOP calculation
-3. HOP calculation and statistical analysis are performed locally
-
-## Available MCP Tools
-
-- **run_sampler_tool**: Submit circuit to hardware
-- **get_job_status_tool**: Check if job is complete (poll until DONE)
-- **get_job_results_tool**: Get measurement counts from completed job
-
-Note: QV circuit generation, HOP calculation, and statistical analysis are performed
-by local helper functions in this script, not via MCP tools.
-
-## Success Criteria
-
-QV 2^n is achieved if:
-- Mean HOP > 2/3 across all circuits
-- 97.5% confidence interval lower bound > 2/3
+1. The `circuit` parameter is REQUIRED - use the exact QASM string from coordinator
+2. You MUST wait for job completion - do NOT just submit and stop
+3. You MUST report the actual counts dictionary
+4. You MUST complete ALL steps before returning
 """
 
 
@@ -325,7 +454,13 @@ QV 2^n is achieved if:
 
 
 def get_mcp_servers_config() -> dict[str, dict[str, Any]]:
-    """Get MCP server configuration for all Qiskit servers."""
+    """Get MCP server configuration for Qiskit servers.
+
+    Note: We only include qiskit-ibm-runtime and qiskit-ibm-transpiler.
+    The qiskit-mcp-server is intentionally excluded because its transpile_circuit_tool
+    requires coupling_map/basis_gates parameters, while hybrid_ai_transpile_tool
+    from qiskit-ibm-transpiler accepts backend_name directly (simpler for agents).
+    """
     return {
         "qiskit-ibm-runtime": {
             "transport": "stdio",
@@ -335,12 +470,6 @@ def get_mcp_servers_config() -> dict[str, dict[str, Any]]:
                 "QISKIT_IBM_TOKEN": os.getenv("QISKIT_IBM_TOKEN", ""),
                 "QISKIT_IBM_RUNTIME_MCP_INSTANCE": os.getenv("QISKIT_IBM_RUNTIME_MCP_INSTANCE", ""),
             },
-        },
-        "qiskit": {
-            "transport": "stdio",
-            "command": "qiskit-mcp-server",
-            "args": [],
-            "env": {},
         },
         "qiskit-ibm-transpiler": {
             "transport": "stdio",
@@ -803,28 +932,30 @@ async def create_qv_optimizer_agent(
         "tools": server_tools.get("qiskit-ibm-runtime", []),  # Has the QV qubit finding tools
     }
 
-    transpiler_benchmarker = {
-        "name": "transpiler-benchmarker",
-        "description": "Expert in circuit optimization. Use this agent to compare transpilation strategies and find the best optimization approach.",
-        "system_prompt": TRANSPILER_BENCHMARKER_PROMPT,
-        "tools": (server_tools.get("qiskit", []) + server_tools.get("qiskit-ibm-transpiler", [])),
-    }
-
     qv_experiment_runner = {
         "name": "qv-experiment-runner",
-        "description": "Expert in running QV experiments on hardware. Use this agent to generate QV circuits, submit jobs, retrieve results, calculate HOP, and validate QV achievement.",
+        "description": "Expert in running QV experiments on hardware. Use this agent to transpile circuits, submit jobs, retrieve results, calculate HOP, and validate QV achievement.",
         "system_prompt": QV_EXPERIMENT_RUNNER_PROMPT,
-        "tools": server_tools.get("qiskit-ibm-runtime", []),
+        "tools": (
+            server_tools.get("qiskit-ibm-runtime", [])
+            + server_tools.get("qiskit-ibm-transpiler", [])  # For ai_routing_tool
+        ),
     }
 
     # Create the coordinator agent
+    # IMPORTANT: Coordinator only gets runtime tools (not transpilation tools)
+    # This forces it to delegate transpilation to qv-experiment-runner subagent
+    # instead of trying to call hybrid_ai_transpile_tool directly without arguments
+    coordinator_tools = server_tools.get("qiskit-ibm-runtime", [])
     print("\nCreating Quantum Volume Optimizer agent...")
+    print(f"  Coordinator tools: {len(coordinator_tools)} (runtime only)")
+    print("  qv-experiment-runner has transpilation tools")
 
     agent = create_deep_agent(
         model=llm,
-        tools=all_tools,
+        tools=coordinator_tools,
         system_prompt=COORDINATOR_SYSTEM_PROMPT,
-        subagents=[backend_analyst, qubit_chain_optimizer, transpiler_benchmarker, qv_experiment_runner],
+        subagents=[backend_analyst, qubit_chain_optimizer, qv_experiment_runner],
     )
 
     print("Agent ready!\n")
@@ -837,110 +968,172 @@ async def run_qv_optimization(
     model: str | None = None,
     max_qv_depth: int = 5,
     backend: str | None = None,
+    verbose: bool = True,
+    run_experiment: bool = True,
 ) -> str:
-    """Run the full Quantum Volume optimization workflow.
+    """Run iterative Quantum Volume finding workflow.
 
     Args:
         provider: LLM provider to use
         model: Optional model name override
-        max_qv_depth: Maximum QV depth to evaluate (2-20)
-        backend: Specific backend to optimize for (optional)
+        max_qv_depth: Maximum QV depth to try (2-20)
+        backend: Specific backend to test (required for experiments)
+        verbose: Show detailed activity logging (tool calls, LLM activity)
+        run_experiment: Actually run QV circuits on hardware (default: True)
 
     Returns:
-        The final optimization report
+        The final QV experiment report with actual results
     """
     agent, mcp_client = await create_qv_optimizer_agent(provider, model, max_qv_depth)
 
-    # Generate sample QV circuits for the agent to work with
-    qv_circuits = {}
-    for depth in range(2, min(max_qv_depth + 1, 6)):
-        qv_circuits[depth] = generate_qv_qasm(depth)
+    # Generate QV circuits with heavy outputs for each depth we'll try
+    qv_data = {}
+    print("\nGenerating QV circuits with heavy output computation...")
+    for depth in range(max_qv_depth, 1, -1):  # From max down to 2
+        print(f"  Generating QV-{depth} circuit...", end=" ", flush=True)
+        result = generate_qv_circuit_with_ideal_distribution(depth, seed=42 + depth)
+        if result["status"] == "success":
+            qv_data[depth] = result
+            print(f"OK ({result['num_heavy_outputs']} heavy outputs)")
+        else:
+            print(f"FAILED: {result.get('message', 'Unknown error')}")
 
-    # Build backend-specific or discovery request
-    if backend:
-        backend_instruction = f"""
-## Target Backend: {backend}
+    # Build the request based on mode
+    if run_experiment:
+        if not backend:
+            backend_section = """
+## Step 1: Select Backend
+Use backend-analyst to find the least busy backend with good calibration.
+Pick ONE backend to run experiments on."""
+        else:
+            backend_section = f"""
+## Step 1: Backend
+Use backend: **{backend}**
+Get its properties to confirm it's available."""
 
-Optimize Quantum Volume configuration specifically for **{backend}**.
-First verify the backend exists and get its properties, then proceed with optimization.
+        # Build QV circuit info for each depth
+        qv_circuit_sections = []
+        for depth in range(max_qv_depth, 1, -1):
+            if depth in qv_data:
+                data = qv_data[depth]
+                heavy_list = data["heavy_outputs"][:20]  # Show first 20 heavy outputs
+                heavy_str = ", ".join(f'"{h}"' for h in heavy_list)
+                if len(data["heavy_outputs"]) > 20:
+                    heavy_str += f", ... ({len(data['heavy_outputs'])} total)"
+                qv_circuit_sections.append(f"""
+### QV-{depth} Circuit (for QV 2^{depth} = {2**depth})
+```qasm
+{data["circuit_qasm"]}
+```
+**Heavy outputs** (for HOP calculation): [{heavy_str}]
+**Num heavy outputs**: {data["num_heavy_outputs"]} out of {2**depth}
+""")
+
+        qv_circuits_text = "\n".join(qv_circuit_sections)
+
+        request = f"""
+# FIND THE HIGHEST ACHIEVABLE QUANTUM VOLUME
+
+Your task: Find the highest QV this backend can achieve by running experiments.
+
+{backend_section}
+
+## Step 2: Find Optimal Qubits
+Use qubit-chain-optimizer with find_optimal_qv_qubits_tool:
+- Get 10 candidate qubit subsets for depth {max_qv_depth}
+- The tool searches ALL qubits on the backend (not just first 10)
+- Save the top candidates for experiments
+
+## Step 3: Run Iterative QV Experiments (TOP-DOWN)
+
+Start from depth {max_qv_depth} and work DOWN until you find a passing depth:
+
+### For each depth (starting at {max_qv_depth}):
+1. Transpile circuit using hybrid_ai_transpile_tool:
+   hybrid_ai_transpile_tool(circuit=<the QASM from this depth>, backend_name="{backend}", optimization_level=3, ai_layout_mode="optimize")
+2. Submit the transpiled circuit: run_sampler_tool with 4096 shots
+3. Wait for job completion (poll get_job_status_tool until DONE)
+4. Get results (get_job_results_tool)
+5. Calculate HOP:
+   - Count how many shots resulted in heavy outputs
+   - HOP = heavy_count / total_shots
+6. If HOP > 0.667: SUCCESS! Report this depth as achieved QV
+7. If HOP <= 0.667: FAILED. Try depth-1 with its circuit and heavy outputs
+
+### IMPORTANT:
+- You MUST report actual measurement counts from hardware
+- You MUST calculate HOP for each depth tried
+- You MUST try lower depths if higher ones fail
+- STOP when you find a passing depth or reach depth 2
+
+## QV Circuits and Heavy Outputs
+
+{qv_circuits_text}
+
+## Expected Output Format
+
+```
+## QV EXPERIMENT RESULTS
+
+### Depth {max_qv_depth} (First Attempt)
+- Backend: <name>
+- Qubits: [<list from find_optimal_qv_qubits_tool>]
+- Job ID: <id>
+- Shots: 4096
+- Counts: {{<actual measurement counts>}}
+- Heavy output count: <number of shots in heavy outputs>
+- HOP: <calculated value>
+- Result: PASS/FAIL (HOP > 0.667?)
+
+### Depth {max_qv_depth - 1} (if needed)
+...
+
+## CONCLUSION
+Highest Achieved QV: 2^N = <value>
+Backend: <name>
+Optimal Qubits: [<list>]
+```
 """
     else:
-        backend_instruction = """
-## Backend Discovery
+        # Analysis only mode (no experiments)
+        request = f"""
+# QUANTUM VOLUME ANALYSIS (No Experiments)
 
-Find all available backends and identify the most promising ones for QV experiments
-(consider qubit count, current QV, queue length). Focus on the top 2-3 backends.
-"""
+Analyze this backend for QV potential without running hardware experiments.
 
-    # Tool guidance based on depth
-    if max_qv_depth <= 10:
-        tool_guidance = f"""
-- Use **find_optimal_qv_qubits_tool** to find densely connected subgraphs (best for QV)
-- The tool automatically scores by connectivity, error rates, and coherence
-- Report the top 3 qubit subsets for each QV depth from 2 to {max_qv_depth}
-"""
-    else:
-        tool_guidance = f"""
-- For QV depth 2-10: Use **find_optimal_qv_qubits_tool** (dense subgraphs)
-- For QV depth 11-{max_qv_depth}: Use **find_optimal_qubit_chains_tool** (linear chains)
-  Note: Subgraph enumeration is expensive for >10 qubits, so we use optimized linear chains
-- Report the top 3 qubit configurations for each QV depth
-"""
+## Target Backend: {backend or "Find least busy"}
 
-    # Construct the optimization request
-    request = f"""
-I need you to find the optimal Quantum Volume configuration.
-{backend_instruction}
-## Objectives
+## Tasks
 
-1. **Verify Backend**: Get backend properties and calibration data
+1. **Backend Analysis**: Get backend properties and calibration data
 
-2. **Find Optimal Qubits**: Use algorithmic tools to find optimal qubit configurations
-   for QV depths 2 through {max_qv_depth}:
-{tool_guidance}
-3. **Compare Transpilation**: For the best qubit configurations, compare:
-   - Local transpilation (levels 0, 1, 2, 3)
-   - AI-powered routing and synthesis
-   - Focus on minimizing two-qubit gate count and circuit depth
+2. **Find Optimal Qubits**: Use find_optimal_qv_qubits_tool to find:
+   - Best qubit subsets for depths 2 through {max_qv_depth}
+   - Request num_results=10 to get multiple candidates
+   - The tool searches ALL qubits on the backend
 
-4. **Generate Recommendation**: Produce a detailed report with:
-   - Backend analysis with key metrics
-   - Optimal qubit subset for each QV depth (with scores from the tools)
-   - Best transpilation strategy
-   - Expected achievable QV with confidence level
+3. **Report**: List the top 10 qubit configurations for each depth with scores
 
-## Sample QV Circuits
-
-Here are sample QV circuits you can use for transpilation comparison:
-
-### QV-2 (2 qubits, depth 2):
-```qasm
-{qv_circuits.get(2, "N/A")}
-```
-
-### QV-3 (3 qubits, depth 3):
-```qasm
-{qv_circuits.get(3, "N/A")}
-```
-
-### QV-4 (4 qubits, depth 4):
-```qasm
-{qv_circuits.get(4, "N/A")}
-```
-
-Please proceed with the analysis and provide your comprehensive recommendation.
+Note: This is analysis only. Use --no-experiment flag was not set to run actual experiments.
 """
 
     print("=" * 70)
-    print("  STARTING QUANTUM VOLUME OPTIMIZATION")
+    print("  STARTING QUANTUM VOLUME FINDER")
     print("=" * 70)
-    print(f"\nTarget backend: {backend or 'Auto-discover best'}")
-    print(f"Target QV depth: up to {max_qv_depth}")
-    print("\nThis may take several minutes as the agents analyze your backends...\n")
+    print(f"\nBackend: {backend or 'Auto-select least busy'}")
+    print(f"Max QV depth to try: {max_qv_depth} (QV 2^{max_qv_depth} = {2**max_qv_depth})")
+    print(f"Mode: {'EXPERIMENT (will run on hardware)' if run_experiment else 'ANALYSIS ONLY'}")
+    print("\nThis may take several minutes...")
     print("-" * 70)
 
-    # Run the agent
-    result = await agent.ainvoke({"messages": [{"role": "user", "content": request}]})
+    # Create callback handler for observability
+    callback_handler = AgentActivityHandler(verbose=verbose)
+
+    # Run the agent with callback
+    result = await agent.ainvoke(
+        {"messages": [{"role": "user", "content": request}]},
+        config={"callbacks": [callback_handler]},
+    )
 
     # Extract final response
     messages = result.get("messages", [])
@@ -950,23 +1143,31 @@ Please proceed with the analysis and provide your comprehensive recommendation.
         final_response = "No response generated."
 
     print("\n" + "=" * 70)
-    print("  OPTIMIZATION COMPLETE")
+    print("  QV FINDING COMPLETE")
     print("=" * 70)
 
     return final_response
 
 
-async def interactive_mode(provider: str, model: str | None, backend: str | None = None) -> None:
+async def interactive_mode(
+    provider: str,
+    model: str | None,
+    backend: str | None = None,
+    verbose: bool = True,
+) -> None:
     """Run interactive mode where users can ask follow-up questions."""
     from langchain_core.messages import HumanMessage
 
     agent, mcp_client = await create_qv_optimizer_agent(provider, model, 20)
 
+    # Create callback handler for observability
+    callback_handler = AgentActivityHandler(verbose=verbose)
+
     print("\n" + "-" * 70)
     print("Interactive Mode - Ask questions about Quantum Volume optimization")
     if backend:
         print(f"Target backend: {backend}")
-    print("Type 'quit' to exit, 'clear' to reset history, 'optimize' to run full optimization")
+    print("Commands: 'quit', 'clear', 'optimize', 'verbose' (toggle activity log)")
     print("-" * 70 + "\n")
 
     # Maintain conversation history for context
@@ -988,6 +1189,12 @@ async def interactive_mode(provider: str, model: str | None, backend: str | None
                 print("Conversation history cleared.\n")
                 continue
 
+            if query.lower() == "verbose":
+                callback_handler.verbose = not callback_handler.verbose
+                status = "ON" if callback_handler.verbose else "OFF"
+                print(f"Verbose activity logging is now {status}\n")
+                continue
+
             if query.lower() == "optimize":
                 if backend:
                     query = f"""Run the full Quantum Volume optimization for {backend}:
@@ -1006,16 +1213,19 @@ async def interactive_mode(provider: str, model: str | None, backend: str | None
             messages = list(history) if history else []
             messages.append(HumanMessage(content=query))
 
-            print("\nThinking...\n")
+            print("\nProcessing...\n")
 
-            result = await agent.ainvoke({"messages": messages})
+            result = await agent.ainvoke(
+                {"messages": messages},
+                config={"callbacks": [callback_handler]},
+            )
 
             result_messages = result.get("messages", [])
             if result_messages:
                 response = result_messages[-1].content
                 # Update history with full conversation from agent
                 history = result_messages
-                print(f"Assistant:\n{response}\n")
+                print(f"\nAssistant:\n{response}\n")
 
         except KeyboardInterrupt:
             print("\n\nGoodbye!")
@@ -1027,21 +1237,21 @@ async def interactive_mode(provider: str, model: str | None, backend: str | None
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Quantum Volume Optimizer - Find optimal QV configuration",
+        description="Quantum Volume Finder - Find highest achievable QV through experiments",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Auto-discover best backend
-  python quantum_volume_optimizer.py
+  # Find highest QV for ibm_brisbane (runs experiments by default)
+  python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5
 
-  # Optimize for a specific backend with higher QV depth
-  python quantum_volume_optimizer.py --backend ibm_brisbane --depth 15
+  # Try higher QV depth
+  python quantum_volume_optimizer.py --backend ibm_brisbane --depth 8
 
-  # Test with fake backend (no credentials needed)
-  python quantum_volume_optimizer.py --backend fake_sherbrooke --depth 8
+  # Analysis only (no hardware execution)
+  python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5 --no-experiment
 
-  # Interactive mode for follow-up questions
-  python quantum_volume_optimizer.py --interactive --backend ibm_fez
+  # Interactive mode for follow-up experiments
+  python quantum_volume_optimizer.py --interactive --backend ibm_brisbane
         """,
     )
     parser.add_argument(
@@ -1075,6 +1285,16 @@ Examples:
         action="store_true",
         help="Run in interactive mode for follow-up questions",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Disable verbose activity logging (hide tool calls and LLM activity)",
+    )
+    parser.add_argument(
+        "--no-experiment",
+        action="store_true",
+        help="Skip running QV circuits on hardware (default: runs experiment)",
+    )
 
     args = parser.parse_args()
 
@@ -1096,11 +1316,14 @@ Examples:
         return
 
     # Run the appropriate mode
+    verbose = not args.quiet
     if args.interactive:
-        asyncio.run(interactive_mode(args.provider, args.model, args.backend))
+        asyncio.run(interactive_mode(args.provider, args.model, args.backend, verbose))
     else:
         result = asyncio.run(
-            run_qv_optimization(args.provider, args.model, args.depth, args.backend)
+            run_qv_optimization(
+                args.provider, args.model, args.depth, args.backend, verbose, not args.no_experiment
+            )
         )
         print(result)
 
