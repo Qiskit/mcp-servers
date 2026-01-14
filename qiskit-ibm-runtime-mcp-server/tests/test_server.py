@@ -18,7 +18,11 @@ from unittest.mock import Mock, patch
 import pytest
 
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
+    active_account_info,
+    active_instance_info,
+    available_instances,
     cancel_job,
+    delete_saved_account,
     get_backend_calibration,
     get_backend_properties,
     get_bell_state_circuit,
@@ -34,8 +38,10 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     least_busy_backend,
     list_backends,
     list_my_jobs,
+    list_saved_accounts,
     run_sampler,
     setup_ibm_quantum_account,
+    usage_info,
 )
 
 
@@ -1680,6 +1686,366 @@ measure q -> c;
             assert (
                 result["error_mitigation"]["dynamical_decoupling"]["sequence"] == "XpXm"
             )
+
+
+class TestDeleteSavedAccount:
+    """Test delete_saved_account function."""
+
+    @pytest.mark.asyncio
+    async def test_delete_saved_account_success(self, mock_runtime_service):
+        """Test successful account deletion."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.delete_account.return_value = True
+
+            result = await delete_saved_account("test_account")
+
+            assert result["status"] == "success"
+            assert result["deleted"] is True
+            assert "successfully deleted" in result["message"]
+            mock_runtime_service.delete_account.assert_called_once_with(
+                name="test_account"
+            )
+
+    @pytest.mark.asyncio
+    async def test_delete_saved_account_not_found(self, mock_runtime_service):
+        """Test account deletion when account not found."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.delete_account.return_value = False
+
+            result = await delete_saved_account("nonexistent_account")
+
+            assert result["status"] == "error"
+            assert result["deleted"] is False
+            assert "not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_delete_saved_account_exception(self, mock_runtime_service):
+        """Test account deletion with exception."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.delete_account.side_effect = Exception(
+                "Permission denied"
+            )
+
+            result = await delete_saved_account("test_account")
+
+            assert result["status"] == "error"
+            assert result["deleted"] is False
+            assert "Permission denied" in result["error"]
+
+
+class TestListSavedAccounts:
+    """Test list_saved_accounts function."""
+
+    @pytest.mark.asyncio
+    async def test_list_saved_accounts_success(self):
+        """Test successful listing of saved accounts."""
+        mock_accounts = {
+            "ibm_quantum_platform": {
+                "channel": "ibm_quantum",
+                "url": "https://auth.quantum-computing.ibm.com/api",
+            },
+            "custom_account": {
+                "channel": "ibm_cloud",
+                "url": "https://cloud.ibm.com",
+            },
+        }
+
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.saved_accounts"
+        ) as mock_saved:
+            mock_saved.return_value = mock_accounts
+
+            result = await list_saved_accounts()
+
+            assert result["status"] == "success"
+            assert "accounts" in result
+            assert result["accounts"] == mock_accounts
+
+    @pytest.mark.asyncio
+    async def test_list_saved_accounts_empty(self):
+        """Test listing saved accounts when none exist."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.saved_accounts"
+        ) as mock_saved:
+            mock_saved.return_value = {}
+
+            result = await list_saved_accounts()
+
+            assert result["status"] == "success"
+            assert result["accounts"] == []
+            assert "No accounts found" in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_list_saved_accounts_exception(self):
+        """Test listing saved accounts with exception."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.saved_accounts"
+        ) as mock_saved:
+            mock_saved.side_effect = Exception("File not found")
+
+            result = await list_saved_accounts()
+
+            assert result["status"] == "error"
+            assert "File not found" in result["error"]
+
+
+class TestActiveAccountInfo:
+    """Test active_account_info function."""
+
+    @pytest.mark.asyncio
+    async def test_active_account_info_success(self, mock_runtime_service):
+        """Test successful retrieval of active account info."""
+        mock_account = {
+            "channel": "ibm_quantum",
+            "url": "https://auth.quantum-computing.ibm.com/api",
+            "token": "test_token_123",
+            "verify": True,
+            "private_endpoint": False,
+        }
+
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.active_account.return_value = mock_account
+
+            result = await active_account_info()
+
+            assert result["status"] == "success"
+            assert "account_info" in result
+            assert result["account_info"]["channel"] == "ibm_quantum"
+            assert result["account_info"]["url"] == mock_account["url"]
+
+    @pytest.mark.asyncio
+    async def test_active_account_info_none_value(self, mock_runtime_service):
+        """Test active account info when service returns None."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.active_account.return_value = None
+
+            result = await active_account_info()
+
+            # Function returns success with None value (doesn't validate)
+            assert result["status"] == "success"
+            assert result["account_info"] is None
+
+    @pytest.mark.asyncio
+    async def test_active_account_info_exception(self, mock_runtime_service):
+        """Test active account info with exception."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.active_account.side_effect = Exception(
+                "Service not initialized"
+            )
+
+            result = await active_account_info()
+
+            assert result["status"] == "error"
+            assert "Service not initialized" in result["error"]
+
+
+class TestActiveInstanceInfo:
+    """Test active_instance_info function."""
+
+    @pytest.mark.asyncio
+    async def test_active_instance_info_success(self, mock_runtime_service):
+        """Test successful retrieval of active instance info."""
+        mock_instance = "crn:v1:bluemix:public:quantum-computing:us-east:a/123:456::"
+
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.active_instance.return_value = mock_instance
+
+            result = await active_instance_info()
+
+            assert result["status"] == "success"
+            assert result["instance_crn"] == mock_instance
+
+    @pytest.mark.asyncio
+    async def test_active_instance_info_none_value(self, mock_runtime_service):
+        """Test active instance info when service returns None."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.active_instance.return_value = None
+
+            result = await active_instance_info()
+
+            # Function returns success with None value (doesn't validate)
+            assert result["status"] == "success"
+            assert result["instance_crn"] is None
+
+    @pytest.mark.asyncio
+    async def test_active_instance_info_exception(self, mock_runtime_service):
+        """Test active instance info with exception."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.active_instance.side_effect = Exception(
+                "Instance lookup failed"
+            )
+
+            result = await active_instance_info()
+
+            assert result["status"] == "error"
+            assert "Instance lookup failed" in result["error"]
+
+
+class TestAvailableInstances:
+    """Test available_instances function."""
+
+    @pytest.mark.asyncio
+    async def test_available_instances_success(self, mock_runtime_service):
+        """Test successful retrieval of available instances."""
+        mock_instances = [
+            {
+                "crn": "crn:v1:bluemix:public:quantum-computing:us-east:a/123:456::",
+                "plan": "open",
+                "name": "My Instance",
+                "tags": [],
+                "pricing_type": "free",
+            },
+            {
+                "crn": "crn:v1:bluemix:public:quantum-computing:us-east:a/123:789::",
+                "plan": "premium",
+                "name": "Premium Instance",
+                "tags": ["production"],
+                "pricing_type": "paid",
+            },
+        ]
+
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.instances.return_value = mock_instances
+
+            result = await available_instances()
+
+            assert result["status"] == "success"
+            assert "instances" in result
+            assert result["total_instances"] == 2
+            assert len(result["instances"]) == 2
+            assert result["instances"][0]["plan"] == "open"
+            assert result["instances"][1]["plan"] == "premium"
+
+    @pytest.mark.asyncio
+    async def test_available_instances_empty(self, mock_runtime_service):
+        """Test available instances when none exist."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.instances.return_value = []
+
+            result = await available_instances()
+
+            assert result["status"] == "success"
+            assert result["instances"] == []
+            assert result["total_instances"] == 0
+
+    @pytest.mark.asyncio
+    async def test_available_instances_exception(self, mock_runtime_service):
+        """Test available instances with exception."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.instances.side_effect = Exception(
+                "Failed to fetch instances"
+            )
+
+            result = await available_instances()
+
+            assert result["status"] == "error"
+            assert "Failed to fetch instances" in result["error"]
+
+
+class TestUsageInfo:
+    """Test usage_info function."""
+
+    @pytest.mark.asyncio
+    async def test_usage_info_success(self, mock_runtime_service):
+        """Test successful retrieval of usage information."""
+        mock_usage = {
+            "instance_id": "crn:v1:bluemix:public:quantum-computing:us-east:a/123:456::",
+            "plan_id": "open",
+            "usage_consumed_seconds": 3600,
+            "usage_period": "2025-01",
+            "usage_limit_seconds": 36000,
+            "usage_limit_reached": False,
+            "usage_remaining_seconds": 32400,
+        }
+
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.usage.return_value = mock_usage
+
+            result = await usage_info()
+
+            assert result["status"] == "success"
+            assert "usage" in result
+            assert result["usage"]["usage_consumed_seconds"] == 3600
+            assert result["usage"]["usage_limit_reached"] is False
+            assert result["usage"]["usage_remaining_seconds"] == 32400
+
+    @pytest.mark.asyncio
+    async def test_usage_info_limit_reached(self, mock_runtime_service):
+        """Test usage info when limit is reached."""
+        mock_usage = {
+            "instance_id": "crn:v1:bluemix:public:quantum-computing:us-east:a/123:456::",
+            "plan_id": "open",
+            "usage_consumed_seconds": 36000,
+            "usage_period": "2025-01",
+            "usage_limit_seconds": 36000,
+            "usage_limit_reached": True,
+            "usage_remaining_seconds": 0,
+        }
+
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.usage.return_value = mock_usage
+
+            result = await usage_info()
+
+            assert result["status"] == "success"
+            assert result["usage"]["usage_limit_reached"] is True
+            assert result["usage"]["usage_remaining_seconds"] == 0
+
+    @pytest.mark.asyncio
+    async def test_usage_info_exception(self, mock_runtime_service):
+        """Test usage info with exception."""
+        with patch(
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+        ) as mock_init:
+            mock_init.return_value = mock_runtime_service
+            mock_runtime_service.usage.side_effect = Exception("Usage data unavailable")
+
+            result = await usage_info()
+
+            assert result["status"] == "error"
+            assert "Usage data unavailable" in result["error"]
 
 
 class TestExampleCircuits:

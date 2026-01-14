@@ -15,7 +15,11 @@
 from unittest.mock import patch
 
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
+    active_account_info,
+    active_instance_info,
+    available_instances,
     cancel_job,
+    delete_saved_account,
     find_optimal_qubit_chains,
     find_optimal_qv_qubits,
     get_backend_properties,
@@ -25,7 +29,9 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     least_busy_backend,
     list_backends,
     list_my_jobs,
+    list_saved_accounts,
     setup_ibm_quantum_account,
+    usage_info,
 )
 
 
@@ -86,6 +92,36 @@ class TestWithSyncDecorator:
         """Test find_optimal_qv_qubits has .sync attribute."""
         assert hasattr(find_optimal_qv_qubits, "sync")
         assert callable(find_optimal_qv_qubits.sync)
+
+    def test_delete_saved_account_has_sync(self):
+        """Test delete_saved_account has .sync attribute."""
+        assert hasattr(delete_saved_account, "sync")
+        assert callable(delete_saved_account.sync)
+
+    def test_list_saved_accounts_has_sync(self):
+        """Test list_saved_accounts has .sync attribute."""
+        assert hasattr(list_saved_accounts, "sync")
+        assert callable(list_saved_accounts.sync)
+
+    def test_active_account_info_has_sync(self):
+        """Test active_account_info has .sync attribute."""
+        assert hasattr(active_account_info, "sync")
+        assert callable(active_account_info.sync)
+
+    def test_active_instance_info_has_sync(self):
+        """Test active_instance_info has .sync attribute."""
+        assert hasattr(active_instance_info, "sync")
+        assert callable(active_instance_info.sync)
+
+    def test_available_instances_has_sync(self):
+        """Test available_instances has .sync attribute."""
+        assert hasattr(available_instances, "sync")
+        assert callable(available_instances.sync)
+
+    def test_usage_info_has_sync(self):
+        """Test usage_info has .sync attribute."""
+        assert hasattr(usage_info, "sync")
+        assert callable(usage_info.sync)
 
 
 class TestSyncMethodExecution:
@@ -314,3 +350,169 @@ class TestSyncMethodExecution:
             assert result["num_qubits"] == 5
             assert len(result["subgraphs"]) == 1
             assert result["subgraphs"][0]["connectivity_ratio"] == 0.6
+
+    def test_delete_saved_account_sync_success(self):
+        """Test successful account deletion with .sync method."""
+        mock_response = {
+            "status": "success",
+            "deleted": True,
+            "message": "Account successfully deleted",
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = delete_saved_account.sync("test_account")
+
+            assert result["status"] == "success"
+            assert result["deleted"] is True
+            assert "successfully deleted" in result["message"]
+
+    def test_delete_saved_account_sync_error(self):
+        """Test error handling in delete_saved_account .sync method."""
+        mock_response = {
+            "status": "error",
+            "deleted": False,
+            "error": "Account name not found or could not be deleted",
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = delete_saved_account.sync("nonexistent_account")
+
+            assert result["status"] == "error"
+            assert result["deleted"] is False
+            assert "not found" in result["error"]
+
+    def test_list_saved_accounts_sync_success(self):
+        """Test successful saved accounts listing with .sync method."""
+        mock_response = {
+            "status": "success",
+            "accounts": [
+                {"name": "ibm_quantum_platform", "channel": "ibm_quantum"},
+                {"name": "custom_account", "channel": "ibm_cloud"},
+            ],
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = list_saved_accounts.sync()
+
+            assert result["status"] == "success"
+            assert "accounts" in result
+            assert len(result["accounts"]) == 2
+
+    def test_list_saved_accounts_sync_no_accounts(self):
+        """Test saved accounts listing with no accounts."""
+        mock_response = {
+            "status": "success",
+            "accounts": [],
+            "message": "No accounts found",
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = list_saved_accounts.sync()
+
+            assert result["status"] == "success"
+            assert result["accounts"] == []
+            assert "No accounts found" in result["message"]
+
+    def test_active_account_info_sync_success(self):
+        """Test successful active account info with .sync method."""
+        mock_response = {
+            "status": "success",
+            "account_info": {
+                "channel": "ibm_quantum",
+                "url": "https://auth.quantum-computing.ibm.com/api",
+                "token": "test_token",
+                "verify": True,
+                "private_endpoint": False,
+            },
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = active_account_info.sync()
+
+            assert result["status"] == "success"
+            assert "account_info" in result
+            assert result["account_info"]["channel"] == "ibm_quantum"
+
+    def test_active_instance_info_sync_success(self):
+        """Test successful active instance info with .sync method."""
+        mock_response = {
+            "status": "success",
+            "instance_crn": "crn:v1:bluemix:public:quantum-computing:us-east:a/123:456::",
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = active_instance_info.sync()
+
+            assert result["status"] == "success"
+            assert "instance_crn" in result
+            assert result["instance_crn"].startswith("crn:v1:bluemix")
+
+    def test_available_instances_sync_success(self):
+        """Test successful available instances listing with .sync method."""
+        mock_response = {
+            "status": "success",
+            "instances": [
+                {
+                    "crn": "crn:v1:bluemix:public:quantum-computing:us-east:a/123:456::",
+                    "plan": "open",
+                    "name": "My Instance",
+                    "tags": [],
+                    "pricing_type": "free",
+                },
+                {
+                    "crn": "crn:v1:bluemix:public:quantum-computing:us-east:a/123:789::",
+                    "plan": "premium",
+                    "name": "Premium Instance",
+                    "tags": ["production"],
+                    "pricing_type": "paid",
+                },
+            ],
+            "total_instances": 2,
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = available_instances.sync()
+
+            assert result["status"] == "success"
+            assert "instances" in result
+            assert result["total_instances"] == 2
+            assert len(result["instances"]) == 2
+
+    def test_usage_info_sync_success(self):
+        """Test successful usage info with .sync method."""
+        mock_response = {
+            "status": "success",
+            "usage": {
+                "instance_id": "crn:v1:bluemix:public:quantum-computing:us-east:a/123:456::",
+                "plan_id": "open",
+                "usage_consumed_seconds": 3600,
+                "usage_period": "2025-01",
+                "usage_limit_seconds": 36000,
+                "usage_limit_reached": False,
+                "usage_remaining_seconds": 32400,
+            },
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = usage_info.sync()
+
+            assert result["status"] == "success"
+            assert "usage" in result
+            assert result["usage"]["usage_consumed_seconds"] == 3600
+            assert result["usage"]["usage_limit_reached"] is False
