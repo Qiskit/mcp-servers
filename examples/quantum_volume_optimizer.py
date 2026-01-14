@@ -873,7 +873,7 @@ async def create_qv_optimizer_agent(
         "system_prompt": QV_EXPERIMENT_RUNNER_PROMPT,
         "tools": (
             server_tools.get("qiskit-ibm-runtime", [])
-            + server_tools.get("qiskit-ibm-transpiler", [])  # For ai_routing_tool
+            + server_tools.get("qiskit-ibm-transpiler", [])  # For hybrid_ai_transpile_tool
         ),
     }
 
