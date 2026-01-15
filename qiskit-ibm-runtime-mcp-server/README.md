@@ -193,16 +193,6 @@ print(f"Recent jobs: {len(jobs['jobs'])}")
 > pip install langchain langchain-mcp-adapters langchain-openai python-dotenv
 > ```
 
-**Supported LLM Providers:**
-
-| Provider | Package | Default Model |
-|----------|---------|---------------|
-| OpenAI | `langchain-openai` | gpt-5.2 |
-| Anthropic | `langchain-anthropic` | claude-sonnet-4-5-20250929 |
-| Google | `langchain-google-genai` | gemini-3-pro-preview |
-| Ollama | `langchain-ollama` | llama3.3 |
-| Watsonx | `langchain-ibm` | ibm/granite-4-h-small |
-
 ```python
 import asyncio
 import os
@@ -244,7 +234,7 @@ async def main():
 asyncio.run(main())
 ```
 
-For more examples including Jupyter notebooks and multiple LLM providers, see the [examples/](examples/) directory.
+For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed examples including Jupyter notebooks, see the [examples/](examples/) directory.
 
 
 ## API Reference
