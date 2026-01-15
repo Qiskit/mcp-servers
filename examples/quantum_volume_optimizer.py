@@ -227,38 +227,45 @@ class AgentActivityHandler(BaseCallbackHandler):
 # =============================================================================
 
 COORDINATOR_SYSTEM_PROMPT = """
-##############################################################################
-#                        STOP! READ THIS FIRST!                              #
-##############################################################################
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  MANDATORY: task() REQUIRES description PARAMETER - NEVER OMIT IT!           ║
+║                                                                              ║
+║  task(subagent_type="X", description="Y")  ← BOTH parameters REQUIRED        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-When you call the `task` tool, you MUST ALWAYS provide BOTH parameters:
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  YOU MUST ACTUALLY RUN EXPERIMENTS - NOT JUST ANALYZE OR DOCUMENT!           ║
+║                                                                              ║
+║  DO NOT write reports about "what you would do"                              ║
+║  DO NOT say "ready for execution" - EXECUTE IT!                              ║
+║  DO NOT create documentation files - SUBMIT JOBS!                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 
-    task(subagent_type="...", description="...")
-         ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
-         REQUIRED              REQUIRED (DO NOT OMIT!)
+You are the Quantum Volume Finder. Your job is to EXECUTE experiments and report ACTUAL results.
 
-If you call task WITHOUT description, it WILL FAIL with "Field required" error.
+## REQUIRED WORKFLOW (DO ALL STEPS)
 
-WRONG (WILL FAIL):  task(subagent_type="qv-experiment-runner")
-RIGHT (WILL WORK):  task(subagent_type="qv-experiment-runner", description="Run QV...")
+1. Get backend info (backend-analyst)
+2. Find optimal qubits (qubit-chain-optimizer)
+3. **EXECUTE QV EXPERIMENT** (qv-experiment-runner) ← THIS IS MANDATORY!
+4. Report actual job ID, counts, and HOP
 
-##############################################################################
+## Subagents - COPY THESE FORMATS
 
-You are the Quantum Volume Finder. Find the highest achievable QV through experiments.
+### backend-analyst
+```
+task(subagent_type="backend-analyst", description="Get ibm_boston properties")
+```
 
-## Strategy
-Start from the HIGHEST depth and work DOWN until HOP > 2/3.
+### qubit-chain-optimizer
+```
+task(subagent_type="qubit-chain-optimizer", description="Find qubits for depth 5 on ibm_boston")
+```
 
-## Your Subagents (use with task tool - ALWAYS include description!)
-
-1. **backend-analyst**: Get backend info
-   task(subagent_type="backend-analyst", description="Get properties for ibm_boston")
-
-2. **qubit-chain-optimizer**: Find optimal qubits
-   task(subagent_type="qubit-chain-optimizer", description="Find 10 qubit subsets for depth 5 on ibm_boston")
-
-3. **qv-experiment-runner**: Run QV experiment (include circuit QASM in description!)
-   task(subagent_type="qv-experiment-runner", description="Backend: ibm_boston. Qubits: [1,2,3,4,5]. Circuit: OPENQASM 3.0; ...")
+### qv-experiment-runner ← YOU MUST CALL THIS TO RUN THE EXPERIMENT!
+```
+task(subagent_type="qv-experiment-runner", description="Run depth 5 on ibm_boston qubits [47,57,66,67,68]")
+```
 
 ## Output Format
 
@@ -353,24 +360,35 @@ QV_EXPERIMENT_RUNNER_PROMPT = """
 #                        CRITICAL INSTRUCTIONS                               #
 ##############################################################################
 
-You MUST complete ALL 5 steps. Do NOT stop early.
-
-When calling run_sampler_tool in Step 2, you MUST pass the circuit_qpy value
-from Step 1's response. If you call it with empty arguments, it WILL FAIL.
+STEP 1: Use hybrid_ai_transpile_tool (NOT ai_routing_tool!)
+STEP 2: Pass the circuit_qpy from Step 1 to run_sampler_tool
+        DO NOT call run_sampler_tool with empty arguments!
 
 ##############################################################################
 
 ## STEP 1: Transpile the circuit
-Call hybrid_ai_transpile_tool with the QASM from your task description.
-SAVE the "circuit_qpy" value from the response - you need it for Step 2!
+
+USE THIS TOOL: hybrid_ai_transpile_tool (NOT ai_routing_tool!)
+
+Call it with the QASM circuit:
+- circuit: <the QASM string>
+- backend_name: <the backend>
+- optimization_level: 3
+- ai_layout_mode: "optimize"
+
+The response will include "circuit_qpy" - a base64 string. SAVE IT!
 
 ## STEP 2: Submit to hardware
+
+CRITICAL: You MUST pass the circuit_qpy value from Step 1!
+
 Call run_sampler_tool with:
-- circuit: THE circuit_qpy VALUE FROM STEP 1 (a long base64 string)
-- backend_name: the backend
+- circuit: <THE CIRCUIT_QPY FROM STEP 1 - the base64 string starting with "UUlT...">
+- backend_name: <the backend>
 - shots: 4096
 
-CRITICAL: The circuit parameter is REQUIRED. Use the circuit_qpy from Step 1.
+DO NOT call run_sampler_tool({}) - that will FAIL!
+DO NOT forget to include the circuit parameter!
 
 ## STEP 3: Wait for completion
 Poll get_job_status_tool until job_status is "DONE".
@@ -878,13 +896,19 @@ async def create_qv_optimizer_agent(
     }
 
     # Create the coordinator agent
-    # IMPORTANT: Coordinator only gets runtime tools (not transpilation tools)
-    # This forces it to delegate transpilation to qv-experiment-runner subagent
-    # instead of trying to call hybrid_ai_transpile_tool directly without arguments
-    coordinator_tools = server_tools.get("qiskit-ibm-runtime", [])
+    # IMPORTANT: Coordinator should NOT have job execution tools
+    # This forces it to delegate to qv-experiment-runner subagent for the full
+    # transpile -> submit -> poll -> get results workflow
+    # Tools to exclude from coordinator (must be delegated to subagents)
+    excluded_tools = {"run_sampler_tool", "run_estimator_tool"}
+    coordinator_tools = [
+        tool
+        for tool in server_tools.get("qiskit-ibm-runtime", [])
+        if tool.name not in excluded_tools
+    ]
     print("\nCreating Quantum Volume Optimizer agent...")
-    print(f"  Coordinator tools: {len(coordinator_tools)} (runtime only)")
-    print("  qv-experiment-runner has transpilation tools")
+    print(f"  Coordinator tools: {len(coordinator_tools)} (excluded: {excluded_tools})")
+    print("  qv-experiment-runner has transpilation + job submission tools")
 
     agent = create_deep_agent(
         model=llm,
