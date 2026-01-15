@@ -88,7 +88,7 @@ The server will start and listen for MCP connections.
 
 ### Synchronous Usage
 
-For frameworks that don't support async operations (DSPy, traditional scripts, etc.), all async functions have a `.sync` attribute for synchronous execution:
+For frameworks that don't support async operations, all async functions have a `.sync` attribute for synchronous execution:
 
 ```python
 from qiskit_code_assistant_mcp_server.qca import (
@@ -117,6 +117,55 @@ print(models)
 - `get_rag_completion(prompt)` - Get RAG-based completion
 - `accept_completion(completion_id)` - Accept a completion
 - `get_service_status()` - Get service status
+
+**LangChain Integration Example:**
+
+> **Note:** To run LangChain examples you will need to install the dependencies:
+> ```bash
+> pip install langchain langchain-mcp-adapters langchain-openai python-dotenv
+> ```
+
+```python
+import asyncio
+import os
+from langchain.agents import create_agent
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+
+# Load environment variables (QISKIT_IBM_TOKEN, OPENAI_API_KEY, etc.)
+load_dotenv()
+
+async def main():
+    # Configure MCP client
+    mcp_client = MultiServerMCPClient({
+        "qiskit-code-assistant": {
+            "transport": "stdio",
+            "command": "qiskit-code-assistant-mcp-server",
+            "args": [],
+            "env": {
+                "QISKIT_IBM_TOKEN": os.getenv("QISKIT_IBM_TOKEN", ""),
+            },
+        }
+    })
+
+    # Use persistent session for efficient tool calls
+    async with mcp_client.session("qiskit-code-assistant") as session:
+        tools = await load_mcp_tools(session)
+
+        # Create agent with LLM
+        llm = ChatOpenAI(model="gpt-5.2", temperature=0)
+        agent = create_agent(llm, tools)
+
+        # Run a query
+        response = await agent.ainvoke("Write a quantum circuit that creates a Bell state")
+        print(response)
+
+asyncio.run(main())
+```
+
+For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed examples including Jupyter notebooks, see the [examples/](examples/) directory.
 
 
 ### Testing and debugging the server
