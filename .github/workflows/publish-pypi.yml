@@ -17,6 +17,7 @@ on:
           - code-assistant
           - runtime
           - transpiler
+          - gym
 
 jobs:
   publish-qiskit:
@@ -175,10 +176,49 @@ jobs:
         packages-dir: qiskit-ibm-transpiler-mcp-server/dist/
         verbose: true
 
+  publish-gym:
+    if: |
+      (github.event_name == 'release' && contains(github.ref, 'gym')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'gym'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for trusted publishing
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Build package
+      working-directory: ./qiskit-gym-mcp-server
+      run: |
+        uv build --out-dir dist
+
+    - name: Verify build output
+      run: |
+        ls -la qiskit-gym-mcp-server/dist/
+        if [ ! -d "qiskit-gym-mcp-server/dist" ] || [ -z "$(ls -A qiskit-gym-mcp-server/dist)" ]; then
+          echo "ERROR: Build did not produce any distribution files"
+          exit 1
+        fi
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: qiskit-gym-mcp-server/dist/
+        verbose: true
+
   publish-meta-package:
     runs-on: ubuntu-latest
     # Meta-package should be published after individual servers
-    needs: [publish-qiskit, publish-code-assistant, publish-runtime, publish-transpiler]
+    needs: [publish-qiskit, publish-code-assistant, publish-runtime, publish-transpiler, publish-gym]
     # Allow meta-package to run even if individual packages were skipped (already published)
     if: |
       always() &&
@@ -186,6 +226,7 @@ jobs:
       (needs.publish-code-assistant.result == 'success' || needs.publish-code-assistant.result == 'skipped') &&
       (needs.publish-runtime.result == 'success' || needs.publish-runtime.result == 'skipped') &&
       (needs.publish-transpiler.result == 'success' || needs.publish-transpiler.result == 'skipped') &&
+      (needs.publish-gym.result == 'success' || needs.publish-gym.result == 'skipped') &&
       ((github.event_name == 'release' && contains(github.ref, 'meta')) ||
        (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'meta-package')))
     permissions:

@@ -54,6 +54,17 @@ Access to the [qiskit-ibm-transpiler](https://github.com/Qiskit/qiskit-ibm-trans
 
 **📁 Directory**: [`./qiskit-ibm-transpiler-mcp-server/`](./qiskit-ibm-transpiler-mcp-server/)
 
+---
+
+## 🏋️ Community Servers
+
+### 🏋️ Qiskit Gym MCP Server
+**Reinforcement learning for quantum circuit synthesis**
+
+Uses [qiskit-gym](https://github.com/rl-institut/qiskit-gym) to train RL models for optimal quantum circuit synthesis, including permutation routing, linear function synthesis, and Clifford circuits.
+
+**📁 Directory**: [`./qiskit-gym-mcp-server/`](./qiskit-gym-mcp-server/)
+
 ## 📚 Examples
 
 Each MCP server includes example code demonstrating how to build AI agents using LangChain:
@@ -64,6 +75,7 @@ Each MCP server includes example code demonstrating how to build AI agents using
 | Qiskit Code Assistant MCP Server | [`qiskit-code-assistant-mcp-server/examples/`](./qiskit-code-assistant-mcp-server/examples/) |
 | Qiskit IBM Runtime MCP Server | [`qiskit-ibm-runtime-mcp-server/examples/`](./qiskit-ibm-runtime-mcp-server/examples/) |
 | Qiskit IBM Transpiler MCP Server | [`qiskit-ibm-transpiler-mcp-server/examples/`](./qiskit-ibm-transpiler-mcp-server/examples/) |
+| Qiskit Gym MCP Server (Community) | [`qiskit-gym-mcp-server/examples/`](./qiskit-gym-mcp-server/examples/) |
 
 Each examples directory contains:
 - **Jupyter Notebook** (`langchain_agent.ipynb`) - Interactive tutorial with step-by-step examples
@@ -83,14 +95,21 @@ Each examples directory contains:
 #### Install from PyPI
 
 ```bash
-# Install all MCP servers at once
+# Install all MCP servers (core + community)
+pip install qiskit-mcp-servers[all]
+
+# Install just the core servers (default)
 pip install qiskit-mcp-servers
 
-# Or install individual servers
-pip install qiskit-mcp-server
-pip install qiskit-code-assistant-mcp-server
-pip install qiskit-ibm-runtime-mcp-server
-pip install qiskit-ibm-transpiler-mcp-server
+# Install individual servers
+pip install qiskit-mcp-servers[qiskit]          # Qiskit server only
+pip install qiskit-mcp-servers[code-assistant]  # Code Assistant server only
+pip install qiskit-mcp-servers[runtime]         # IBM Runtime server only
+pip install qiskit-mcp-servers[transpiler]      # IBM Transpiler server only
+pip install qiskit-mcp-servers[gym]             # Qiskit Gym server only (community)
+
+# Install community servers only
+pip install qiskit-mcp-servers[community]
 ```
 
 #### Install from Source
@@ -119,6 +138,12 @@ uv run qiskit-ibm-runtime-mcp-server
 ```bash
 cd qiskit-ibm-transpiler-mcp-server
 uv run qiskit-ibm-transpiler-mcp-server
+```
+
+#### 🏋️ Qiskit Gym Server (Community)
+```bash
+cd qiskit-gym-mcp-server
+uv run qiskit-gym-mcp-server
 ```
 
 ### 🔧 Configuration

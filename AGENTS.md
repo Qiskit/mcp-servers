@@ -36,7 +36,7 @@ qiskit-mcp-servers is a collection of **Model Context Protocol (MCP)** servers t
 
 ### Repository Structure
 
-This is a **monorepo** using uv workspace containing four independent MCP servers:
+This is a **monorepo** using uv workspace containing five independent MCP servers:
 
 ```
 qiskit-mcp-servers/
@@ -44,6 +44,7 @@ qiskit-mcp-servers/
 ├── qiskit-code-assistant-mcp-server/        # AI code completion
 ├── qiskit-ibm-runtime-mcp-server/           # IBM Quantum cloud services
 ├── qiskit-ibm-transpiler-mcp-server/        # AI-powered transpilation
+├── qiskit-gym-mcp-server/                   # RL-based circuit synthesis
 ├── .claude/skills/                          # Claude Code skills
 ├── .github/                                 # GitHub templates and workflows
 ├── pyproject.toml                           # Workspace configuration & meta-package
@@ -73,6 +74,7 @@ members = [
     "qiskit-code-assistant-mcp-server",
     "qiskit-ibm-runtime-mcp-server",
     "qiskit-ibm-transpiler-mcp-server",
+    "qiskit-gym-mcp-server",
 ]
 ```
 
@@ -249,6 +251,62 @@ Each MCP server follows this standard structure:
 
 ---
 
+### 5. Qiskit Gym MCP Server
+
+**Purpose**: Reinforcement learning-based quantum circuit synthesis
+
+**Directory**: [`qiskit-gym-mcp-server/`](qiskit-gym-mcp-server/)
+
+**Core Files**:
+- `server.py`: FastMCP server with tool/resource definitions
+- `gym_core.py`: Environment creation (PermutationGym, LinearFunctionGym, CliffordGym)
+- `training.py`: RL training session management
+- `synthesis.py`: Circuit synthesis from trained models
+- `models.py`: Model persistence (save/load)
+- `coupling_maps.py`: Hardware presets and subtopology extraction
+- `state.py`: Singleton state manager
+
+**Tools Provided**:
+| Tool | Description |
+|------|-------------|
+| `create_permutation_env_tool` | Create environment for SWAP routing |
+| `create_linear_function_env_tool` | Create environment for CNOT synthesis |
+| `create_clifford_env_tool` | Create environment for Clifford synthesis |
+| `start_training_tool` | Start RL training (PPO/AlphaZero) |
+| `batch_train_environments_tool` | Train multiple environments |
+| `synthesize_permutation_tool` | Generate optimal SWAP circuit |
+| `synthesize_linear_function_tool` | Generate optimal CNOT circuit |
+| `synthesize_clifford_tool` | Generate optimal Clifford circuit |
+| `save_model_tool` | Save trained model to disk |
+| `load_model_tool` | Load model from disk |
+| `extract_subtopologies_tool` | Extract N-qubit subtopologies from hardware |
+
+**Resources Provided**:
+| Resource URI | Description |
+|--------------|-------------|
+| `qiskit-gym://presets/coupling-maps` | Hardware presets (Heron, Nighthawk, grids) |
+| `qiskit-gym://algorithms` | PPO, AlphaZero documentation |
+| `qiskit-gym://policies` | BasicPolicy, Conv1dPolicy docs |
+| `qiskit-gym://environments` | Environment type documentation |
+| `qiskit-gym://training/sessions` | Active training sessions |
+| `qiskit-gym://models` | Loaded models |
+| `qiskit-gym://server/config` | Server configuration |
+
+**Environment Variables**:
+- `QISKIT_GYM_MODEL_DIR`: Model storage directory (default: ~/.qiskit-gym/models)
+- `QISKIT_GYM_TENSORBOARD_DIR`: TensorBoard logs (default: ~/.qiskit-gym/runs)
+- `QISKIT_GYM_MAX_ITERATIONS`: Maximum training iterations (default: 10000)
+- `QISKIT_GYM_MAX_QUBITS`: Maximum qubits (default: 15)
+
+**Hardware Presets**:
+- `ibm_heron_r1` (133 qubits, heavy-hex)
+- `ibm_heron_r2` (156 qubits, heavy-hex)
+- `ibm_nighthawk` (120 qubits, 10x12 grid)
+- `grid_3x3`, `grid_5x5`, `grid_10x10`
+- `linear_5`, `linear_10`
+
+---
+
 ## Data Flow
 
 ### Qiskit MCP Server
@@ -295,6 +353,17 @@ AI Assistant → MCP Client → ai_routing_tool / ai_*_synthesis_tool
                     Optimized circuit (QPY format)
 ```
 
+### Qiskit Gym Server
+```
+AI Assistant → MCP Client → create_*_env_tool → start_training_tool
+                                  ↓                    ↓
+                         gym_core.py (envs)    training.py (RLSynthesis)
+                                                       ↓
+                                         synthesize_*_tool
+                                                       ↓
+                                    Optimized circuit (QPY format)
+```
+
 ## Development Guidelines
 
 ### Environment Setup
@@ -335,6 +404,7 @@ AI Assistant → MCP Client → ai_routing_tool / ai_*_synthesis_tool
    uv run qiskit-code-assistant-mcp-server
    uv run qiskit-ibm-runtime-mcp-server
    uv run qiskit-ibm-transpiler-mcp-server
+   uv run qiskit-gym-mcp-server
    ```
 
 5. **Interactive Testing**:
@@ -604,6 +674,7 @@ When adding a new MCP server, you must update the following GitHub configuration
    | qiskit-code-assistant-mcp-server | `code-assistant*` |
    | qiskit-ibm-runtime-mcp-server | `runtime*` |
    | qiskit-ibm-transpiler-mcp-server | `transpiler*` |
+   | qiskit-gym-mcp-server | `gym*` |
    | Meta-package | `meta*` |
 
 5. **GitHub Secrets Required**:
@@ -714,6 +785,7 @@ uv publish --repository testpypi
 - `qiskit-code-assistant-mcp-server/README.md`: Code Assistant server docs
 - `qiskit-ibm-runtime-mcp-server/README.md`: IBM Runtime server docs
 - `qiskit-ibm-transpiler-mcp-server/README.md`: IBM Transpiler server docs
+- `qiskit-gym-mcp-server/README.md`: Qiskit Gym RL server docs
 
 ### GitHub Configuration
 - `.github/CODEOWNERS`: Default reviewers (@vabarbosa @cbjuan)
@@ -899,6 +971,24 @@ qiskit-mcp-servers/
 │   ├── pyproject.toml
 │   ├── pytest.ini
 │   ├── LICENSE
+│   ├── README.md
+│   └── run_tests.sh
+├── qiskit-gym-mcp-server/
+│   ├── src/qiskit_gym_mcp_server/
+│   │   ├── __init__.py
+│   │   ├── server.py                    # FastMCP server
+│   │   ├── gym_core.py                  # Environment creation
+│   │   ├── training.py                  # RL training functions
+│   │   ├── synthesis.py                 # Circuit synthesis
+│   │   ├── models.py                    # Model persistence
+│   │   ├── coupling_maps.py             # Hardware presets
+│   │   ├── state.py                     # Singleton state manager
+│   │   ├── constants.py                 # Configuration
+│   │   └── utils.py                     # Utilities
+│   ├── tests/
+│   │   ├── conftest.py
+│   │   └── test_*.py
+│   ├── pyproject.toml
 │   ├── README.md
 │   └── run_tests.sh
 ├── src/
