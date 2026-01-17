@@ -101,7 +101,7 @@ def _ensure_tensorboard_dir(experiment_name: str | None) -> str | None:
 # ============================================================================
 
 
-def _suppress_training_logs():
+def _suppress_training_logs() -> None:
     """Suppress verbose INFO training logs from twisterl (uses loguru).
 
     This only suppresses INFO-level terminal output. WARNING and ERROR
@@ -414,20 +414,16 @@ async def get_training_status(session_id: str) -> dict[str, Any]:
         if "error" not in tb_metrics:
             # Get the current step from any available metric
             for metric_name in ["difficulty", "success", "reward"]:
-                if metric_name in tb_metrics and tb_metrics[metric_name]:
+                if tb_metrics.get(metric_name):
                     latest_step = tb_metrics[metric_name][-1]["step"]
-                    if latest_step > current_step:
-                        current_step = latest_step
+                    current_step = max(current_step, latest_step)
 
             # Use TensorBoard step as progress if it's more current
-            if current_step > progress:
-                progress = current_step
+            progress = max(progress, current_step)
 
     # Calculate progress percentage
     progress_percent = (
-        round(100 * progress / session.total_iterations, 1)
-        if session.total_iterations > 0
-        else 0
+        round(100 * progress / session.total_iterations, 1) if session.total_iterations > 0 else 0
     )
 
     result = {
@@ -451,12 +447,12 @@ async def get_training_status(session_id: str) -> dict[str, Any]:
 
     # Include live metrics from TensorBoard if available
     if "error" not in tb_metrics:
-        if "difficulty" in tb_metrics and tb_metrics["difficulty"]:
+        if tb_metrics.get("difficulty"):
             result["current_difficulty"] = tb_metrics["difficulty"][-1]["value"]
-        if "success" in tb_metrics and tb_metrics["success"]:
+        if tb_metrics.get("success"):
             result["current_success"] = tb_metrics["success"][-1]["value"]
             result["current_success_percent"] = f"{tb_metrics['success'][-1]['value']:.0%}"
-        if "reward" in tb_metrics and tb_metrics["reward"]:
+        if tb_metrics.get("reward"):
             result["current_reward"] = tb_metrics["reward"][-1]["value"]
 
     return result
@@ -561,14 +557,14 @@ async def get_training_metrics(session_id: str) -> dict[str, Any]:
     }
 
     # Add final values for quick reference
-    if "difficulty" in metrics and metrics["difficulty"]:
+    if metrics.get("difficulty"):
         result["final_difficulty"] = metrics["difficulty"][-1]["value"]
 
-    if "success" in metrics and metrics["success"]:
+    if metrics.get("success"):
         result["final_success"] = metrics["success"][-1]["value"]
         result["final_success_percent"] = f"{metrics['success'][-1]['value']:.0%}"
 
-    if "reward" in metrics and metrics["reward"]:
+    if metrics.get("reward"):
         result["final_reward"] = metrics["reward"][-1]["value"]
 
     return result
@@ -599,7 +595,6 @@ async def get_tensorboard_metrics(
         - final_difficulty: The final difficulty level reached
         - final_success: The final success rate achieved
     """
-    import os
 
     if experiment_name is None and tensorboard_path is None:
         return {
@@ -615,28 +610,30 @@ async def get_tensorboard_metrics(
 
     # Resolve the TensorBoard path
     if experiment_name is not None:
-        tb_path = os.path.join(QISKIT_GYM_TENSORBOARD_DIR, experiment_name)
-        if not os.path.exists(tb_path):
+        tb_path = Path(QISKIT_GYM_TENSORBOARD_DIR) / experiment_name
+        if not tb_path.exists():
             # List available experiments
-            available = []
-            if os.path.exists(QISKIT_GYM_TENSORBOARD_DIR):
-                available = sorted(os.listdir(QISKIT_GYM_TENSORBOARD_DIR))[:10]
+            available: list[str] = []
+            tb_dir = Path(QISKIT_GYM_TENSORBOARD_DIR)
+            if tb_dir.exists():
+                available = sorted(p.name for p in tb_dir.iterdir())[:10]
             return {
                 "status": "error",
                 "message": f"Experiment '{experiment_name}' not found in {QISKIT_GYM_TENSORBOARD_DIR}",
                 "available_experiments": available,
                 "hint": "Use list format like 'linear_function_train_0001_abc123'",
             }
+        tb_path_str = str(tb_path)
     else:
-        tb_path = tensorboard_path
-        if not os.path.exists(tb_path):
+        tb_path_str = tensorboard_path  # type: ignore[assignment]
+        if not Path(tb_path_str).exists():
             return {
                 "status": "error",
-                "message": f"TensorBoard path not found: {tb_path}",
+                "message": f"TensorBoard path not found: {tb_path_str}",
             }
 
     # Read metrics from TensorBoard
-    metrics = _read_tensorboard_metrics(tb_path)
+    metrics = _read_tensorboard_metrics(tb_path_str)
 
     if "error" in metrics:
         return {
@@ -646,7 +643,7 @@ async def get_tensorboard_metrics(
 
     result: dict[str, Any] = {
         "status": "success",
-        "tensorboard_path": tb_path,
+        "tensorboard_path": tb_path_str,
         "metrics": metrics,
     }
 
@@ -654,14 +651,14 @@ async def get_tensorboard_metrics(
         result["experiment_name"] = experiment_name
 
     # Add final values for quick reference
-    if "difficulty" in metrics and metrics["difficulty"]:
+    if metrics.get("difficulty"):
         result["final_difficulty"] = metrics["difficulty"][-1]["value"]
 
-    if "success" in metrics and metrics["success"]:
+    if metrics.get("success"):
         result["final_success"] = metrics["success"][-1]["value"]
         result["final_success_percent"] = f"{metrics['success'][-1]['value']:.0%}"
 
-    if "reward" in metrics and metrics["reward"]:
+    if metrics.get("reward"):
         result["final_reward"] = metrics["reward"][-1]["value"]
 
     return result
@@ -677,9 +674,9 @@ async def list_tensorboard_experiments() -> dict[str, Any]:
     Returns:
         Dict with list of experiment names and their paths.
     """
-    import os
+    tb_dir = Path(QISKIT_GYM_TENSORBOARD_DIR)
 
-    if not os.path.exists(QISKIT_GYM_TENSORBOARD_DIR):
+    if not tb_dir.exists():
         return {
             "status": "success",
             "experiments": [],
@@ -687,20 +684,21 @@ async def list_tensorboard_experiments() -> dict[str, Any]:
             "tensorboard_dir": QISKIT_GYM_TENSORBOARD_DIR,
         }
 
-    experiments = []
-    for name in sorted(os.listdir(QISKIT_GYM_TENSORBOARD_DIR)):
-        exp_path = os.path.join(QISKIT_GYM_TENSORBOARD_DIR, name)
-        if os.path.isdir(exp_path):
+    experiments: list[dict[str, Any]] = []
+    for exp_path in sorted(tb_dir.iterdir()):
+        if exp_path.is_dir():
             # Get modification time for sorting
-            mtime = os.path.getmtime(exp_path)
-            experiments.append({
-                "name": name,
-                "path": exp_path,
-                "modified": mtime,
-            })
+            mtime = exp_path.stat().st_mtime
+            experiments.append(
+                {
+                    "name": exp_path.name,
+                    "path": str(exp_path),
+                    "modified": mtime,
+                }
+            )
 
     # Sort by modification time (newest first)
-    experiments.sort(key=lambda x: x["modified"], reverse=True)
+    experiments.sort(key=lambda x: float(x["modified"]), reverse=True)
 
     # Remove mtime from output (just used for sorting)
     for exp in experiments:

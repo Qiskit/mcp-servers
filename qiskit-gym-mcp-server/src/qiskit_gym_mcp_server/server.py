@@ -446,24 +446,29 @@ async def get_tensorboard_metrics_tool(
     )
 
 
-# Module-level variables to track the TensorBoard process
-_tensorboard_process: subprocess.Popen | None = None
-_tensorboard_port: int | None = None
+# TensorBoard state management class to avoid global statements
+class _TensorBoardState:
+    """Manages the TensorBoard process state."""
+
+    def __init__(self) -> None:
+        self.process: subprocess.Popen[bytes] | None = None
+        self.port: int | None = None
+
+    def cleanup(self) -> None:
+        """Cleanup function to terminate TensorBoard on exit."""
+        if self.process is not None and self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
 
 
-def _cleanup_tensorboard() -> None:
-    """Cleanup function to terminate TensorBoard on exit."""
-    global _tensorboard_process
-    if _tensorboard_process is not None and _tensorboard_process.poll() is None:
-        _tensorboard_process.terminate()
-        try:
-            _tensorboard_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            _tensorboard_process.kill()
-
+# Module-level state instance
+_tb_state = _TensorBoardState()
 
 # Register cleanup function to handle orphaned processes
-atexit.register(_cleanup_tensorboard)
+atexit.register(_tb_state.cleanup)
 
 
 @mcp.tool()
@@ -482,18 +487,16 @@ async def start_tensorboard_tool(port: int = 6006) -> dict[str, Any]:
     Note:
         Use stop_tensorboard_tool to stop the TensorBoard process when done.
     """
-    global _tensorboard_process, _tensorboard_port
-
-    if _tensorboard_process is not None and _tensorboard_process.poll() is None:
+    if _tb_state.process is not None and _tb_state.process.poll() is None:
         return {
             "status": "already_running",
-            "message": f"TensorBoard is already running on port {_tensorboard_port}. "
+            "message": f"TensorBoard is already running on port {_tb_state.port}. "
             "Use stop_tensorboard_tool to stop it first.",
-            "url": f"http://localhost:{_tensorboard_port}",
+            "url": f"http://localhost:{_tb_state.port}",
         }
 
     try:
-        _tensorboard_process = subprocess.Popen(
+        _tb_state.process = subprocess.Popen(
             ["tensorboard", "--logdir", QISKIT_GYM_TENSORBOARD_DIR, "--port", str(port)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -501,19 +504,19 @@ async def start_tensorboard_tool(port: int = 6006) -> dict[str, Any]:
 
         # Wait briefly and verify TensorBoard actually started
         time.sleep(1)
-        if _tensorboard_process.poll() is not None:
+        if _tb_state.process.poll() is not None:
             # Process exited - read stderr for error message
             stderr_output = ""
-            if _tensorboard_process.stderr:
-                stderr_output = _tensorboard_process.stderr.read().decode()
-            _tensorboard_process = None
-            _tensorboard_port = None
+            if _tb_state.process.stderr:
+                stderr_output = _tb_state.process.stderr.read().decode()
+            _tb_state.process = None
+            _tb_state.port = None
             return {
                 "status": "error",
                 "error": f"TensorBoard failed to start: {stderr_output or 'unknown error'}",
             }
 
-        _tensorboard_port = port
+        _tb_state.port = port
         return {
             "status": "success",
             "message": "TensorBoard started successfully",
@@ -541,31 +544,29 @@ async def stop_tensorboard_tool() -> dict[str, Any]:
     Returns:
         Dict with status message indicating whether TensorBoard was stopped.
     """
-    global _tensorboard_process, _tensorboard_port
-
-    if _tensorboard_process is None:
+    if _tb_state.process is None:
         return {
             "status": "not_running",
             "message": "TensorBoard is not running.",
         }
 
-    if _tensorboard_process.poll() is not None:
-        _tensorboard_process = None
-        _tensorboard_port = None
+    if _tb_state.process.poll() is not None:
+        _tb_state.process = None
+        _tb_state.port = None
         return {
             "status": "not_running",
             "message": "TensorBoard is not running (process already terminated).",
         }
 
-    _tensorboard_process.terminate()
+    _tb_state.process.terminate()
     try:
-        _tensorboard_process.wait(timeout=5)
+        _tb_state.process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        _tensorboard_process.kill()
-        _tensorboard_process.wait()
+        _tb_state.process.kill()
+        _tb_state.process.wait()
 
-    _tensorboard_process = None
-    _tensorboard_port = None
+    _tb_state.process = None
+    _tb_state.port = None
     return {
         "status": "success",
         "message": "TensorBoard stopped successfully.",
@@ -581,19 +582,17 @@ async def get_tensorboard_status_tool() -> dict[str, Any]:
     Returns:
         Dict with running status, port, and URL if running.
     """
-    global _tensorboard_process, _tensorboard_port
-
-    if _tensorboard_process is None:
+    if _tb_state.process is None:
         return {
             "status": "not_running",
             "running": False,
             "message": "TensorBoard is not running.",
         }
 
-    if _tensorboard_process.poll() is not None:
+    if _tb_state.process.poll() is not None:
         # Process has terminated
-        _tensorboard_process = None
-        _tensorboard_port = None
+        _tb_state.process = None
+        _tb_state.port = None
         return {
             "status": "not_running",
             "running": False,
@@ -603,10 +602,10 @@ async def get_tensorboard_status_tool() -> dict[str, Any]:
     return {
         "status": "running",
         "running": True,
-        "port": _tensorboard_port,
-        "url": f"http://localhost:{_tensorboard_port}",
+        "port": _tb_state.port,
+        "url": f"http://localhost:{_tb_state.port}",
         "logdir": QISKIT_GYM_TENSORBOARD_DIR,
-        "message": f"TensorBoard is running on port {_tensorboard_port}.",
+        "message": f"TensorBoard is running on port {_tb_state.port}.",
     }
 
 

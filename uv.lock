@@ -3876,6 +3876,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "qiskit-code-assistant-mcp-server" },
+    { name = "qiskit-gym-mcp-server" },
     { name = "qiskit-ibm-runtime-mcp-server" },
     { name = "qiskit-ibm-transpiler-mcp-server" },
     { name = "qiskit-mcp-server" },
@@ -3916,6 +3917,7 @@ requires-dist = [
     { name = "qiskit-code-assistant-mcp-server", editable = "qiskit-code-assistant-mcp-server" },
     { name = "qiskit-code-assistant-mcp-server", marker = "extra == 'all'", editable = "qiskit-code-assistant-mcp-server" },
     { name = "qiskit-code-assistant-mcp-server", marker = "extra == 'code-assistant'", editable = "qiskit-code-assistant-mcp-server" },
+    { name = "qiskit-gym-mcp-server", marker = "extra == 'all'", editable = "qiskit-gym-mcp-server" },
     { name = "qiskit-gym-mcp-server", marker = "extra == 'community'", editable = "qiskit-gym-mcp-server" },
     { name = "qiskit-gym-mcp-server", marker = "extra == 'gym'", editable = "qiskit-gym-mcp-server" },
     { name = "qiskit-ibm-runtime-mcp-server", editable = "qiskit-ibm-runtime-mcp-server" },

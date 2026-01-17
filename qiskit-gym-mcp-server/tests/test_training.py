@@ -407,9 +407,7 @@ class TestBackgroundTraining:
         session_id = result["session_id"]
 
         # Wait with very short timeout - should timeout
-        wait_result = await wait_for_training(
-            session_id, timeout=0.1, poll_interval=0.05
-        )
+        wait_result = await wait_for_training(session_id, timeout=0.1, poll_interval=0.05)
 
         assert wait_result["status"] == "timeout"
         assert wait_result["session_id"] == session_id
