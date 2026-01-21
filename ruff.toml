@@ -111,8 +111,49 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
     "PLC0415",  # Import inside cleanup function (asyncio)
 ]
 
+# qiskit-gym-mcp-server specific ignores (intentional lazy loading)
+"**/qiskit_gym_mcp_server/gym_core.py" = [
+    "PLC0415",  # Import inside function (lazy loading qiskit-gym)
+    "PLR0912",  # Too many branches (gateset parsing)
+    "C401",     # Set comprehension (readability preference)
+]
+"**/qiskit_gym_mcp_server/training.py" = [
+    "PLC0415",  # Import inside function (lazy loading qiskit-gym)
+    "PLR0911",  # Too many return statements (async training logic)
+]
+"**/qiskit_gym_mcp_server/synthesis.py" = [
+    "PLC0415",  # Import inside function (lazy loading)
+    "PLR0911",  # Too many return statements (validation)
+    "RUF046",   # Int cast on det (numpy type handling)
+]
+"**/qiskit_gym_mcp_server/models.py" = [
+    "PLC0415",  # Import inside function (lazy loading qiskit-gym)
+    "PTH107",   # os.remove (backward compatibility)
+    "PTH123",   # open() (config file reading)
+]
+"**/qiskit_gym_mcp_server/coupling_maps.py" = [
+    "PLC0415",  # Import inside function (math, random)
+    "PLR0912",  # Too many branches (subgraph algorithm)
+    "PLR0915",  # Too many statements (subgraph algorithm)
+    "C401",     # Generator vs comprehension (readability)
+    "SIM102",   # Nested if statements (topology detection logic)
+    "PERF401",  # List comprehension (readability in loop)
+]
+
+# Example agent scripts (conditional imports for optional LLM providers)
+"**/examples/langchain_agent.py" = [
+    "PLC0415",  # Import inside function (optional LLM providers)
+    "TCH002",   # Type-checking import (BaseChatModel for type hint)
+]
+"**/examples/langchain_agent.ipynb" = [
+    "I001",     # Import sorting (cell-by-cell execution doesn't need strict sorting)
+    "W293",     # Blank lines with whitespace (notebook formatting)
+    "ERA001",   # Commented out code (examples for users to uncomment)
+    "PLC0415",  # Import inside function (optional LLM providers)
+]
+
 [lint.isort]
-known-first-party = ["qiskit_code_assistant_mcp_server", "qiskit_ibm_runtime_mcp_server"]
+known-first-party = ["qiskit_code_assistant_mcp_server", "qiskit_ibm_runtime_mcp_server", "qiskit_gym_mcp_server"]
 force-single-line = false
 lines-after-imports = 2
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
