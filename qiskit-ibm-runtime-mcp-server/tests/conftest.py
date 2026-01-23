@@ -150,4 +150,16 @@ def mock_successful_init():
     return init_service_mock
 
 
+@pytest.fixture
+def mock_estimator_service():
+    """Mock que simula el servicio de estimación."""
+    return Mock(name="estimator_service")
+
+
+@pytest.fixture
+def mock_backend():
+    """Mock que simula un backend de Qiskit."""
+    return Mock(name="backend")
+
+
 # Assisted by watsonx Code Assistant
