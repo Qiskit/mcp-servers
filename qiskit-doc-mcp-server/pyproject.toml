@@ -1,0 +1,26 @@
+[project]
+name = "qiskit-docs-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dotenv>=0.9.9",
+    "fastmcp>=2.14.0",
+    "modelcontextprotocol>=1.0.1",
+    "pytest>=9.0.2",
+    "requests>=2.32.5",
+]
+
+[dependency-groups]
+dev = [
+    "bandit[toml]>=1.9.2",
+    "mypy>=1.15.0",
+    "ruff>=0.11.13",
+]
+test = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+]
