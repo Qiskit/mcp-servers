@@ -130,7 +130,7 @@ def get_style_docs(style: str) -> Optional[str]:
     return fetch_text(url)
 
 
-def search_qiskit_docs(query: str, module: str = "documentation") -> list[dict]:   # to add a modules parameter here 
+def search_qiskit_docs(query: str, module: str = "documentation") -> list[dict]:
     """
     Search Qiskit documentation for relevant results.
     

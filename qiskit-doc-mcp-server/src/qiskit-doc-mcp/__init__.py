@@ -14,7 +14,7 @@ import server
 
 def main() -> None:
     """Main entry point for the package."""
-    server.mcp.run(transport="stdio")
+    server.mcp.run()
 
 if __name__ == "__main__":
     main()
