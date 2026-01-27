@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 QISKIT_DOCS_BASE = "https://docs.quantum.ibm.com/"
 QISKIT_SDK_DOCS = "https://docs.quantum.ibm.com/"
 QISKIT_RUNTIME_DOCS = "https://docs.quantum.ibm.com/run/"
+BASE_URL = "https://quantum.cloud.ibm.com/"
 
 # Qiskit modules and their documentation paths
 QISKIT_MODULES = {
@@ -37,6 +38,8 @@ QISKIT_ADDON_MODULES = {
     "addon-qpe": "guides/qpe",
     "addon-vqe": "guides/vqe",
 }
+
+SEARCH_PATH = "endpoints-docs-learning/api/search"
 
 @lru_cache(maxsize=100)
 def fetch_text(url: str) -> Optional[str]: 
@@ -60,29 +63,6 @@ def fetch_text(url: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"Unexpected error fetching {url}: {e}")
         return None
-
-
-# def get_component_list() -> list[str]:
-#     """Get list of all Qiskit SDK modules."""
-#     return list(QISKIT_MODULES.keys())
-
-
-# def get_pattern_list() -> list[str]:
-#     """Get list of all Qiskit addon modules and tutorials."""
-#     return list(QISKIT_ADDON_MODULES.keys())
-
-
-# def get_style_list() -> list[str]:
-#     """Get list of Qiskit guides and best practices."""
-#     return [
-#         "optimization",
-#         "quantum-circuits",
-#         "error-mitigation",
-#         "dynamic-circuits",
-#         "parametric-compilation",
-#         "performance-tuning"
-#     ]
-
 
 def get_component_docs(component: str) -> Optional[str]:
     """
@@ -150,17 +130,17 @@ def get_style_docs(style: str) -> Optional[str]:
     return fetch_text(url)
 
 
-def search_qiskit_docs(query: str) -> list[dict]:   # to add a modules parameter here 
+def search_qiskit_docs(query: str, module: str = "documentation") -> list[dict]:   # to add a modules parameter here 
     """
     Search Qiskit documentation for relevant results.
     
     Args:
         query: Search query string
-        
+        module: Search module string
+
     Returns:
         List of relevant documentation entries with name and description
     """
-    results = []
     
     # Search in SDK modules
     # for module, path in QISKIT_MODULES.items():
@@ -184,9 +164,8 @@ def search_qiskit_docs(query: str) -> list[dict]:   # to add a modules parameter
 
     # Search everything
 
-    path = "/endpoints-docs-learning/api/search"
-    url = f"https://quantum.cloud.ibm.com{path}?query={query}"
-    logger.info(f"Querying from {query} which gives {url}")
+    url = f"{BASE_URL}{SEARCH_PATH}?query={query}&module={module}"
+    logger.info(f"Querying from {query} which gives {url} from {module}")
     
     return fetch_text_json(url)
 

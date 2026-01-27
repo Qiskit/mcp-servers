@@ -86,21 +86,23 @@ def get_guide(guide: str) -> dict:
 
 
 @mcp.tool()
-def search_docs(query: str) -> list[dict]:
+def search_docs(query: str, module: str = "documentation") -> list[dict]:
     """
     Search Qiskit documentation for relevant modules, addons, and guides.
     
     Args:
         query: Search query (e.g., 'optimization', 'circuit', 'error')
+        module: Search module (e.g. 'documentation', 'API' etc)
     
     Returns:
         List of matching documentation entries with URLs and types.
     """
-    results = search_qiskit_docs(query)
+    results = search_qiskit_docs(query, module)
     if not results:
         return [{"info": f"No results found for '{query}'"}]
     return results
 
+## Resource
 @mcp.resource("qdc://modules", mime_type="application/json")
 def get_component_list() -> list[str]:
     """Get list of all Qiskit SDK modules."""
