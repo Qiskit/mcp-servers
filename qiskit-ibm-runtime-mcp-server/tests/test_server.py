@@ -1740,15 +1740,17 @@ class TestListSavedAccounts:
 
     @pytest.mark.asyncio
     async def test_list_saved_accounts_success(self):
-        """Test successful listing of saved accounts."""
+        """Test successful listing of saved accounts with token masking."""
         mock_accounts = {
             "ibm_quantum_platform": {
                 "channel": "ibm_quantum",
                 "url": "https://auth.quantum-computing.ibm.com/api",
+                "token": "secret_token_abc123",
             },
             "custom_account": {
                 "channel": "ibm_cloud",
                 "url": "https://cloud.ibm.com",
+                "token": "another_secret_xyz789",
             },
         }
 
@@ -1761,7 +1763,12 @@ class TestListSavedAccounts:
 
             assert result["status"] == "success"
             assert "accounts" in result
-            assert result["accounts"] == mock_accounts
+            # Verify tokens are masked (showing only last 4 characters)
+            assert result["accounts"]["ibm_quantum_platform"]["token"] == "***c123"
+            assert result["accounts"]["custom_account"]["token"] == "***z789"
+            # Verify other fields are unchanged
+            assert result["accounts"]["ibm_quantum_platform"]["channel"] == "ibm_quantum"
+            assert result["accounts"]["custom_account"]["channel"] == "ibm_cloud"
 
     @pytest.mark.asyncio
     async def test_list_saved_accounts_empty(self):
@@ -1817,6 +1824,8 @@ class TestActiveAccountInfo:
             assert "account_info" in result
             assert result["account_info"]["channel"] == "ibm_quantum"
             assert result["account_info"]["url"] == mock_account["url"]
+            # Verify token is masked (showing only last 4 characters)
+            assert result["account_info"]["token"] == "***_123"
 
     @pytest.mark.asyncio
     async def test_active_account_info_none_value(self, mock_runtime_service):

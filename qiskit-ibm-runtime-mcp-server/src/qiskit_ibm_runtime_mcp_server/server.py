@@ -351,7 +351,7 @@ async def list_saved_accounts_tool() -> dict[str, Any]:
 
     Returns account information from ~/.qiskit/qiskit-ibm.json including account names
     and channels. Useful for checking available accounts before initializing the service
-    or before deleting an account.
+    or before deleting an account. Tokens are masked for security.
     """
     return await list_saved_accounts()
 
@@ -362,6 +362,7 @@ async def active_account_info_tool() -> dict[str, Any]:
 
     Returns details about the account being used in the current session, including
     channel, instance, and name. This is the account used for all quantum operations.
+    Tokens are masked for security.
     """
     return await active_account_info()
 
