@@ -2338,10 +2338,10 @@ async def available_instances() -> dict[str, Any]:
     try:
         if service is None:
             service = initialize_service()
-        instances = service.instances()
+        instances = list(service.instances())
         instance_data = {
             "status": "success",
-            "instances": list(instances),
+            "instances": instances,
             "total_instances": len(instances),
         }
         return instance_data
