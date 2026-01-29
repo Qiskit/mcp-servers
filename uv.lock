@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -3864,9 +3864,11 @@ test = [
 
 [[package]]
 name = "qiskit-mcp-servers"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
+    { name = "langchain" },
+    { name = "langchain-mcp-adapters" },
     { name = "qiskit-code-assistant-mcp-server" },
     { name = "qiskit-ibm-runtime-mcp-server" },
     { name = "qiskit-ibm-transpiler-mcp-server" },
@@ -3914,6 +3916,8 @@ examples = [
 
 [package.metadata]
 requires-dist = [
+    { name = "langchain", specifier = ">=1.2.2" },
+    { name = "langchain-mcp-adapters", specifier = ">=0.2.1" },
     { name = "qiskit-code-assistant-mcp-server", editable = "qiskit-code-assistant-mcp-server" },
     { name = "qiskit-code-assistant-mcp-server", marker = "extra == 'all'", editable = "qiskit-code-assistant-mcp-server" },
     { name = "qiskit-code-assistant-mcp-server", marker = "extra == 'code-assistant'", editable = "qiskit-code-assistant-mcp-server" },

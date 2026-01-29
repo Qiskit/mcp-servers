@@ -29,6 +29,8 @@ dependencies = [
     "qiskit-code-assistant-mcp-server>=0.2.0",
     "qiskit-ibm-runtime-mcp-server>=0.3.0",
     "qiskit-ibm-transpiler-mcp-server>=0.2.0",
+    "langchain>=1.2.2",
+    "langchain-mcp-adapters>=0.2.1",
 ]
 
 [project.optional-dependencies]
