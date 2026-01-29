@@ -3335,7 +3335,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bandit", extras = ["toml"], marker = "extra == 'dev'", specifier = ">=1.7.0" },
-    { name = "fastmcp", specifier = ">=2.8.1" },
+    { name = "fastmcp", specifier = ">=2.8.1,<3" },
     { name = "httpx", specifier = ">=0.25.0" },
     { name = "httpx", marker = "extra == 'test'", specifier = ">=0.25.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15.0" },
@@ -3468,7 +3468,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bandit", extras = ["toml"], marker = "extra == 'test'", specifier = ">=1.9.2" },
-    { name = "fastmcp", specifier = ">=2.12.4" },
+    { name = "fastmcp", specifier = ">=2.12.4,<3" },
     { name = "langchain", marker = "extra == 'examples'", specifier = ">=0.3.0" },
     { name = "langchain-anthropic", marker = "extra == 'examples'", specifier = ">=0.3.0" },
     { name = "langchain-mcp-adapters", marker = "extra == 'examples'", specifier = ">=0.1.0" },
@@ -3622,7 +3622,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bandit", extras = ["toml"], marker = "extra == 'dev'", specifier = ">=1.7.0" },
-    { name = "fastmcp", specifier = ">=2.8.1" },
+    { name = "fastmcp", specifier = ">=2.8.1,<3" },
     { name = "langchain", marker = "extra == 'examples'", specifier = ">=1.2.0" },
     { name = "langchain-mcp-adapters", marker = "extra == 'examples'", specifier = ">=0.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15.0" },
@@ -3734,7 +3734,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bandit", extras = ["toml"], marker = "extra == 'test'", specifier = ">=1.9.2" },
-    { name = "fastmcp", specifier = ">=2.12.4" },
+    { name = "fastmcp", specifier = ">=2.12.4,<3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15.0" },
     { name = "nest-asyncio", specifier = ">=1.5.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.4.2" },
@@ -3826,7 +3826,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "bandit", extras = ["toml"], marker = "extra == 'dev'", specifier = ">=1.7.0" },
-    { name = "fastmcp", specifier = ">=2.8.1" },
+    { name = "fastmcp", specifier = ">=2.8.1,<3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15.0" },
     { name = "nest-asyncio", specifier = ">=1.5.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
@@ -3864,7 +3864,7 @@ test = [
 
 [[package]]
 name = "qiskit-mcp-servers"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "qiskit-code-assistant-mcp-server" },

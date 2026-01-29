@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10,<3.14"
 
 dependencies = [
-    "fastmcp>=2.12.4",
+    "fastmcp>=2.12.4,<3",
     "qiskit-gym>=0.3.0",
     "qiskit>=1.3.0",
     "nest-asyncio>=1.5.0",
