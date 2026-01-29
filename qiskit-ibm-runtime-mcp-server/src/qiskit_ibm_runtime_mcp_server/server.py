@@ -335,12 +335,9 @@ async def delete_saved_account_tool(account_name: str) -> dict[str, Any]:
     The operation cannot be undone. Use list_saved_accounts_tool() first to verify
     the account name before deletion.
 
-    Note: The account_name parameter is intentionally required (not optional) as a
-    safety measure to prevent accidental deletion of the default account.
-
     Args:
         account_name: Name of the saved account to delete (e.g., 'ibm_quantum_platform').
-                      Required - use list_saved_accounts_tool() to find available names.
+                      Use list_saved_accounts_tool() to find available names.
     """
     return await delete_saved_account(account_name)
 

@@ -2169,7 +2169,7 @@ c = measure q;
 
 
 @with_sync
-async def delete_saved_account(account_name: str = "") -> dict[str, Any]:
+async def delete_saved_account(account_name: str) -> dict[str, Any]:
     """
     Delete a saved IBM Quantum account from disk.
 
@@ -2178,9 +2178,9 @@ async def delete_saved_account(account_name: str = "") -> dict[str, Any]:
     The operation CANNOT be undone. Deleted credentials must be re-entered to restore access.
 
     Args:
-        account_name: Name of the saved account to delete. If empty string (default),
-                     deletes the default account. Account names are typically in the
-                     format 'ibm_quantum_platform' or custom names set during save.
+        account_name: Name of the saved account to delete. Use list_saved_accounts()
+                     to find available account names. Account names are typically in
+                     the format 'ibm_quantum_platform' or custom names set during save.
 
     Returns:
         Dictionary containing deletion status:

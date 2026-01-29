@@ -1742,21 +1742,6 @@ class TestDeleteSavedAccount:
             assert result["deleted"] is False
             assert "Permission denied" in result["error"]
 
-    @pytest.mark.asyncio
-    async def test_delete_saved_account_default(self):
-        """Test deletion of default account (empty string)."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.delete_account"
-        ) as mock_delete:
-            mock_delete.return_value = True
-
-            result = await delete_saved_account("")
-
-            assert result["status"] == "success"
-            assert result["deleted"] is True
-            mock_delete.assert_called_once_with(name="")
-
-
 class TestListSavedAccounts:
     """Test list_saved_accounts function."""
 
