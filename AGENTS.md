@@ -105,6 +105,7 @@ Each MCP server follows this standard structure:
 │   ├── langchain_agent.ipynb    # Interactive tutorial with step-by-step examples
 │   └── langchain_agent.py       # Command-line agent with multiple LLM provider support
 ├── pyproject.toml               # Project metadata & dependencies
+├── server.json                  # MCP Registry metadata (for publishing)
 ├── pytest.ini                   # pytest configuration (optional)
 ├── LICENSE                      # Apache 2.0 license (copy from root)
 ├── README.md                    # Server-specific documentation
@@ -681,6 +682,48 @@ When adding a new MCP server, you must update the following GitHub configuration
    - `QISKIT_IBM_TOKEN`: IBM Quantum API token for integration tests
    - PyPI trusted publishing is configured (no token needed for publish)
 
+6. **Update `.github/workflows/publish-mcp-registry.yml`**:
+   - Add new option to `workflow_dispatch` inputs
+   - Create a new `publish-<name>-mcp-registry` job (copy from existing)
+   - Uses the same release tag pattern as PyPI publishing
+
+7. **Create `server.json`** for MCP Registry:
+   ```json
+   {
+     "$schema": "https://static.modelcontextprotocol.io/schemas/draft/server.schema.json",
+     "name": "io.github.qiskit/qiskit-<name>-mcp-server",
+     "title": "Qiskit <Name> MCP Server",
+     "description": "Short description (max 100 chars)",
+     "version": "0.1.0",
+     "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-<name>-mcp-server",
+     "repository": {
+       "url": "https://github.com/Qiskit/mcp-servers",
+       "source": "github",
+       "id": "1051018539",
+       "subfolder": "qiskit-<name>-mcp-server"
+     },
+     "packages": [
+       {
+         "registryType": "pypi",
+         "identifier": "qiskit-<name>-mcp-server",
+         "version": "0.1.0",
+         "runtimeHint": "uvx",
+         "transport": {
+           "type": "stdio"
+         },
+         "environmentVariables": [
+           {
+             "name": "QISKIT_IBM_TOKEN",
+             "description": "Your IBM Quantum API token",
+             "isRequired": true,
+             "isSecret": true
+           }
+         ]
+       }
+     ]
+   }
+   ```
+
 ## Common Tasks
 
 ### Building and Testing
@@ -770,6 +813,38 @@ uv publish
 uv publish --repository testpypi
 ```
 
+### Publishing to MCP Registry
+
+Each server is also published to the [MCP Registry](https://registry.modelcontextprotocol.io) for discoverability by MCP clients.
+
+**Automated publishing** (recommended):
+- Publishing happens automatically via GitHub Actions when a release is created
+- Uses the same release tags as PyPI (`qiskit-v*`, `code-assistant*`, `runtime*`, `transpiler*`, `gym*`)
+- Uses GitHub OIDC authentication (no secrets required)
+
+**Manual publishing**:
+```bash
+# Trigger via GitHub Actions
+gh workflow run "Publish to MCP Registry" -f package=all
+
+# Or publish a specific server
+gh workflow run "Publish to MCP Registry" -f package=qiskit
+```
+
+**server.json configuration**:
+Each server has a `server.json` file that defines its MCP Registry metadata:
+- `name`: Reverse-DNS format (`io.github.qiskit/server-name`)
+- `description`: Short description (max 100 characters)
+- `version`: Must match the version in `pyproject.toml`
+- `packages`: PyPI package configuration with environment variables
+- `repository`: GitHub repository metadata with subfolder path
+
+**When releasing a new version**:
+1. Update version in `pyproject.toml`
+2. Update version in `server.json` (must match)
+3. Create and push release tag
+4. Both PyPI and MCP Registry workflows trigger automatically
+
 ## Documentation Structure
 
 ### Repository-Level Documentation
@@ -794,6 +869,7 @@ uv publish --repository testpypi
 - `.github/ISSUE_TEMPLATE/feature_request.md`: Feature request template
 - `.github/workflows/test.yml`: CI workflow (lint + test all servers)
 - `.github/workflows/publish-pypi.yml`: PyPI publishing workflow
+- `.github/workflows/publish-mcp-registry.yml`: MCP Registry publishing workflow
 
 ## Important Constraints
 
@@ -897,7 +973,8 @@ qiskit-mcp-servers/
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
 │       ├── test.yml                     # CI: lint + test all servers
-│       └── publish-pypi.yml             # CD: publish to PyPI on release
+│       ├── publish-pypi.yml             # CD: publish to PyPI on release
+│       └── publish-mcp-registry.yml     # CD: publish to MCP Registry on release
 ├── qiskit-mcp-server/
 │   ├── src/qiskit_mcp_server/
 │   │   ├── __init__.py
@@ -913,6 +990,7 @@ qiskit-mcp-servers/
 │   │   ├── langchain_agent.ipynb
 │   │   └── langchain_agent.py
 │   ├── pyproject.toml
+│   ├── server.json                      # MCP Registry metadata
 │   ├── LICENSE
 │   ├── README.md
 │   └── run_tests.sh

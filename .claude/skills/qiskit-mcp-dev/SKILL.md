@@ -138,7 +138,11 @@ When creating a new server `qiskit-<name>-mcp-server`:
    - Add to `workflow_dispatch` options
    - Add `publish-<name>` job
    - Add to `publish-meta-package` needs array
-6. **Update documentation** - README.md, AGENTS.md
+6. **Update MCP Registry CD** - `.github/workflows/publish-mcp-registry.yml`:
+   - Add to `workflow_dispatch` options
+   - Add `publish-<name>-mcp-registry` job
+7. **Create server.json** for MCP Registry (see template in AGENTS.md)
+8. **Update documentation** - README.md, AGENTS.md
 
 ## Server Structure
 
@@ -156,6 +160,7 @@ qiskit-<name>-mcp-server/
 │   ├── langchain_agent.ipynb    # Jupyter notebook tutorial
 │   └── langchain_agent.py       # CLI agent example
 ├── pyproject.toml
+├── server.json          # MCP Registry metadata
 ├── pytest.ini           # (optional) pytest configuration
 ├── .env.example         # (optional) Environment variable template
 ├── LICENSE              # Apache 2.0 license (copy from root)
@@ -173,6 +178,8 @@ qiskit-<name>-mcp-server/
 | Test fixtures | `tests/conftest.py` | `@pytest.fixture` |
 | Unit tests | `tests/test_*.py` | `@pytest.mark.asyncio` |
 | New server CI | `.github/workflows/test.yml` | Add lint steps + test job |
-| New server CD | `.github/workflows/publish-pypi.yml` | Add publish job |
+| New server CD (PyPI) | `.github/workflows/publish-pypi.yml` | Add publish job |
+| New server CD (MCP) | `.github/workflows/publish-mcp-registry.yml` | Add publish job |
+| MCP Registry metadata | `server.json` | JSON with name, version, packages |
 
 For comprehensive documentation, read [AGENTS.md](AGENTS.md) in the repository root.

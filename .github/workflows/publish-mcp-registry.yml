@@ -1,0 +1,145 @@
+name: Publish to MCP Registry
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to publish to MCP Registry'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - qiskit
+          - code-assistant
+          - runtime
+          - transpiler
+          - gym
+
+jobs:
+  publish-qiskit-mcp-registry:
+    if: |
+      (github.event_name == 'release' && contains(github.ref, 'qiskit-v')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'qiskit'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for GitHub OIDC authentication
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download mcp-publisher
+      run: |
+        curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+        sudo mv mcp-publisher /usr/local/bin/
+        mcp-publisher --help
+
+    - name: Login to MCP Registry (OIDC)
+      run: mcp-publisher login github-oidc
+
+    - name: Publish to MCP Registry
+      working-directory: ./qiskit-mcp-server
+      run: mcp-publisher publish
+
+  publish-code-assistant-mcp-registry:
+    if: |
+      (github.event_name == 'release' && contains(github.ref, 'code-assistant')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'code-assistant'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for GitHub OIDC authentication
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download mcp-publisher
+      run: |
+        curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+        sudo mv mcp-publisher /usr/local/bin/
+        mcp-publisher --help
+
+    - name: Login to MCP Registry (OIDC)
+      run: mcp-publisher login github-oidc
+
+    - name: Publish to MCP Registry
+      working-directory: ./qiskit-code-assistant-mcp-server
+      run: mcp-publisher publish
+
+  publish-runtime-mcp-registry:
+    if: |
+      (github.event_name == 'release' && contains(github.ref, 'runtime')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'runtime'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for GitHub OIDC authentication
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download mcp-publisher
+      run: |
+        curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+        sudo mv mcp-publisher /usr/local/bin/
+        mcp-publisher --help
+
+    - name: Login to MCP Registry (OIDC)
+      run: mcp-publisher login github-oidc
+
+    - name: Publish to MCP Registry
+      working-directory: ./qiskit-ibm-runtime-mcp-server
+      run: mcp-publisher publish
+
+  publish-transpiler-mcp-registry:
+    if: |
+      (github.event_name == 'release' && contains(github.ref, 'transpiler')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'transpiler'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for GitHub OIDC authentication
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download mcp-publisher
+      run: |
+        curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+        sudo mv mcp-publisher /usr/local/bin/
+        mcp-publisher --help
+
+    - name: Login to MCP Registry (OIDC)
+      run: mcp-publisher login github-oidc
+
+    - name: Publish to MCP Registry
+      working-directory: ./qiskit-ibm-transpiler-mcp-server
+      run: mcp-publisher publish
+
+  publish-gym-mcp-registry:
+    if: |
+      (github.event_name == 'release' && contains(github.ref, 'gym')) ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'gym'))
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for GitHub OIDC authentication
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download mcp-publisher
+      run: |
+        curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+        sudo mv mcp-publisher /usr/local/bin/
+        mcp-publisher --help
+
+    - name: Login to MCP Registry (OIDC)
+      run: mcp-publisher login github-oidc
+
+    - name: Publish to MCP Registry
+      working-directory: ./qiskit-gym-mcp-server
+      run: mcp-publisher publish
