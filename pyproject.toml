@@ -1,6 +1,6 @@
 [project]
 name = "qiskit-mcp-servers"
-version = "0.2.2"
+version = "0.4.0"
 description = "Model Context Protocol servers for IBM Quantum services and Qiskit"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -27,7 +27,7 @@ classifiers = [
 dependencies = [
     "qiskit-mcp-server>=0.1.0",
     "qiskit-code-assistant-mcp-server>=0.2.0",
-    "qiskit-ibm-runtime-mcp-server>=0.2.0",
+    "qiskit-ibm-runtime-mcp-server>=0.3.0",
     "qiskit-ibm-transpiler-mcp-server>=0.2.0",
 ]
 
@@ -37,12 +37,19 @@ qiskit = ["qiskit-mcp-server>=0.1.0"]
 code-assistant = ["qiskit-code-assistant-mcp-server>=0.2.0"]
 runtime = ["qiskit-ibm-runtime-mcp-server>=0.2.0"]
 transpiler = ["qiskit-ibm-transpiler-mcp-server>=0.2.0"]
-# Install all servers (same as default dependencies)
+gym = ["qiskit-gym-mcp-server>=0.1.0"]
+# Install all servers (core + community)
 all = [
     "qiskit-mcp-server>=0.1.0",
     "qiskit-code-assistant-mcp-server>=0.2.0",
-    "qiskit-ibm-runtime-mcp-server>=0.2.0",
+    "qiskit-ibm-runtime-mcp-server>=0.3.0",
     "qiskit-ibm-transpiler-mcp-server>=0.2.0",
+    "qiskit-gym-mcp-server>=0.1.0",
+]
+
+# Community servers
+community = [
+    "qiskit-gym-mcp-server>=0.1.0",
 ]
 
 [project.urls]
@@ -65,6 +72,7 @@ members = [
     "qiskit-code-assistant-mcp-server",
     "qiskit-ibm-runtime-mcp-server",
     "qiskit-ibm-transpiler-mcp-server",
+    "qiskit-gym-mcp-server",
 ]
 
 # Source configuration for workspace dependencies
@@ -73,6 +81,7 @@ qiskit-mcp-server = { workspace = true }
 qiskit-code-assistant-mcp-server = { workspace = true }
 qiskit-ibm-runtime-mcp-server = { workspace = true }
 qiskit-ibm-transpiler-mcp-server = { workspace = true }
+qiskit-gym-mcp-server = { workspace = true }
 
 # Shared tool configurations
 [tool.ruff]
@@ -84,7 +93,7 @@ extend = "ruff.toml"
 # Note: mypy doesn't support extend in pyproject.toml, see mypy.ini
 
 [tool.pytest.ini_options]
-testpaths = ["qiskit-mcp-server/tests", "qiskit-code-assistant-mcp-server/tests", "qiskit-ibm-runtime-mcp-server/tests", "qiskit-ibm-transpiler-mcp-server/tests"]
+testpaths = ["qiskit-mcp-server/tests", "qiskit-code-assistant-mcp-server/tests", "qiskit-ibm-runtime-mcp-server/tests", "qiskit-ibm-transpiler-mcp-server/tests", "qiskit-gym-mcp-server/tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
@@ -110,6 +119,7 @@ source = [
     "qiskit-code-assistant-mcp-server/src",
     "qiskit-ibm-runtime-mcp-server/src",
     "qiskit-ibm-transpiler-mcp-server/src",
+    "qiskit-gym-mcp-server/src",
 ]
 omit = [
     "*/tests/*",

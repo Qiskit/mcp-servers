@@ -9,7 +9,7 @@ A Model Context Protocol (MCP) server that provides quantum circuit transpilatio
 - **Topology Support**: Built-in support for linear, ring, grid, and custom coupling maps
 - **Circuit Analysis**: Analyze circuit complexity without transpilation
 - **Optimization Comparison**: Compare results across all optimization levels
-- **Dual API**: Supports both async (MCP) and sync (DSPy, Jupyter, scripts) usage
+- **Dual API**: Supports both async (MCP) and sync (Jupyter, scripts) usage
 
 ## Prerequisites
 
@@ -124,7 +124,7 @@ transpiled_qpy = result["transpiled_circuit"]["circuit_qpy"]
 result2 = await transpile_circuit(transpiled_qpy, circuit_format="qpy", optimization_level=3)
 ```
 
-### Sync Usage (DSPy, Jupyter, Scripts)
+### Sync Usage (Scripts, Jupyter)
 
 ```python
 from qiskit_mcp_server.transpiler import transpile_circuit, analyze_circuit
@@ -150,6 +150,62 @@ for level in range(4):
     result = comparison['optimization_results'][f'level_{level}']
     print(f"Level {level}: depth={result['depth']}, size={result['size']}")
 ```
+
+**LangChain Integration Example:**
+
+> **Note:** To run LangChain examples you will need to install the dependencies:
+> ```bash
+> pip install langchain langchain-mcp-adapters langchain-openai python-dotenv
+> ```
+
+```python
+import asyncio
+import os
+from langchain.agents import create_agent
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+
+# Load environment variables (OPENAI_API_KEY, etc.)
+load_dotenv()
+
+# Sample Bell state circuit
+SAMPLE_BELL = """
+OPENQASM 3.0;
+include "stdgates.inc";
+qubit[2] q;
+h q[0];
+cx q[0], q[1];
+"""
+
+async def main():
+    # Configure MCP client
+    mcp_client = MultiServerMCPClient({
+        "qiskit": {
+            "transport": "stdio",
+            "command": "qiskit-mcp-server",
+            "args": [],
+            "env": {},
+        }
+    })
+
+    # Use persistent session for efficient tool calls
+    async with mcp_client.session("qiskit") as session:
+        tools = await load_mcp_tools(session)
+
+        # Create agent with LLM
+        llm = ChatOpenAI(model="gpt-5.2", temperature=0)
+        agent = create_agent(llm, tools)
+
+        # Run a query
+        response = await agent.ainvoke(f"Transpile this circuit for IBM Heron: {SAMPLE_BELL}")
+        print(response)
+
+asyncio.run(main())
+```
+
+For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed examples including Jupyter notebooks, see the [examples/](examples/) directory.
 
 ## API Reference
 

@@ -40,11 +40,11 @@ The agent can:
 
 | Provider | Package | Default Model | API Key Required |
 |----------|---------|---------------|------------------|
-| OpenAI | `langchain-openai` | gpt-4o | Yes (`OPENAI_API_KEY`) |
-| Anthropic | `langchain-anthropic` | claude-sonnet-4-20250514 | Yes (`ANTHROPIC_API_KEY`) |
-| Google | `langchain-google-genai` | gemini-2.5-pro | Yes (`GOOGLE_API_KEY`) |
-| Ollama | `langchain-ollama` | llama3.2 | No (runs locally) |
-| Watsonx | `langchain-ibm` | ibm/granite-3-8b-instruct | Yes (`WATSONX_APIKEY`, `WATSONX_PROJECT_ID`) |
+| OpenAI | `langchain-openai` | gpt-5.2 | Yes (`OPENAI_API_KEY`) |
+| Anthropic | `langchain-anthropic` | claude-sonnet-4-5-20250929 | Yes (`ANTHROPIC_API_KEY`) |
+| Google | `langchain-google-genai` | gemini-3-pro-preview | Yes (`GOOGLE_API_KEY`) |
+| Ollama | `langchain-ollama` | llama3.3 | No (runs locally) |
+| Watsonx | `langchain-ibm` | ibm/granite-4-h-small | Yes (`WATSONX_APIKEY`, `WATSONX_PROJECT_ID`) |
 
 ### Architecture
 
@@ -148,8 +148,8 @@ python langchain_agent.py --provider google
 
 ```bash
 # First, make sure Ollama is running with a model pulled
-# ollama pull llama3.2
-python langchain_agent.py --provider ollama --model llama3.2
+# ollama pull llama3.3
+python langchain_agent.py --provider ollama --model llama3.3
 ```
 
 **With IBM Watsonx:**
@@ -157,7 +157,7 @@ python langchain_agent.py --provider ollama --model llama3.2
 ```bash
 python langchain_agent.py --provider watsonx
 # Or with a specific model
-python langchain_agent.py --provider watsonx --model ibm/granite-3-8b-instruct
+python langchain_agent.py --provider watsonx --model ibm/granite-4-h-small
 ```
 
 **Single query mode:**
@@ -252,7 +252,7 @@ async def create_custom_agent():
         # Custom system prompt
         system_prompt = "You are a quantum computing expert assistant..."
 
-        llm = ChatOpenAI(model="gpt-4o", temperature=0)
+        llm = ChatOpenAI(model="gpt-5.2", temperature=0)
         agent = create_agent(llm, tools, system_prompt=system_prompt)
 
         # Use the agent within the session context

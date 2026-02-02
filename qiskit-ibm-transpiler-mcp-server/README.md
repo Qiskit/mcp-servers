@@ -49,7 +49,7 @@ uv run qiskit-ibm-transpiler-mcp-server
 The server will start and listen for MCP connections.
 
 
-### Sync Usage (DSPy, Scripts, Jupyter)
+### Sync Usage (Scripts, Jupyter)
 
 For frameworks that don't support async operations:
 
@@ -71,7 +71,7 @@ qasm_string = "your_qasm_circuit_here"
 # Will use saved credentials or environment variable if token not provided
 setup_ibm_quantum_account.sync()
 
-# Works in Jupyter notebooks and DSPy agents
+# Works in Jupyter notebooks
 # 3. AI Clifford Synthesis
 
 # 3.1 AI Routing [Optional]
@@ -95,47 +95,64 @@ if conversion["status"] == "success":
     print(f"Human-readable circuit:\n{conversion['qasm3']}")
 ```
 
-**DSPy Integration Example:**
-> _**Note**: to launch the DSPy script you will need to have [`dspy`](https://dspy.ai) installed_ 
+**LangChain Integration Example:**
+
+> **Note:** To run LangChain examples you will need to install the dependencies:
+> ```bash
+> pip install langchain langchain-mcp-adapters langchain-openai python-dotenv
+> ```
+
 ```python
-import dspy
-
+import asyncio
+import os
+from langchain.agents import create_agent
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-from qiskit_ibm_transpiler_mcp_server.qta import (
-    ai_clifford_synthesis,
-    ai_routing,
-    ai_linear_function_synthesis,
-    ai_pauli_network_synthesis,
-    ai_permutation_synthesis
-)
-from qiskit_ibm_transpiler_mcp_server.utils import setup_ibm_quantum_account
 
-
-# Load environment variables (includes QISKIT_IBM_TOKEN)
+# Load environment variables (QISKIT_IBM_TOKEN, OPENAI_API_KEY, etc.)
 load_dotenv()
 
-lm = dspy.LM("your_llm_model_here", api_base="http://localhost:11434", api_key=None)
-dspy.configure(lm=lm)
+# Sample Clifford circuit
+SAMPLE_CLIFFORD = """
+OPENQASM 3.0;
+include "stdgates.inc";
+qubit[3] q;
+h q[0];
+cx q[0], q[1];
+s q[2];
+"""
 
-# The agent will automatically use saved credentials or environment variables
-# No need to explicitly pass tokens to individual functions
-agent = dspy.ReAct(
-    "question -> answer",
-    tools=[
-        setup_ibm_quantum_account.sync,
-        ai_routing.sync,
-        ai_clifford_synthesis.sync,
-        ai_linear_function_synthesis.sync,
-        ai_pauli_network_synthesis.sync,
-        ai_permutation_synthesis.sync
-    ]
-)
+async def main():
+    # Configure MCP client
+    mcp_client = MultiServerMCPClient({
+        "qiskit-ibm-transpiler": {
+            "transport": "stdio",
+            "command": "qiskit-ibm-transpiler-mcp-server",
+            "args": [],
+            "env": {
+                "QISKIT_IBM_TOKEN": os.getenv("QISKIT_IBM_TOKEN", ""),
+            },
+        }
+    })
 
-# load your Quantum Circuit to be synthesized as QASM 3.0 string
-qasm_string = "your_qasm_string_here"
-result = agent(question=f"Can you synthesize the given QASM Clifford Quantum circuit using ibm_fez backend? This is the QASM string {qasm_string}")
-print(result)
+    # Use persistent session for efficient tool calls
+    async with mcp_client.session("qiskit-ibm-transpiler") as session:
+        tools = await load_mcp_tools(session)
+
+        # Create agent with LLM
+        llm = ChatOpenAI(model="gpt-5.2", temperature=0)
+        agent = create_agent(llm, tools)
+
+        # Run a query
+        response = await agent.ainvoke(f"Synthesize this Clifford circuit for ibm_fez: {SAMPLE_CLIFFORD}")
+        print(response)
+
+asyncio.run(main())
 ```
+
+For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed examples including Jupyter notebooks, see the [examples/](examples/) directory.
 
 ### Other ways of testing and debugging the server
 1. From a terminal, go into the cloned repo directory 

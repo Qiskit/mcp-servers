@@ -43,7 +43,7 @@ Usage:
     python langchain_agent.py --provider anthropic
 
     # With Ollama (local, no API key needed)
-    python langchain_agent.py --provider ollama --model llama3.2
+    python langchain_agent.py --provider ollama --model llama3.3
 
     # With Google
     export GOOGLE_API_KEY="your-api-key"
@@ -117,28 +117,28 @@ def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
             from langchain_openai import ChatOpenAI
         except ImportError:
             raise ValueError("Install langchain-openai: pip install langchain-openai")
-        return ChatOpenAI(model=model or "gpt-4o", temperature=0)
+        return ChatOpenAI(model=model or "gpt-5.2", temperature=0)
 
     elif provider == "anthropic":
         try:
             from langchain_anthropic import ChatAnthropic
         except ImportError:
             raise ValueError("Install langchain-anthropic: pip install langchain-anthropic")
-        return ChatAnthropic(model=model or "claude-sonnet-4-20250514", temperature=0)
+        return ChatAnthropic(model=model or "claude-sonnet-4-5-20250929", temperature=0)
 
     elif provider == "ollama":
         try:
             from langchain_ollama import ChatOllama
         except ImportError:
             raise ValueError("Install langchain-ollama: pip install langchain-ollama")
-        return ChatOllama(model=model or "llama3.2", temperature=0)
+        return ChatOllama(model=model or "llama3.3", temperature=0)
 
     elif provider == "google":
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
         except ImportError:
             raise ValueError("Install langchain-google-genai: pip install langchain-google-genai")
-        return ChatGoogleGenerativeAI(model=model or "gemini-2.5-pro", temperature=0)
+        return ChatGoogleGenerativeAI(model=model or "gemini-3-pro-preview", temperature=0)
 
     elif provider == "watsonx":
         try:
@@ -146,7 +146,7 @@ def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
         except ImportError:
             raise ValueError("Install langchain-ibm: pip install langchain-ibm")
         return ChatWatsonx(
-            model_id=model or "ibm/granite-3-8b-instruct",
+            model_id=model or "ibm/granite-4-h-small",
             url=os.getenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com"),
             project_id=os.getenv("WATSONX_PROJECT_ID"),
             params={
@@ -418,7 +418,7 @@ Examples:
   python langchain_agent.py --provider anthropic
 
   # Local Ollama
-  python langchain_agent.py --provider ollama --model llama3.2
+  python langchain_agent.py --provider ollama --model llama3.3
 
   # Google Gemini
   python langchain_agent.py --provider google

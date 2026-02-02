@@ -1,43 +1,57 @@
 [project]
-name = "qiskit-mcp-server"
+name = "qiskit-gym-mcp-server"
 version = "0.1.0"
-description = "MCP server for Qiskit quantum computing capabilities with circuit serialization utilities"
+description = "MCP server for qiskit-gym reinforcement learning quantum circuit synthesis"
 readme = "README.md"
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.10,<3.14"
+
 dependencies = [
-    "fastmcp>=2.8.1,<3",
+    "fastmcp>=2.12.4,<3",
+    "qiskit-gym>=0.3.0",
     "qiskit>=1.3.0",
-    "qiskit-qasm3-import>=0.5.0",
-    "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
     "nest-asyncio>=1.5.0",
+    "qiskit-mcp-server",
+    "pydantic>=2.0.0",
+    "qiskit-ibm-runtime>=0.34.0",  # For fake backends (exact IBM topologies without credentials)
 ]
+
+[tool.uv.sources]
+qiskit-mcp-server = { workspace = true }
 
 [project.optional-dependencies]
 dev = [
     "ruff>=0.11.13",
-    "mypy>=1.15.0",
-    "pre-commit>=3.5.0",
-    "bandit[toml]>=1.7.0",
+    "mypy>=1.15.0"
 ]
+
 test = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-mock>=3.11.0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-mock>=3.15.1",
     "pytest-cov>=4.1.0",
+    "bandit[toml]>=1.9.2"
 ]
+
+examples = [
+    "langchain>=0.3.0",
+    "langchain-anthropic>=0.3.0",
+    "langchain-mcp-adapters>=0.1.0",
+    "python-dotenv>=1.0.0",
+]
+
 all = [
-    "qiskit-mcp-server[dev,test]",
+    "qiskit-gym-mcp-server[dev,test,examples]",
 ]
 
 [[project.authors]]
-name = "Quantum+AI Team. IBM Quantum"
-email = "Quantum.Plus.AI@ibm.com"
+name = "Qiskit Community"
+email = "qiskit@us.ibm.com"
 
 [project.license]
 text = "Apache-2.0"
 
-keywords = ["quantum", "qiskit", "mcp", "ai", "quantum-computing", "transpiler", "qpy", "qasm"]
+keywords = ["quantum", "qiskit", "ibm", "mcp", "ai", "quantum-computing", "reinforcement-learning", "circuit-synthesis"]
+
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -47,7 +61,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
@@ -55,7 +68,7 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/Qiskit/mcp-servers"
 Repository = "https://github.com/Qiskit/mcp-servers"
-Documentation = "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-mcp-server#readme"
+Documentation = "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-gym-mcp-server#readme"
 "Bug Tracker" = "https://github.com/Qiskit/mcp-servers/issues"
 
 [build-system]
@@ -63,10 +76,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/qiskit_mcp_server"]
+packages = ["src/qiskit_gym_mcp_server"]
+include = ["src/qiskit_gym_mcp_server/py.typed"]
 
 [project.scripts]
-qiskit-mcp-server = "qiskit_mcp_server:main"
+qiskit-gym-mcp-server = "qiskit_gym_mcp_server:main"
 
 [dependency-groups]
 dev = [
@@ -75,27 +89,21 @@ dev = [
     "bandit[toml]>=1.9.2",
 ]
 test = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-mock>=3.11.0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-mock>=3.15.1",
     "pytest-cov>=4.1.0",
 ]
 examples = [
-    "langchain>=1.2.0",
+    "langchain>=0.3.0",
+    "langchain-anthropic>=0.3.0",
     "langchain-mcp-adapters>=0.1.0",
-    "langchain-anthropic>=1.0.0",
     "python-dotenv>=1.0.0",
 ]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = "test_*.py"
-python_classes = "Test*"
-python_functions = "test_*"
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
-
 # Bandit security configuration
 [tool.bandit]
-skips = ["B101"]  # Skip assert_used check in tests
+skips = [
+    "B101",  # Skip assert_used check (used for type narrowing)
+]
 exclude_dirs = ["tests", ".venv", "build", "dist"]

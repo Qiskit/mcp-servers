@@ -142,7 +142,7 @@ cancelled_job = await cancel_job("job_id")
 print(f"Cancelled job: {cancelled_job}")
 ```
 
-#### Sync Usage (DSPy, Scripts, Jupyter)
+#### Sync Usage (Scripts, Jupyter)
 
 For frameworks that don't support async operations, all async functions have a `.sync` attribute:
 
@@ -186,40 +186,55 @@ jobs = list_my_jobs.sync(limit=5)
 print(f"Recent jobs: {len(jobs['jobs'])}")
 ```
 
-**DSPy Integration Example:**
+**LangChain Integration Example:**
+
+> **Note:** To run LangChain examples you will need to install the dependencies:
+> ```bash
+> pip install langchain langchain-mcp-adapters langchain-openai python-dotenv
+> ```
 
 ```python
-import dspy
+import asyncio
+import os
+from langchain.agents import create_agent
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
-    setup_ibm_quantum_account,
-    list_backends,
-    least_busy_backend,
-    get_backend_properties,
-    get_coupling_map,
-    find_optimal_qubit_chains,
-    find_optimal_qv_qubits
-)
 
-# Load environment variables (includes QISKIT_IBM_TOKEN)
+# Load environment variables (QISKIT_IBM_TOKEN, OPENAI_API_KEY, etc.)
 load_dotenv()
 
-# Use .sync versions for DSPy tools
-agent = dspy.ReAct(
-    YourSignature,
-    tools=[
-        setup_ibm_quantum_account.sync,  # Optional - only if you need to verify setup
-        list_backends.sync,
-        least_busy_backend.sync,
-        get_backend_properties.sync,
-        get_coupling_map.sync,  # Works with fake backends too (no credentials needed)
-        find_optimal_qubit_chains.sync,  # Find best linear qubit chains
-        find_optimal_qv_qubits.sync  # Find best qubits for Quantum Volume
-    ]
-)
+async def main():
+    # Configure MCP client
+    mcp_client = MultiServerMCPClient({
+        "qiskit-ibm-runtime": {
+            "transport": "stdio",
+            "command": "qiskit-ibm-runtime-mcp-server",
+            "args": [],
+            "env": {
+                "QISKIT_IBM_TOKEN": os.getenv("QISKIT_IBM_TOKEN", ""),
+                "QISKIT_IBM_RUNTIME_MCP_INSTANCE": os.getenv("QISKIT_IBM_RUNTIME_MCP_INSTANCE", ""),
+            },
+        }
+    })
 
-result = agent(user_request="What QPUs are available?")
+    # Use persistent session for efficient tool calls
+    async with mcp_client.session("qiskit-ibm-runtime") as session:
+        tools = await load_mcp_tools(session)
+
+        # Create agent with LLM
+        llm = ChatOpenAI(model="gpt-5.2", temperature=0)
+        agent = create_agent(llm, tools)
+
+        # Run a query
+        response = await agent.ainvoke("What QPUs are available and which one is least busy?")
+        print(response)
+
+asyncio.run(main())
 ```
+
+For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed examples including Jupyter notebooks, see the [examples/](examples/) directory.
 
 
 ## API Reference
@@ -247,8 +262,9 @@ Get list of available quantum backends.
 - Number of qubits, coupling map
 - Simulator vs. hardware designation
 
-### `least_busy_backend()`
-Get the current least busy IBM Quantum backend available
+#### `least_busy_backend()`
+Get the current least busy IBM Quantum backend available.
+
 **Returns:** The backend with the fewest number of pending jobs
 
 #### `get_backend_properties(backend_name: str)`
@@ -397,6 +413,66 @@ Cancel a running or queued job.
 
 **Parameters:**
 - `job_id`: The ID of the job to cancel
+
+#### `list_saved_accounts()`
+List all IBM Quantum accounts saved on disk.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `accounts`: Dictionary of saved accounts (keyed by account name)
+- Each account contains: channel, url, token (masked for security)
+- `message`: Status message
+
+**Note:** Tokens are masked in the response, showing only the last 4 characters.
+
+#### `delete_saved_account(account_name: str)`
+Delete a saved IBM Quantum account from disk.
+
+**WARNING:** This permanently removes credentials from `~/.qiskit/qiskit-ibm.json`. The operation cannot be undone.
+
+**Parameters:**
+- `account_name`: Name of the saved account to delete. Use `list_saved_accounts()` to find available names.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `deleted`: Boolean indicating if deletion was successful
+- `message` or `error`: Status message
+
+#### `active_account_info()`
+Get information about the currently active IBM Quantum account.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `account_info`: Account details including channel, url, token (masked for security)
+
+**Note:** Tokens are masked in the response, showing only the last 4 characters.
+
+#### `active_instance_info()`
+Get the Cloud Resource Name (CRN) of the currently active instance.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `instance_crn`: The CRN string identifying the active instance
+
+#### `available_instances()`
+List all IBM Quantum instances available to the active account.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `instances`: List of available instances with CRN, plan, name, and pricing info
+- `total_instances`: Count of available instances
+
+#### `usage_info()`
+Get usage statistics and quota information for the active instance.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `usage`: Usage metrics including:
+  - `usage_consumed_seconds`: Time consumed this period
+  - `usage_limit_seconds`: Total quota for the period
+  - `usage_remaining_seconds`: Remaining quota
+  - `usage_limit_reached`: Boolean indicating if limit is reached
+  - `usage_period`: Current billing period
 
 
 ### Resources

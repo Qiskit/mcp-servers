@@ -32,9 +32,11 @@ from fastmcp import FastMCP
 from qiskit_mcp_server.circuit_serialization import CircuitFormat
 
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
+    active_account_info,
+    active_instance_info,
+    available_instances,
+    delete_saved_account,
     DDSequenceType,
-    QVScoringMetric,
-    ScoringMetric,
     cancel_job,
     find_optimal_qubit_chains,
     find_optimal_qv_qubits,
@@ -51,8 +53,12 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     least_busy_backend,
     list_backends,
     list_my_jobs,
+    list_saved_accounts,
+    QVScoringMetric,
     run_sampler,
     setup_ibm_quantum_account,
+    ScoringMetric,
+    usage_info,
 )
 
 
@@ -319,6 +325,75 @@ async def get_job_results_tool(job_id: str) -> dict[str, Any]:
 async def cancel_job_tool(job_id: str) -> dict[str, Any]:
     """Cancel a specific job."""
     return await cancel_job(job_id)
+
+
+@mcp.tool()
+async def delete_saved_account_tool(account_name: str) -> dict[str, Any]:
+    """Delete a saved IBM Quantum account from disk.
+
+    WARNING: This permanently removes credentials from ~/.qiskit/qiskit-ibm.json.
+    The operation cannot be undone. Use list_saved_accounts_tool() first to verify
+    the account name before deletion.
+
+    Args:
+        account_name: Name of the saved account to delete (e.g., 'ibm_quantum_platform').
+                      Use list_saved_accounts_tool() to find available names.
+    """
+    return await delete_saved_account(account_name)
+
+
+@mcp.tool()
+async def list_saved_accounts_tool() -> dict[str, Any]:
+    """List all IBM Quantum accounts saved on disk.
+
+    Returns account information from ~/.qiskit/qiskit-ibm.json including account names
+    and channels. Useful for checking available accounts before initializing the service
+    or before deleting an account. Tokens are masked for security.
+    """
+    return await list_saved_accounts()
+
+
+@mcp.tool()
+async def active_account_info_tool() -> dict[str, Any]:
+    """Get information about the currently active IBM Quantum account.
+
+    Returns details about the account being used in the current session, including
+    channel, instance, and name. This is the account used for all quantum operations.
+    Tokens are masked for security.
+    """
+    return await active_account_info()
+
+
+@mcp.tool()
+async def active_instance_info_tool() -> dict[str, Any]:
+    """Get the Cloud Resource Name (CRN) of the currently active instance.
+
+    Returns the instance identifier determining which quantum backends and resources
+    are accessible. Important for users with access to multiple instances.
+    """
+    return await active_instance_info()
+
+
+@mcp.tool()
+async def available_instances_tool() -> dict[str, Any]:
+    """List all IBM Quantum instances available to the active account.
+
+    Returns information about all instances (organizations, projects, or service plans)
+    the user has access to, including CRN, plan type, and name. Each instance provides
+    access to different quantum backends with different quotas.
+    """
+    return await available_instances()
+
+
+@mcp.tool()
+async def usage_info_tool() -> dict[str, Any]:
+    """Get usage statistics and quota information for the active instance.
+
+    Returns detailed metrics including job counts, quantum runtime consumption,
+    quota limits, and billing period information. Useful for monitoring resource
+    utilization and planning job submissions.
+    """
+    return await usage_info()
 
 
 @mcp.tool()
