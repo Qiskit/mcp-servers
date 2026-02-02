@@ -1,6 +1,6 @@
-# Publishing to PyPI
+# Publishing Guide
 
-This guide covers how to publish the Qiskit MCP servers to PyPI, both manually and via automated workflows.
+This guide covers how to publish the Qiskit MCP servers to PyPI and the MCP Registry.
 
 ## Packages
 
@@ -401,6 +401,7 @@ The current version for each package is defined in their respective `pyproject.t
 Before publishing, ensure:
 
 - [ ] Version number updated in `pyproject.toml`
+- [ ] Version number updated in `server.json` (must match `pyproject.toml`)
 - [ ] All tests pass: `./run_tests.sh`
 - [ ] Code is formatted: `uv run ruff format`
 - [ ] Linting passes: `uv run ruff check`
@@ -439,9 +440,73 @@ cd qiskit-mcp-server  # or qiskit-code-assistant-mcp-server, qiskit-ibm-runtime-
 uv build
 ```
 
+## MCP Registry Publishing
+
+In addition to PyPI, servers are also published to the [MCP Registry](https://registry.modelcontextprotocol.io) for discoverability by MCP clients.
+
+### Automated Publishing
+
+MCP Registry publishing is automated via GitHub Actions and triggers alongside PyPI publishing:
+
+- **Workflow**: `.github/workflows/publish-mcp-registry.yml`
+- **Authentication**: GitHub OIDC (no secrets required)
+- **Trigger**: Same release tags as PyPI (`qiskit-v*`, `code-assistant-v*`, etc.)
+
+When you create a GitHub release, both workflows trigger automatically:
+1. `publish-pypi.yml` → publishes to PyPI
+2. `publish-mcp-registry.yml` → publishes to MCP Registry
+
+### Manual Trigger
+
+```bash
+# Publish all servers to MCP Registry
+gh workflow run "Publish to MCP Registry" -f package=all
+
+# Publish specific server
+gh workflow run "Publish to MCP Registry" -f package=qiskit
+gh workflow run "Publish to MCP Registry" -f package=code-assistant
+gh workflow run "Publish to MCP Registry" -f package=runtime
+gh workflow run "Publish to MCP Registry" -f package=transpiler
+gh workflow run "Publish to MCP Registry" -f package=gym
+```
+
+### server.json Configuration
+
+Each server has a `server.json` file that defines its MCP Registry metadata:
+
+```json
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/draft/server.schema.json",
+  "name": "io.github.qiskit/qiskit-<name>-mcp-server",
+  "title": "Human-readable title",
+  "description": "Short description (max 100 chars)",
+  "version": "0.1.0",
+  "packages": [...]
+}
+```
+
+**Important**: When releasing a new version, update both:
+1. `pyproject.toml` - version field
+2. `server.json` - version field (must match)
+
+### Validating server.json
+
+Before committing, validate against the schema:
+
+```bash
+npx ajv-cli validate -s /tmp/server.schema.json -d server.json --spec=draft7 --strict=false
+```
+
+Or download the schema first:
+```bash
+curl -sS "https://raw.githubusercontent.com/modelcontextprotocol/registry/main/docs/reference/server-json/server.schema.json" -o /tmp/server.schema.json
+```
+
 ## Resources
 
 - [PyPI Publishing Guide](https://packaging.python.org/tutorials/packaging-projects/)
 - [Trusted Publishers (PyPI)](https://docs.pypi.org/trusted-publishers/)
+- [MCP Registry](https://registry.modelcontextprotocol.io)
+- [MCP server.json Schema](https://github.com/modelcontextprotocol/registry/blob/main/docs/reference/server-json/server.schema.json)
 - [Semantic Versioning](https://semver.org/)
 - [GitHub Actions - PyPI Publish](https://github.com/marketplace/actions/pypi-publish)
