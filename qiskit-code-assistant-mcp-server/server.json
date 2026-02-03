@@ -1,5 +1,5 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.qiskit/qiskit-code-assistant-mcp-server",
   "title": "Qiskit Code Assistant MCP Server",
   "description": "MCP server for the Qiskit Code Assistant intelligent code completion",
