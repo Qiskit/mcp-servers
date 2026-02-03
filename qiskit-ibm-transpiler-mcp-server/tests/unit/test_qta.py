@@ -346,13 +346,9 @@ class TestAIRouting:
         Test AI routing with custom coupling_map parameter.
         """
         custom_coupling_map = [[0, 1], [1, 2], [2, 3]]
-        mock_coupling_map_class = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.qta.CouplingMap"
-        )
+        mock_coupling_map_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.CouplingMap")
         mock_coupling_map_class.return_value = "custom_coupling_map"
-        mock_ai_routing_class = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.qta.AIRouting"
-        )
+        mock_ai_routing_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.AIRouting")
         mock_ai_routing_class.__name__ = "AIRouting"
 
         result = await ai_routing(
@@ -1069,9 +1065,7 @@ class TestHybridAITranspile:
         Test hybrid AI transpilation with custom coupling_map parameter.
         """
         custom_coupling_map = [[0, 1], [1, 2], [2, 3]]
-        mock_coupling_map_class = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.qta.CouplingMap"
-        )
+        mock_coupling_map_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.CouplingMap")
         mock_coupling_map_class.return_value = "custom_coupling_map"
 
         result = await hybrid_ai_transpile(
@@ -1107,9 +1101,7 @@ class TestHybridAITranspile:
         """
         initial_layout = [0, 1, 2]
         custom_coupling_map = [[0, 1], [1, 2]]
-        mock_coupling_map_class = mocker.patch(
-            "qiskit_ibm_transpiler_mcp_server.qta.CouplingMap"
-        )
+        mock_coupling_map_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.CouplingMap")
         mock_coupling_map_class.return_value = "custom_coupling_map"
 
         result = await hybrid_ai_transpile(

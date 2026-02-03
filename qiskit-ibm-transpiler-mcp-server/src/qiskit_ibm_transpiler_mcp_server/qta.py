@@ -242,12 +242,9 @@ async def ai_routing(
         circuit_format: format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3".
     """
     # Validate parameters
-    validation_error = (
-        _validate_optimization_params(
-            optimization_level=optimization_level, layout_mode=layout_mode
-        )
-        or _validate_qubit_targeting_params(coupling_map=coupling_map)
-    )
+    validation_error = _validate_optimization_params(
+        optimization_level=optimization_level, layout_mode=layout_mode
+    ) or _validate_qubit_targeting_params(coupling_map=coupling_map)
     if validation_error:
         return {"status": "error", "message": validation_error}
 
