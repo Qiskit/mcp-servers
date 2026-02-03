@@ -101,9 +101,14 @@ class TestAIRouting:
         Test AI routing with custom coupling_map parameter.
         Verifies that the library accepts a custom coupling_map and produces a valid result.
         """
-        with open(TESTS_DIR / "qasm" / "correct_qasm_1") as f:
-            qasm_str = f.read()
-
+        # Use a small 3-qubit circuit that matches the coupling map
+        qasm_str = """OPENQASM 3.0;
+include "stdgates.inc";
+qubit[3] q;
+h q[0];
+cx q[0], q[1];
+cx q[1], q[2];
+"""
         # Linear coupling map for 3 qubits
         coupling_map = [[0, 1], [1, 0], [1, 2], [2, 1]]
 
@@ -545,7 +550,7 @@ class TestHybridAITranspile:
             initial_layout="not_a_list",
         )
         assert result["status"] == "error"
-        assert "initial_layout must be a list" in result["message"]
+        assert "initial_layout must be a non-empty list" in result["message"]
 
     @pytest.mark.integration
     @pytest.mark.asyncio
