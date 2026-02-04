@@ -40,7 +40,7 @@ Before you begin, ensure you have the following installed:
 
 3. **Install dependencies**:
    ```bash
-   uv sync --group dev --group test
+   uv sync --group dev
    ```
 
 4. **Configure environment variables**:
