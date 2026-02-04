@@ -21,6 +21,8 @@ This repository contains production-ready MCP servers that enable AI systems to 
 ## 🛠️ Available Servers
 
 ### 🔬 Qiskit MCP Server
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=MCP%20Registry&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-mcp-server)
+
 **Core Qiskit quantum computing capabilities**
 
 Provides quantum circuit creation, manipulation, transpilation, and serialization utilities (QASM3, QPY) for local quantum development using [Qiskit](https://github.com/Qiskit/qiskit)
@@ -30,6 +32,8 @@ Provides quantum circuit creation, manipulation, transpilation, and serializatio
 ---
 
 ### 🧠 Qiskit Code Assistant MCP Server
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-code-assistant-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=MCP%20Registry&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-code-assistant-mcp-server)
+
 **Intelligent quantum code completion and assistance**
 
 Provides access to [IBM's Qiskit Code Assistant](https://quantum.cloud.ibm.com/docs/en/guides/qiskit-code-assistant) for AI-assisted quantum programming
@@ -39,6 +43,8 @@ Provides access to [IBM's Qiskit Code Assistant](https://quantum.cloud.ibm.com/d
 ---
 
 ### ⚙️ Qiskit IBM Runtime MCP Server
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-ibm-runtime-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=MCP%20Registry&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-ibm-runtime-mcp-server)
+
 **Complete access to IBM Quantum cloud services**
 
 Comprehensive interface to IBM Quantum hardware via [Qiskit IBM Runtime](https://github.com/Qiskit/qiskit-ibm-runtime/)
@@ -48,6 +54,8 @@ Comprehensive interface to IBM Quantum hardware via [Qiskit IBM Runtime](https:/
 ---
 
 ### 🚀 Qiskit IBM Transpiler MCP Server
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-ibm-transpiler-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=MCP%20Registry&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-ibm-transpiler-mcp-server)
+
 **AI-powered circuit transpilation**
 
 Access to the [qiskit-ibm-transpiler](https://github.com/Qiskit/qiskit-ibm-transpiler) library for AI-optimized circuit routing and optimization.
@@ -59,6 +67,8 @@ Access to the [qiskit-ibm-transpiler](https://github.com/Qiskit/qiskit-ibm-trans
 ## 🏋️ Community Servers
 
 ### 🏋️ Qiskit Gym MCP Server
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-gym-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=MCP%20Registry&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-gym-mcp-server)
+
 **Reinforcement learning for quantum circuit synthesis**
 
 Uses [qiskit-gym](https://github.com/rl-institut/qiskit-gym) to train RL models for optimal quantum circuit synthesis, including permutation routing, linear function synthesis, and Clifford circuits.
