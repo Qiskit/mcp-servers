@@ -3,7 +3,7 @@
   "name": "io.github.Qiskit/qiskit-mcp-server",
   "title": "Qiskit MCP Server",
   "description": "MCP server for Qiskit quantum computing with circuit serialization utilities",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-mcp-server",
   "repository": {
     "url": "https://github.com/Qiskit/mcp-servers",
@@ -15,7 +15,7 @@
     {
       "registryType": "pypi",
       "identifier": "qiskit-mcp-server",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
