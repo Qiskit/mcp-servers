@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.qiskit/qiskit-ibm-runtime-mcp-server",
+  "name": "io.github.Qiskit/qiskit-ibm-runtime-mcp-server",
   "title": "Qiskit IBM Runtime MCP Server",
   "description": "MCP server for IBM Quantum computing services through Qiskit IBM Runtime",
   "version": "0.3.0",
