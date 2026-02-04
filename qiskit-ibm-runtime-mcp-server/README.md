@@ -1,6 +1,6 @@
 # Qiskit IBM Runtime MCP Server
 
-mcp-name: io.github.Qiskit/qiskit-ibm-runtime-mcp-server
+<!-- mcp-name: io.github.Qiskit/qiskit-ibm-runtime-mcp-server -->
 
 A comprehensive Model Context Protocol (MCP) server that provides AI assistants with access to IBM Quantum computing services through Qiskit IBM Runtime. This server enables quantum circuit creation, execution, and management directly from AI conversations.
 

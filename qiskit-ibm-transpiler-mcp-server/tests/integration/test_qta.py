@@ -94,6 +94,49 @@ class TestAIRouting:
         )
         assert result["status"] == "error"
 
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_ai_routing_with_coupling_map(self, backend_name):
+        """
+        Test AI routing with custom coupling_map parameter.
+        Verifies that the library accepts a custom coupling_map and produces a valid result.
+        """
+        # Use a small 3-qubit circuit that matches the coupling map
+        qasm_str = """OPENQASM 3.0;
+include "stdgates.inc";
+qubit[3] q;
+h q[0];
+cx q[0], q[1];
+cx q[1], q[2];
+"""
+        # Linear coupling map for 3 qubits
+        coupling_map = [[0, 1], [1, 0], [1, 2], [2, 1]]
+
+        result = await ai_routing(
+            circuit=qasm_str,
+            backend_name=backend_name,
+            coupling_map=coupling_map,
+        )
+        assert result["status"] == "success"
+        assert "circuit_qpy" in result
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_ai_routing_invalid_coupling_map(self, backend_name):
+        """
+        Test that invalid coupling_map is rejected before calling the library.
+        """
+        with open(TESTS_DIR / "qasm" / "correct_qasm_1") as f:
+            qasm_str = f.read()
+
+        result = await ai_routing(
+            circuit=qasm_str,
+            backend_name=backend_name,
+            coupling_map=[[0, 1], [1]],  # Invalid: second element is not a pair
+        )
+        assert result["status"] == "error"
+        assert "coupling_map must contain pairs" in result["message"]
+
 
 class TestAICliffordSynthesis:
     """Test AI Clifford synthesis tool"""
@@ -443,3 +486,85 @@ class TestHybridAITranspile:
             backend_name=backend_name,
         )
         assert result["status"] == "error"
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    @pytest.mark.xfail(
+        reason="generate_ai_pass_manager may fail with Layout error on some backends/circuits",
+        strict=False,
+    )
+    async def test_hybrid_ai_transpile_with_initial_layout(self, backend_name):
+        """
+        Test hybrid AI transpilation with initial_layout parameter.
+        Verifies that the library accepts initial_layout and produces a valid result.
+        """
+        with open(TESTS_DIR / "qasm" / "correct_qasm_1") as f:
+            qasm_str = f.read()
+
+        # Use a simple initial_layout for a small circuit
+        initial_layout = [0, 1, 2]
+
+        result = await hybrid_ai_transpile(
+            circuit=qasm_str,
+            backend_name=backend_name,
+            initial_layout=initial_layout,
+        )
+        validate_hybrid_transpile_result(result)
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    @pytest.mark.xfail(
+        reason="generate_ai_pass_manager may fail with Layout error on some backends/circuits",
+        strict=False,
+    )
+    async def test_hybrid_ai_transpile_with_coupling_map(self, backend_name):
+        """
+        Test hybrid AI transpilation with custom coupling_map.
+        Verifies that the library accepts a custom coupling_map and produces a valid result.
+        """
+        with open(TESTS_DIR / "qasm" / "correct_qasm_1") as f:
+            qasm_str = f.read()
+
+        # Linear coupling map for 3 qubits
+        coupling_map = [[0, 1], [1, 0], [1, 2], [2, 1]]
+
+        result = await hybrid_ai_transpile(
+            circuit=qasm_str,
+            backend_name=backend_name,
+            coupling_map=coupling_map,
+        )
+        validate_hybrid_transpile_result(result)
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_invalid_initial_layout(self, backend_name):
+        """
+        Test that invalid initial_layout is rejected before calling the library.
+        """
+        with open(TESTS_DIR / "qasm" / "correct_qasm_1") as f:
+            qasm_str = f.read()
+
+        result = await hybrid_ai_transpile(
+            circuit=qasm_str,
+            backend_name=backend_name,
+            initial_layout="not_a_list",
+        )
+        assert result["status"] == "error"
+        assert "initial_layout must be a non-empty list" in result["message"]
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_invalid_coupling_map(self, backend_name):
+        """
+        Test that invalid coupling_map is rejected before calling the library.
+        """
+        with open(TESTS_DIR / "qasm" / "correct_qasm_1") as f:
+            qasm_str = f.read()
+
+        result = await hybrid_ai_transpile(
+            circuit=qasm_str,
+            backend_name=backend_name,
+            coupling_map=[[0, 1], [1]],  # Invalid: second element is not a pair
+        )
+        assert result["status"] == "error"
+        assert "coupling_map must contain pairs" in result["message"]
