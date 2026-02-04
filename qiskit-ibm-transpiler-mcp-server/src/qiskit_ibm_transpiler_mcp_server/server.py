@@ -65,6 +65,7 @@ async def ai_routing_tool(
     | list[Literal["n_cnots", "n_gates", "cnot_layers", "layers", "noise"]]
     | None = None,
     local_mode: bool = True,
+    coupling_map: list[list[int]] | None = None,
     circuit_format: CircuitFormat = "qasm3",
 ) -> dict[str, Any]:
     """Route a quantum circuit by inserting SWAP operations for backend compatibility. Use this FIRST before other synthesis tools.
@@ -76,6 +77,9 @@ async def ai_routing_tool(
         layout_mode: 'keep' (respect existing layout), 'improve' (refine initial guess), 'optimize' (best for general circuits)
         optimization_preferences: What to minimize - 'n_cnots', 'n_gates', 'cnot_layers', 'layers', or 'noise'. Can be a list.
         local_mode: True runs locally (recommended), False uses remote Qiskit Transpiler Service
+        coupling_map: Optional list of qubit pairs representing the backend topology.
+            If provided, overrides the backend's coupling map. Useful for targeting a
+            specific subset of qubits.
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
 
     Returns:
@@ -93,6 +97,7 @@ async def ai_routing_tool(
         layout_mode=layout_mode,
         optimization_preferences=optimization_preferences,
         local_mode=local_mode,
+        coupling_map=coupling_map,
         circuit_format=circuit_format,
     )
 
@@ -240,6 +245,8 @@ async def hybrid_ai_transpile_tool(
     ai_optimization_level: Literal[1, 2, 3] = 3,
     optimization_level: Literal[1, 2, 3] = 3,
     ai_layout_mode: Literal["keep", "improve", "optimize"] = "optimize",
+    initial_layout: list[int] | None = None,
+    coupling_map: list[list[int]] | None = None,
     circuit_format: CircuitFormat = "qasm3",
 ) -> dict[str, Any]:
     """Transpile a circuit using a hybrid pass manager combining Qiskit heuristics with AI-powered passes.
@@ -256,6 +263,14 @@ async def hybrid_ai_transpile_tool(
             - 'keep': Respect existing layout (for specific qubit requirements)
             - 'improve': Use prior layout as starting point
             - 'optimize': Best for general circuits (default)
+            Note: If initial_layout is provided with 'optimize', it automatically converts
+            to 'improve' to leverage the user-provided layout.
+        initial_layout: Optional list of physical qubit indices specifying where to place
+            virtual qubits. For example, [0, 1, 5, 6, 7] maps virtual qubit 0 to physical
+            qubit 0, virtual qubit 1 to physical qubit 1, etc.
+        coupling_map: Optional list of qubit pairs representing the backend topology.
+            If provided, overrides the backend's coupling map. Useful for targeting a
+            specific subset of qubits.
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
 
     Returns:
@@ -272,6 +287,8 @@ async def hybrid_ai_transpile_tool(
         ai_optimization_level=ai_optimization_level,
         optimization_level=optimization_level,
         ai_layout_mode=ai_layout_mode,
+        initial_layout=initial_layout,
+        coupling_map=coupling_map,
         circuit_format=circuit_format,
     )
 

@@ -1,5 +1,7 @@
 # Qiskit MCP Server
 
+<!-- mcp-name: io.github.Qiskit/qiskit-mcp-server -->
+
 A Model Context Protocol (MCP) server that provides quantum circuit transpilation capabilities using Qiskit's pass managers. This server enables AI assistants to optimize quantum circuits for various hardware targets.
 
 ## Features

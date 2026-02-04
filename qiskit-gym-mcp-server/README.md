@@ -1,5 +1,7 @@
 # Qiskit Gym MCP Server
 
+<!-- mcp-name: io.github.Qiskit/qiskit-gym-mcp-server -->
+
 A Model Context Protocol (MCP) server that provides reinforcement learning-based quantum circuit synthesis capabilities using [qiskit-gym](https://github.com/AI4quantum/qiskit-gym).
 
 ## Features

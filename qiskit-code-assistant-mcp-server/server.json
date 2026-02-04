@@ -1,9 +1,9 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/draft/server.schema.json",
-  "name": "io.github.qiskit/qiskit-code-assistant-mcp-server",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Qiskit/qiskit-code-assistant-mcp-server",
   "title": "Qiskit Code Assistant MCP Server",
   "description": "MCP server for the Qiskit Code Assistant intelligent code completion",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-code-assistant-mcp-server",
   "repository": {
     "url": "https://github.com/Qiskit/mcp-servers",
@@ -15,7 +15,7 @@
     {
       "registryType": "pypi",
       "identifier": "qiskit-code-assistant-mcp-server",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
