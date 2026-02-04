@@ -1,6 +1,6 @@
 # qiskit-ibm-transpiler-mcp-server
 
-mcp-name: io.github.Qiskit/qiskit-ibm-transpiler-mcp-server
+<!-- mcp-name: io.github.Qiskit/qiskit-ibm-transpiler-mcp-server -->
 
 MCP server for Qiskit transpiler. It supports **AI routing**, 
 **AI Clifford** synthesis, **AI Linear Function** synthesis, **AI Permutation** synthesis, and **AI Pauli Network** synthesis using QASM 3.0 as the input/output tools format.
