@@ -1,5 +1,7 @@
 # qiskit-code-assistant-mcp-server
 
+<!-- mcp-name: io.github.Qiskit/qiskit-code-assistant-mcp-server -->
+
 MCP server for Qiskit Code Assistant
 
 
