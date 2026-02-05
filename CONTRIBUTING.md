@@ -38,7 +38,7 @@ Before you begin, ensure you have the following installed:
    cd qiskit-gym-mcp-server
    ```
 
-3. **Install dependencies**:
+3. **Install dependencies** (make sure you're in a sub-package directory from step 2):
    ```bash
    uv sync --group dev --group test
    ```
