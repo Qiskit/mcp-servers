@@ -1726,7 +1726,7 @@ async def find_optimal_qv_qubits(
 
     Args:
         backend_name: Name of the backend (e.g., 'ibm_brisbane')
-        num_qubits: Number of qubits in the subgraph (default: 5, range: 2-10)
+        num_qubits: Number of qubits in the subgraph (default: 5, range: 2-20)
         num_results: Number of top subgraphs to return (default: 5, max: 20)
         metric: Scoring metric to optimize:
             - "qv_optimized": Balanced scoring for QV (connectivity + errors + coherence)
@@ -1746,8 +1746,8 @@ async def find_optimal_qv_qubits(
     global service
 
     try:
-        # Validate inputs - limit num_qubits to 10 for performance
-        num_qubits = _clamp(num_qubits, 2, 10)
+        # Validate inputs - limit num_qubits to 20 for performance
+        num_qubits = _clamp(num_qubits, 2, 20)
         num_results = _clamp(num_results, 1, 20)
 
         # Check for fake backends early
