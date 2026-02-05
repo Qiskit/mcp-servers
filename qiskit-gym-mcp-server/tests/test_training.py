@@ -130,8 +130,11 @@ class TestStartTraining:
     @pytest.mark.asyncio
     async def test_start_training_invalid_initial_difficulty(self):
         """Test error when initial_difficulty is less than 1."""
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
         result = await start_training(
-            env_id="nonexistent_env",  # It will fail first on initial_difficulty before checking env_id
+            env_id=env_id,
             num_iterations=10,
             initial_difficulty=0,
         )
