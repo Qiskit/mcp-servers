@@ -132,6 +132,7 @@ def _run_training_in_background(
     algorithm: str,
     policy: str,
     num_iterations: int,
+    initial_difficulty: int,
     tb_path: str | None,
 ) -> None:
     """Run training in a background thread.
@@ -160,9 +161,13 @@ def _run_training_in_background(
         # Run training
         logger.info(f"Background training started for session {session_id}")
         if tb_path:
-            rls.learn(num_iterations=num_iterations, tb_path=tb_path)
+            rls.learn(
+                initial_difficulty=initial_difficulty,
+                num_iterations=num_iterations,
+                tb_path=tb_path,
+            )
         else:
-            rls.learn(num_iterations=num_iterations)
+            rls.learn(initial_difficulty=initial_difficulty, num_iterations=num_iterations)
 
         # Training completed
         state.set_training_status(session_id, "completed")
@@ -196,6 +201,7 @@ async def start_training(
     algorithm: Literal["ppo", "alphazero"] = "ppo",
     policy: Literal["basic", "conv1d"] = "basic",
     num_iterations: int = 100,
+    initial_difficulty: int = 1,
     tensorboard_experiment: str | None = None,
     background: bool = False,
 ) -> dict[str, Any]:
@@ -212,6 +218,7 @@ async def start_training(
             - "basic": Simple feedforward network (faster, good for small problems)
             - "conv1d": 1D convolutional network (better for larger problems)
         num_iterations: Number of training iterations (default: 100)
+        initial_difficulty: Starting difficulty level (default: 1)
         tensorboard_experiment: Name for TensorBoard experiment logging (optional)
         background: If True, run training in background and return immediately.
             Use get_training_status to poll for completion, or wait_for_training
@@ -223,7 +230,6 @@ async def start_training(
         session_id for polling.
 
     TODO: Add training curriculum parameters (currently using qiskit-gym defaults):
-        - initial_difficulty: Starting difficulty level (default: 1)
         - depth_slope: How fast difficulty increases (default: 2)
         - max_depth: Maximum circuit depth (default: 128)
     """
@@ -240,6 +246,11 @@ async def start_training(
             return {
                 "status": "error",
                 "message": "num_iterations must be at least 1",
+            }
+        if initial_difficulty < 1:
+            return {
+                "status": "error",
+                "message": "initial_difficulty must be at least 1",
             }
 
         # Get environment
@@ -288,6 +299,7 @@ async def start_training(
                     algorithm,
                     policy,
                     num_iterations,
+                    initial_difficulty,
                     tb_path,
                 ),
                 daemon=True,
@@ -301,6 +313,7 @@ async def start_training(
                 "algorithm": algorithm,
                 "policy": policy,
                 "num_iterations": num_iterations,
+                "initial_difficulty": initial_difficulty,
                 "background": True,
                 "tensorboard_path": tb_path,
                 "message": "Training started in background",
@@ -331,9 +344,16 @@ async def start_training(
         logger.info(f"Starting training session {session_id} with {num_iterations} iterations")
         try:
             if tb_path:
-                rls.learn(num_iterations=num_iterations, tb_path=tb_path)
+                rls.learn(
+                    initial_difficulty=initial_difficulty,
+                    num_iterations=num_iterations,
+                    tb_path=tb_path,
+                )
             else:
-                rls.learn(num_iterations=num_iterations)
+                rls.learn(
+                    initial_difficulty=initial_difficulty,
+                    num_iterations=num_iterations,
+                )
 
             # Training completed
             state.set_training_status(session_id, "completed")
