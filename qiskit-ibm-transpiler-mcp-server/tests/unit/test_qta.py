@@ -865,6 +865,7 @@ class TestHybridAITranspile:
             mock_circuit_qasm, circuit_format="qasm3"
         )
         mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
             coupling_map="mock_coupling_map",
             ai_optimization_level=3,
             optimization_level=3,
@@ -896,6 +897,7 @@ class TestHybridAITranspile:
 
         assert result["status"] == "success"
         mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
             coupling_map="mock_coupling_map",
             ai_optimization_level=1,
             optimization_level=2,
@@ -1042,6 +1044,7 @@ class TestHybridAITranspile:
 
         assert result["status"] == "success"
         mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
             coupling_map="mock_coupling_map",
             ai_optimization_level=3,
             optimization_level=3,
@@ -1077,6 +1080,7 @@ class TestHybridAITranspile:
         assert result["status"] == "success"
         mock_coupling_map_class.assert_called_once_with(custom_coupling_map)
         mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
             coupling_map="custom_coupling_map",
             ai_optimization_level=3,
             optimization_level=3,
@@ -1114,6 +1118,7 @@ class TestHybridAITranspile:
         assert result["status"] == "success"
         mock_coupling_map_class.assert_called_once_with(custom_coupling_map)
         mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
             coupling_map="custom_coupling_map",
             ai_optimization_level=3,
             optimization_level=3,

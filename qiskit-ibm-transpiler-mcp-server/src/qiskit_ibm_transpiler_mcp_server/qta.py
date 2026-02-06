@@ -466,6 +466,8 @@ async def hybrid_ai_transpile(
         if backend_service_result["status"] != "success":
             return {"status": "error", "message": backend_service_result["message"]}
         backend_service = backend_service_result["backend"]
+        if backend_service is None:
+            return {"status": "error", "message": f"Backend '{backend_name}' returned None"}
 
         # Load input circuit
         loaded_quantum_circuit = load_circuit(circuit, circuit_format=circuit_format)
@@ -485,7 +487,9 @@ async def hybrid_ai_transpile(
             qiskit_transpile_options = {"initial_layout": initial_layout}
 
         # Create hybrid AI pass manager
+        # Pass both backend (for basis gates/target) and coupling_map (may be overridden)
         ai_pass_manager = generate_ai_pass_manager(
+            backend=backend_service,
             coupling_map=target_coupling_map,
             ai_optimization_level=ai_optimization_level,
             optimization_level=optimization_level,

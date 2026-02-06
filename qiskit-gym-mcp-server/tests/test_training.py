@@ -98,6 +98,49 @@ class TestStartTraining:
         assert result["status"] == "error"
         assert "exceeds maximum" in result["message"]
 
+    @pytest.mark.asyncio
+    async def test_start_training_passes_initial_difficulty(
+        self,
+        mock_permutation_gym,
+        mock_rls_synthesis,
+        mock_ppo_config,
+        mock_basic_policy_config,
+    ):
+        """Test that initial_difficulty is passed through to RLSynthesis.learn()."""
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        result = await start_training(
+            env_id=env_id,
+            algorithm="ppo",
+            policy="basic",
+            num_iterations=10,
+            initial_difficulty=2,
+            background=False,
+        )
+
+        assert result["status"] == "success"
+
+        # `learn` is a MagicMock (mock_rls_synthesis.return_value.learn), so we can
+        # inspect the keyword arguments passed by start_training() to learn().
+        mock_rls_synthesis.return_value.learn.assert_called_once()
+        _, kwargs = mock_rls_synthesis.return_value.learn.call_args
+        assert kwargs["initial_difficulty"] == 2
+
+    @pytest.mark.asyncio
+    async def test_start_training_invalid_initial_difficulty(self, mock_permutation_gym):
+        """Test error when initial_difficulty is less than 1."""
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        result = await start_training(
+            env_id=env_id,
+            num_iterations=10,
+            initial_difficulty=0,
+        )
+        assert result["status"] == "error"
+        assert result["message"] == "initial_difficulty must be at least 1"
+
 
 class TestTrainingStatus:
     """Tests for training status retrieval."""
