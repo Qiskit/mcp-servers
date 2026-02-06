@@ -611,13 +611,19 @@ class TestGetJobStatus:
             assert result["job_status"] == "DONE"
 
     @pytest.mark.asyncio
-    async def test_get_job_status_no_service(self):
-        """Test job status retrieval when service is None."""
-        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None):
+    async def test_get_job_status_no_service(self, mock_runtime_service):
+        """Test job status auto-initializes service when None."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None),
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+            ) as mock_init,
+        ):
+            mock_init.return_value = mock_runtime_service
             result = await get_job_status("job_123")
 
-            assert result["status"] == "error"
-            assert "service not initialized" in result["message"]
+            mock_init.assert_called_once()
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_get_job_status_job_not_found(self, mock_runtime_service):
@@ -653,13 +659,19 @@ class TestGetJobResults:
             assert result["execution_time"] == 1.5
 
     @pytest.mark.asyncio
-    async def test_get_job_results_no_service(self):
-        """Test job results retrieval when service is None."""
-        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None):
+    async def test_get_job_results_no_service(self, mock_runtime_service):
+        """Test job results auto-initializes service when None."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None),
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+            ) as mock_init,
+        ):
+            mock_init.return_value = mock_runtime_service
             result = await get_job_results("job_123")
 
-            assert result["status"] == "error"
-            assert "service not initialized" in result["message"]
+            mock_init.assert_called_once()
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_get_job_results_job_pending(self, mock_runtime_service):
@@ -767,13 +779,19 @@ class TestCancelJob:
             assert "cancellation requested" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_cancel_job_no_service(self):
-        """Test job cancellation when service is None."""
-        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None):
+    async def test_cancel_job_no_service(self, mock_runtime_service):
+        """Test job cancellation auto-initializes service when None."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None),
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+            ) as mock_init,
+        ):
+            mock_init.return_value = mock_runtime_service
             result = await cancel_job("job_123")
 
-            assert result["status"] == "error"
-            assert "service not initialized" in result["message"]
+            mock_init.assert_called_once()
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_cancel_job_failure(self, mock_runtime_service):
