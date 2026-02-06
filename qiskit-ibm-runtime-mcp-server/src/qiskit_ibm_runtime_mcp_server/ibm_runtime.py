@@ -1348,10 +1348,7 @@ async def get_job_status(job_id: str) -> dict[str, Any]:
 
     try:
         if service is None:
-            return {
-                "status": "error",
-                "message": "Failed to get job status: service not initialized",
-            }
+            service = initialize_service()
 
         job = service.job(job_id)
 
@@ -1400,10 +1397,7 @@ async def get_job_results(job_id: str) -> dict[str, Any]:
 
     try:
         if service is None:
-            return {
-                "status": "error",
-                "message": "Failed to get job results: service not initialized",
-            }
+            service = initialize_service()
 
         job = service.job(job_id)
         job_status = job.status()
@@ -1498,10 +1492,7 @@ async def cancel_job(job_id: str) -> dict[str, Any]:
 
     try:
         if service is None:
-            return {
-                "status": "error",
-                "message": "Failed to cancel job: service not initialized",
-            }
+            service = initialize_service()
 
         job = service.job(job_id)
         job.cancel()
