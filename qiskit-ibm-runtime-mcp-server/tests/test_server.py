@@ -1187,7 +1187,7 @@ cx q[0], q[1];
                 return_value=Mock(
                     run=Mock(return_value=Mock(name="isa_circuit", layout=Mock()))
                 ),
-            ) as mock_pm,
+            ),
             patch(
                 "qiskit_ibm_runtime_mcp_server.ibm_runtime.EstimatorV2",
             ) as mock_estimator_cls,

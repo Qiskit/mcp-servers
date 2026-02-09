@@ -1711,12 +1711,6 @@ async def run_estimator(
                     hamiltonian = SparsePauliOp.from_list(
                         [(obs, 1.0) for obs in observables]
                     )
-            else:
-                return {
-                    "status": "error",
-                    "message": f"Invalid observables type: {type(observables)}. "
-                    "Expected str, list[str], or list[tuple[str, float]]",
-                }
         except Exception as e:
             return {
                 "status": "error",
@@ -1757,6 +1751,8 @@ async def run_estimator(
         estimator = EstimatorV2(mode=backend, options=options)
 
         # Build PUB (Primitive Unified Bloc)
+        # Type: tuple[QuantumCircuit, SparsePauliOp] | tuple[QuantumCircuit, SparsePauliOp, list[list[float]]]
+        pub: tuple[Any, ...]
         if parameter_values is not None:
             # Parameterized circuit with values
             pub = (isa_circuit, isa_observables, [parameter_values])
