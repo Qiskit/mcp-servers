@@ -1,12 +1,12 @@
 [project]
 name = "qiskit-ibm-transpiler-mcp-server"
-version = "0.2.0"
+version = "0.3.0"
 description = "MCP server for AI Transpiler IBM Quantum services through local and Qiskit IBM Runtime executions"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 
 dependencies = [
-    "fastmcp>=2.12.4",
+    "fastmcp>=2.12.4,<3",
     "qiskit-ibm-transpiler>=0.15.0",
     "nest-asyncio>=1.5.0",
     "qiskit-mcp-server",
