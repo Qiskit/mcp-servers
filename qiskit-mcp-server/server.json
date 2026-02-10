@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Qiskit/qiskit-mcp-server",
+  "title": "Qiskit MCP Server",
+  "description": "MCP server for Qiskit quantum computing with circuit serialization utilities",
+  "version": "0.1.1",
+  "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-mcp-server",
+  "repository": {
+    "url": "https://github.com/Qiskit/mcp-servers",
+    "source": "github",
+    "id": "1051018539",
+    "subfolder": "qiskit-mcp-server"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "qiskit-mcp-server",
+      "version": "0.1.1",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

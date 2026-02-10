@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Qiskit/qiskit-ibm-runtime-mcp-server",
+  "title": "Qiskit IBM Runtime MCP Server",
+  "description": "MCP server for IBM Quantum computing services through Qiskit IBM Runtime",
+  "version": "0.4.0",
+  "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-ibm-runtime-mcp-server",
+  "repository": {
+    "url": "https://github.com/Qiskit/mcp-servers",
+    "source": "github",
+    "id": "1051018539",
+    "subfolder": "qiskit-ibm-runtime-mcp-server"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "qiskit-ibm-runtime-mcp-server",
+      "version": "0.4.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "QISKIT_IBM_TOKEN",
+          "description": "Your IBM Quantum API token for authentication",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "QISKIT_IBM_RUNTIME_MCP_INSTANCE",
+          "description": "IBM Quantum instance CRN for faster startup (skips instance lookup)"
+        }
+      ]
+    }
+  ]
+}

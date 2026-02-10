@@ -13,7 +13,7 @@ import logging
 from typing import Any, Literal
 
 from qiskit import QuantumCircuit
-from qiskit.transpiler import PassManager
+from qiskit.transpiler import CouplingMap, PassManager
 from qiskit_ibm_transpiler import generate_ai_pass_manager
 from qiskit_ibm_transpiler.ai.routing import AIRouting
 from qiskit_ibm_transpiler.ai.synthesis import (
@@ -63,6 +63,50 @@ def _validate_optimization_params(
     return None
 
 
+def _validate_qubit_targeting_params(
+    initial_layout: list[int] | None = None,
+    coupling_map: list[list[int]] | None = None,
+) -> str | None:
+    """Validate initial_layout and coupling_map parameters.
+
+    Args:
+        initial_layout: List of physical qubit indices for virtual-to-physical mapping.
+        coupling_map: List of qubit pairs representing backend topology.
+
+    Returns:
+        Error message string if validation fails, None if all validations pass.
+    """
+    error = _validate_initial_layout(initial_layout)
+    if error:
+        return error
+    return _validate_coupling_map(coupling_map)
+
+
+def _validate_initial_layout(initial_layout: list[int] | None) -> str | None:
+    """Validate initial_layout parameter."""
+    if initial_layout is None:
+        return None
+    if not isinstance(initial_layout, list) or len(initial_layout) == 0:
+        return "initial_layout must be a non-empty list of integers"
+    if not all(isinstance(q, int) and q >= 0 for q in initial_layout):
+        return "initial_layout must contain only non-negative integers"
+    return None
+
+
+def _validate_coupling_map(coupling_map: list[list[int]] | None) -> str | None:
+    """Validate coupling_map parameter."""
+    if coupling_map is None:
+        return None
+    if not isinstance(coupling_map, list) or len(coupling_map) == 0:
+        return "coupling_map must be a non-empty list of qubit pairs"
+    for edge in coupling_map:
+        if not isinstance(edge, list) or len(edge) != 2:
+            return "coupling_map must contain pairs of qubit indices (e.g., [[0, 1], [1, 2]])"
+        if not all(isinstance(q, int) and q >= 0 for q in edge):
+            return "coupling_map qubit indices must be non-negative integers"
+    return None
+
+
 def _get_circuit_metrics(circuit: QuantumCircuit) -> dict[str, Any]:
     """Extract metrics from a quantum circuit for reporting.
 
@@ -92,6 +136,7 @@ async def _run_synthesis_pass(
     synthesis_pass_class: type,
     pass_kwargs: dict[str, Any],
     circuit_format: CircuitFormat = "qasm3",
+    coupling_map: list[list[int]] | None = None,
 ) -> dict[str, Any]:
     """
     Helper function to run specific synthesis routine
@@ -102,6 +147,8 @@ async def _run_synthesis_pass(
         synthesis_pass_class: the specific AI synthesis procedure to be executed
         pass_kwargs: args for the AI synthesis class (e.g., `optimization_preferences`, `layout_mode`, `local_mode`, ...)
         circuit_format: format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3".
+        coupling_map: Optional list of qubit pairs to override the backend's coupling map.
+            If provided, uses this coupling map instead of the backend's.
 
     Returns:
         Dictionary with QPY format of the optimized circuit (base64-encoded).
@@ -118,9 +165,16 @@ async def _run_synthesis_pass(
             backend_service = backend_service_coroutine["backend"]
         else:
             return {"status": "error", "message": backend_service_coroutine["message"]}
-        ai_synthesis_pass = PassManager(
-            [synthesis_pass_class(backend=backend_service, **pass_kwargs)]
-        )
+
+        # Use custom coupling_map if provided, otherwise use backend
+        if coupling_map is not None:
+            ai_synthesis_pass = PassManager(
+                [synthesis_pass_class(coupling_map=CouplingMap(coupling_map), **pass_kwargs)]
+            )
+        else:
+            ai_synthesis_pass = PassManager(
+                [synthesis_pass_class(backend=backend_service, **pass_kwargs)]
+            )
         loaded_quantum_circuit = load_circuit(circuit, circuit_format=circuit_format)
         if loaded_quantum_circuit["status"] == "success":
             original_circuit = loaded_quantum_circuit["circuit"]
@@ -165,6 +219,7 @@ async def ai_routing(
     | list[Literal["n_cnots", "n_gates", "cnot_layers", "layers", "noise"]]
     | None = None,
     local_mode: bool = True,
+    coupling_map: list[list[int]] | None = None,
     circuit_format: CircuitFormat = "qasm3",
 ) -> dict[str, Any]:
     """
@@ -181,12 +236,15 @@ async def ai_routing(
             - optimize: This is the default mode. It works best for general circuits where you might not have good layout guesses. This mode ignores previous layout selections.
         optimization_preferences: indicates what you want to reduce through optimization: number of cnot gates (n_cnots), number of gates (n_gates), number of cnots layers (cnot_layers), number of layers (layers), and/or noise (noise)
         local_mode: determines where the AIRouting pass runs. If False, AIRouting runs remotely through the Qiskit Transpiler Service. If True, the package tries to run the pass in your local environment with a fallback to cloud mode if the required dependencies are not found
+        coupling_map: Optional list of qubit pairs representing the backend topology.
+            If provided, overrides the backend's coupling map. Useful for targeting a
+            specific subset of qubits.
         circuit_format: format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3".
     """
     # Validate parameters
     validation_error = _validate_optimization_params(
         optimization_level=optimization_level, layout_mode=layout_mode
-    )
+    ) or _validate_qubit_targeting_params(coupling_map=coupling_map)
     if validation_error:
         return {"status": "error", "message": validation_error}
 
@@ -202,6 +260,7 @@ async def ai_routing(
         synthesis_pass_class=AIRouting,
         pass_kwargs=ai_routing_pass_kwargs,
         circuit_format=circuit_format,
+        coupling_map=coupling_map,
     )
     return ai_routing_result
 
@@ -341,6 +400,8 @@ async def hybrid_ai_transpile(
     ai_optimization_level: Literal[1, 2, 3] = 3,
     optimization_level: Literal[1, 2, 3] = 3,
     ai_layout_mode: Literal["keep", "improve", "optimize"] = "optimize",
+    initial_layout: list[int] | None = None,
+    coupling_map: list[list[int]] | None = None,
     circuit_format: CircuitFormat = "qasm3",
 ) -> dict[str, Any]:
     """
@@ -360,6 +421,14 @@ async def hybrid_ai_transpile(
             - 'keep': Respects the layout set by previous transpiler passes
             - 'improve': Uses prior layouts as starting points for optimization
             - 'optimize': Default; ignores previous layout selections for general circuits
+            Note: If initial_layout is provided with 'optimize', it automatically converts
+            to 'improve' to leverage the user-provided layout.
+        initial_layout: Optional list of physical qubit indices specifying where to place
+            virtual qubits. For example, [0, 1, 5, 6, 7] maps virtual qubit 0 to physical
+            qubit 0, virtual qubit 1 to physical qubit 1, etc.
+        coupling_map: Optional list of qubit pairs representing the backend topology.
+            If provided, overrides the backend's coupling map. Useful for targeting a
+            specific subset of qubits.
         circuit_format: format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3".
 
     Returns:
@@ -382,6 +451,9 @@ async def hybrid_ai_transpile(
             )
             or _validate_optimization_params(optimization_level=optimization_level)
             or _validate_optimization_params(layout_mode=ai_layout_mode, param_prefix="ai_")
+            or _validate_qubit_targeting_params(
+                initial_layout=initial_layout, coupling_map=coupling_map
+            )
         )
     if validation_error:
         return {"status": "error", "message": validation_error}
@@ -394,6 +466,8 @@ async def hybrid_ai_transpile(
         if backend_service_result["status"] != "success":
             return {"status": "error", "message": backend_service_result["message"]}
         backend_service = backend_service_result["backend"]
+        if backend_service is None:
+            return {"status": "error", "message": f"Backend '{backend_name}' returned None"}
 
         # Load input circuit
         loaded_quantum_circuit = load_circuit(circuit, circuit_format=circuit_format)
@@ -401,12 +475,26 @@ async def hybrid_ai_transpile(
             return {"status": "error", "message": loaded_quantum_circuit["message"]}
         original_circuit = loaded_quantum_circuit["circuit"]
 
+        # Determine coupling map to use
+        if coupling_map is not None:
+            target_coupling_map = CouplingMap(coupling_map)
+        else:
+            target_coupling_map = backend_service.coupling_map
+
+        # Build qiskit_transpile_options if initial_layout is provided
+        qiskit_transpile_options = None
+        if initial_layout is not None:
+            qiskit_transpile_options = {"initial_layout": initial_layout}
+
         # Create hybrid AI pass manager
+        # Pass both backend (for basis gates/target) and coupling_map (may be overridden)
         ai_pass_manager = generate_ai_pass_manager(
-            coupling_map=backend_service.coupling_map,
+            backend=backend_service,
+            coupling_map=target_coupling_map,
             ai_optimization_level=ai_optimization_level,
             optimization_level=optimization_level,
             ai_layout_mode=ai_layout_mode,
+            qiskit_transpile_options=qiskit_transpile_options,
         )
 
         # Run the hybrid transpilation

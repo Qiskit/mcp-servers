@@ -484,4 +484,6 @@ def mock_get_backend_service_with_coupling_map(mocker):
     mock_backend = MagicMock()
     mock_backend.coupling_map = "mock_coupling_map"
     mock.return_value = {"backend": mock_backend, "status": "success"}
+    # Expose the mock_backend so tests can reference it
+    mock.mock_backend = mock_backend
     return mock

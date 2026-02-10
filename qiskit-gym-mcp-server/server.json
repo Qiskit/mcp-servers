@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Qiskit/qiskit-gym-mcp-server",
+  "title": "Qiskit Gym MCP Server",
+  "description": "MCP server for qiskit-gym reinforcement learning quantum circuit synthesis",
+  "version": "0.1.1",
+  "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-gym-mcp-server",
+  "repository": {
+    "url": "https://github.com/Qiskit/mcp-servers",
+    "source": "github",
+    "id": "1051018539",
+    "subfolder": "qiskit-gym-mcp-server"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "qiskit-gym-mcp-server",
+      "version": "0.1.1",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

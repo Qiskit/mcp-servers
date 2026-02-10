@@ -43,6 +43,14 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     setup_ibm_quantum_account,
     usage_info,
 )
+from qiskit_ibm_runtime_mcp_server.server import (
+    active_account_info_tool,
+    active_instance_info_tool,
+    available_instances_tool,
+    delete_saved_account_tool,
+    list_saved_accounts_tool,
+    usage_info_tool,
+)
 
 
 class TestGetTokenFromEnv:
@@ -603,13 +611,19 @@ class TestGetJobStatus:
             assert result["job_status"] == "DONE"
 
     @pytest.mark.asyncio
-    async def test_get_job_status_no_service(self):
-        """Test job status retrieval when service is None."""
-        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None):
+    async def test_get_job_status_no_service(self, mock_runtime_service):
+        """Test job status auto-initializes service when None."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None),
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+            ) as mock_init,
+        ):
+            mock_init.return_value = mock_runtime_service
             result = await get_job_status("job_123")
 
-            assert result["status"] == "error"
-            assert "service not initialized" in result["message"]
+            mock_init.assert_called_once()
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_get_job_status_job_not_found(self, mock_runtime_service):
@@ -645,13 +659,19 @@ class TestGetJobResults:
             assert result["execution_time"] == 1.5
 
     @pytest.mark.asyncio
-    async def test_get_job_results_no_service(self):
-        """Test job results retrieval when service is None."""
-        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None):
+    async def test_get_job_results_no_service(self, mock_runtime_service):
+        """Test job results auto-initializes service when None."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None),
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+            ) as mock_init,
+        ):
+            mock_init.return_value = mock_runtime_service
             result = await get_job_results("job_123")
 
-            assert result["status"] == "error"
-            assert "service not initialized" in result["message"]
+            mock_init.assert_called_once()
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_get_job_results_job_pending(self, mock_runtime_service):
@@ -759,13 +779,19 @@ class TestCancelJob:
             assert "cancellation requested" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_cancel_job_no_service(self):
-        """Test job cancellation when service is None."""
-        with patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None):
+    async def test_cancel_job_no_service(self, mock_runtime_service):
+        """Test job cancellation auto-initializes service when None."""
+        with (
+            patch("qiskit_ibm_runtime_mcp_server.ibm_runtime.service", None),
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
+            ) as mock_init,
+        ):
+            mock_init.return_value = mock_runtime_service
             result = await cancel_job("job_123")
 
-            assert result["status"] == "error"
-            assert "service not initialized" in result["message"]
+            mock_init.assert_called_once()
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
     async def test_cancel_job_failure(self, mock_runtime_service):
@@ -1692,31 +1718,27 @@ class TestDeleteSavedAccount:
     """Test delete_saved_account function."""
 
     @pytest.mark.asyncio
-    async def test_delete_saved_account_success(self, mock_runtime_service):
+    async def test_delete_saved_account_success(self):
         """Test successful account deletion."""
         with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
-        ) as mock_init:
-            mock_init.return_value = mock_runtime_service
-            mock_runtime_service.delete_account.return_value = True
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.delete_account"
+        ) as mock_delete:
+            mock_delete.return_value = True
 
             result = await delete_saved_account("test_account")
 
             assert result["status"] == "success"
             assert result["deleted"] is True
             assert "successfully deleted" in result["message"]
-            mock_runtime_service.delete_account.assert_called_once_with(
-                name="test_account"
-            )
+            mock_delete.assert_called_once_with(name="test_account")
 
     @pytest.mark.asyncio
-    async def test_delete_saved_account_not_found(self, mock_runtime_service):
+    async def test_delete_saved_account_not_found(self):
         """Test account deletion when account not found."""
         with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
-        ) as mock_init:
-            mock_init.return_value = mock_runtime_service
-            mock_runtime_service.delete_account.return_value = False
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.delete_account"
+        ) as mock_delete:
+            mock_delete.return_value = False
 
             result = await delete_saved_account("nonexistent_account")
 
@@ -1725,15 +1747,12 @@ class TestDeleteSavedAccount:
             assert "not found" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_delete_saved_account_exception(self, mock_runtime_service):
+    async def test_delete_saved_account_exception(self):
         """Test account deletion with exception."""
         with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
-        ) as mock_init:
-            mock_init.return_value = mock_runtime_service
-            mock_runtime_service.delete_account.side_effect = Exception(
-                "Permission denied"
-            )
+            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.delete_account"
+        ) as mock_delete:
+            mock_delete.side_effect = Exception("Permission denied")
 
             result = await delete_saved_account("test_account")
 
@@ -1747,15 +1766,17 @@ class TestListSavedAccounts:
 
     @pytest.mark.asyncio
     async def test_list_saved_accounts_success(self):
-        """Test successful listing of saved accounts."""
+        """Test successful listing of saved accounts with token masking."""
         mock_accounts = {
             "ibm_quantum_platform": {
                 "channel": "ibm_quantum",
                 "url": "https://auth.quantum-computing.ibm.com/api",
+                "token": "secret_token_abc123",
             },
             "custom_account": {
                 "channel": "ibm_cloud",
                 "url": "https://cloud.ibm.com",
+                "token": "another_secret_xyz789",
             },
         }
 
@@ -1768,7 +1789,14 @@ class TestListSavedAccounts:
 
             assert result["status"] == "success"
             assert "accounts" in result
-            assert result["accounts"] == mock_accounts
+            # Verify tokens are masked (showing only last 4 characters)
+            assert result["accounts"]["ibm_quantum_platform"]["token"] == "***c123"
+            assert result["accounts"]["custom_account"]["token"] == "***z789"
+            # Verify other fields are unchanged
+            assert (
+                result["accounts"]["ibm_quantum_platform"]["channel"] == "ibm_quantum"
+            )
+            assert result["accounts"]["custom_account"]["channel"] == "ibm_cloud"
 
     @pytest.mark.asyncio
     async def test_list_saved_accounts_empty(self):
@@ -1781,7 +1809,7 @@ class TestListSavedAccounts:
             result = await list_saved_accounts()
 
             assert result["status"] == "success"
-            assert result["accounts"] == []
+            assert result["accounts"] == {}
             assert "No accounts found" in result["message"]
 
     @pytest.mark.asyncio
@@ -1824,6 +1852,8 @@ class TestActiveAccountInfo:
             assert "account_info" in result
             assert result["account_info"]["channel"] == "ibm_quantum"
             assert result["account_info"]["url"] == mock_account["url"]
+            # Verify token is masked (showing only last 4 characters)
+            assert result["account_info"]["token"] == "***_123"
 
     @pytest.mark.asyncio
     async def test_active_account_info_none_value(self, mock_runtime_service):
@@ -2046,6 +2076,40 @@ class TestUsageInfo:
 
             assert result["status"] == "error"
             assert "Usage data unavailable" in result["error"]
+
+
+class TestAccountManagementToolsExist:
+    """Test that MCP tool wrappers for account management are properly registered."""
+
+    def test_delete_saved_account_tool_exists(self):
+        """Test delete_saved_account_tool is registered as MCP tool."""
+        assert delete_saved_account_tool is not None
+        assert hasattr(delete_saved_account_tool, "name")
+
+    def test_list_saved_accounts_tool_exists(self):
+        """Test list_saved_accounts_tool is registered as MCP tool."""
+        assert list_saved_accounts_tool is not None
+        assert hasattr(list_saved_accounts_tool, "name")
+
+    def test_active_account_info_tool_exists(self):
+        """Test active_account_info_tool is registered as MCP tool."""
+        assert active_account_info_tool is not None
+        assert hasattr(active_account_info_tool, "name")
+
+    def test_active_instance_info_tool_exists(self):
+        """Test active_instance_info_tool is registered as MCP tool."""
+        assert active_instance_info_tool is not None
+        assert hasattr(active_instance_info_tool, "name")
+
+    def test_available_instances_tool_exists(self):
+        """Test available_instances_tool is registered as MCP tool."""
+        assert available_instances_tool is not None
+        assert hasattr(available_instances_tool, "name")
+
+    def test_usage_info_tool_exists(self):
+        """Test usage_info_tool is registered as MCP tool."""
+        assert usage_info_tool is not None
+        assert hasattr(usage_info_tool, "name")
 
 
 class TestExampleCircuits:

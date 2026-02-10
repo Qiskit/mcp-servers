@@ -331,6 +331,63 @@ class TestAIRouting:
         assert result["status"] == "error"
         assert expected_message in result["message"]
 
+    @pytest.mark.asyncio
+    async def test_ai_routing_with_coupling_map(
+        self,
+        mock_circuit_qasm,
+        mock_backend,
+        mock_load_qasm_circuit_success,
+        mock_dumps_qasm_success,
+        mock_get_backend_service_success,
+        mock_pass_manager_success,
+        mocker,
+    ):
+        """
+        Test AI routing with custom coupling_map parameter.
+        """
+        custom_coupling_map = [[0, 1], [1, 2], [2, 3]]
+        mock_coupling_map_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.CouplingMap")
+        mock_coupling_map_class.return_value = "custom_coupling_map"
+        mock_ai_routing_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.AIRouting")
+        mock_ai_routing_class.__name__ = "AIRouting"
+
+        result = await ai_routing(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            coupling_map=custom_coupling_map,
+        )
+
+        assert result["status"] == "success"
+        mock_coupling_map_class.assert_called_once_with(custom_coupling_map)
+        mock_ai_routing_class.assert_called_once_with(
+            coupling_map="custom_coupling_map",
+            optimization_level=1,
+            layout_mode="optimize",
+            optimization_preferences=None,
+            local_mode=True,
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "coupling_map, expected_error",
+        [
+            ("not_a_list", "coupling_map must be a non-empty list of qubit pairs"),
+            ([[0, 1], [1]], "coupling_map must contain pairs of qubit indices"),
+            ([], "coupling_map must be a non-empty list of qubit pairs"),
+        ],
+    )
+    async def test_ai_routing_invalid_coupling_map(
+        self, mock_circuit_qasm, mock_backend, coupling_map, expected_error
+    ):
+        """Test AI routing with invalid coupling_map values."""
+        result = await ai_routing(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            coupling_map=coupling_map,
+        )
+        assert result["status"] == "error"
+        assert expected_error in result["message"]
+
 
 class TestAICliffordSynthesis:
     """Test AI Clifford synthesis tool"""
@@ -808,10 +865,12 @@ class TestHybridAITranspile:
             mock_circuit_qasm, circuit_format="qasm3"
         )
         mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
             coupling_map="mock_coupling_map",
             ai_optimization_level=3,
             optimization_level=3,
             ai_layout_mode="optimize",
+            qiskit_transpile_options=None,
         )
 
     @pytest.mark.asyncio
@@ -838,10 +897,12 @@ class TestHybridAITranspile:
 
         assert result["status"] == "success"
         mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
             coupling_map="mock_coupling_map",
             ai_optimization_level=1,
             optimization_level=2,
             ai_layout_mode="improve",
+            qiskit_transpile_options=None,
         )
 
     @pytest.mark.asyncio
@@ -959,3 +1020,154 @@ class TestHybridAITranspile:
         )
         assert result["status"] == "error"
         assert expected_message in result["message"]
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_with_initial_layout(
+        self,
+        mock_circuit_qasm,
+        mock_backend,
+        mock_load_qasm_circuit_success,
+        mock_dumps_qasm_success,
+        mock_get_backend_service_with_coupling_map,
+        mock_generate_ai_pass_manager_success,
+        mock_get_circuit_metrics,
+    ):
+        """
+        Test hybrid AI transpilation with initial_layout parameter.
+        """
+        initial_layout = [0, 1, 5, 6, 7]
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            initial_layout=initial_layout,
+        )
+
+        assert result["status"] == "success"
+        mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
+            coupling_map="mock_coupling_map",
+            ai_optimization_level=3,
+            optimization_level=3,
+            ai_layout_mode="optimize",
+            qiskit_transpile_options={"initial_layout": initial_layout},
+        )
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_with_coupling_map(
+        self,
+        mock_circuit_qasm,
+        mock_backend,
+        mock_load_qasm_circuit_success,
+        mock_dumps_qasm_success,
+        mock_get_backend_service_with_coupling_map,
+        mock_generate_ai_pass_manager_success,
+        mock_get_circuit_metrics,
+        mocker,
+    ):
+        """
+        Test hybrid AI transpilation with custom coupling_map parameter.
+        """
+        custom_coupling_map = [[0, 1], [1, 2], [2, 3]]
+        mock_coupling_map_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.CouplingMap")
+        mock_coupling_map_class.return_value = "custom_coupling_map"
+
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            coupling_map=custom_coupling_map,
+        )
+
+        assert result["status"] == "success"
+        mock_coupling_map_class.assert_called_once_with(custom_coupling_map)
+        mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
+            coupling_map="custom_coupling_map",
+            ai_optimization_level=3,
+            optimization_level=3,
+            ai_layout_mode="optimize",
+            qiskit_transpile_options=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_hybrid_ai_transpile_with_both_initial_layout_and_coupling_map(
+        self,
+        mock_circuit_qasm,
+        mock_backend,
+        mock_load_qasm_circuit_success,
+        mock_dumps_qasm_success,
+        mock_get_backend_service_with_coupling_map,
+        mock_generate_ai_pass_manager_success,
+        mock_get_circuit_metrics,
+        mocker,
+    ):
+        """
+        Test hybrid AI transpilation with both initial_layout and coupling_map.
+        """
+        initial_layout = [0, 1, 2]
+        custom_coupling_map = [[0, 1], [1, 2]]
+        mock_coupling_map_class = mocker.patch("qiskit_ibm_transpiler_mcp_server.qta.CouplingMap")
+        mock_coupling_map_class.return_value = "custom_coupling_map"
+
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            initial_layout=initial_layout,
+            coupling_map=custom_coupling_map,
+        )
+
+        assert result["status"] == "success"
+        mock_coupling_map_class.assert_called_once_with(custom_coupling_map)
+        mock_generate_ai_pass_manager_success.assert_called_once_with(
+            backend=mock_get_backend_service_with_coupling_map.mock_backend,
+            coupling_map="custom_coupling_map",
+            ai_optimization_level=3,
+            optimization_level=3,
+            ai_layout_mode="optimize",
+            qiskit_transpile_options={"initial_layout": initial_layout},
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "initial_layout, expected_error",
+        [
+            ("not_a_list", "initial_layout must be a non-empty list of integers"),
+            ([-1, 0, 1], "initial_layout must contain only non-negative integers"),
+            ([0, "a", 2], "initial_layout must contain only non-negative integers"),
+            ([], "initial_layout must be a non-empty list of integers"),
+        ],
+    )
+    async def test_hybrid_ai_transpile_invalid_initial_layout(
+        self, mock_circuit_qasm, mock_backend, initial_layout, expected_error
+    ):
+        """Test hybrid AI transpilation with invalid initial_layout values."""
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            initial_layout=initial_layout,
+        )
+        assert result["status"] == "error"
+        assert expected_error in result["message"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "coupling_map, expected_error",
+        [
+            ("not_a_list", "coupling_map must be a non-empty list of qubit pairs"),
+            ([[0, 1], [1]], "coupling_map must contain pairs of qubit indices"),
+            ([[0, 1, 2]], "coupling_map must contain pairs of qubit indices"),
+            ([[0, -1]], "coupling_map qubit indices must be non-negative integers"),
+            ([[0, "a"]], "coupling_map qubit indices must be non-negative integers"),
+            ([], "coupling_map must be a non-empty list of qubit pairs"),
+        ],
+    )
+    async def test_hybrid_ai_transpile_invalid_coupling_map(
+        self, mock_circuit_qasm, mock_backend, coupling_map, expected_error
+    ):
+        """Test hybrid AI transpilation with invalid coupling_map values."""
+        result = await hybrid_ai_transpile(
+            circuit=mock_circuit_qasm,
+            backend_name=mock_backend,
+            coupling_map=coupling_map,
+        )
+        assert result["status"] == "error"
+        assert expected_error in result["message"]

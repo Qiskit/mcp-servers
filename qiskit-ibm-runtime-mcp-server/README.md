@@ -1,5 +1,9 @@
 # Qiskit IBM Runtime MCP Server
 
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-ibm-runtime-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=MCP%20Registry&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-ibm-runtime-mcp-server)
+
+<!-- mcp-name: io.github.Qiskit/qiskit-ibm-runtime-mcp-server -->
+
 A comprehensive Model Context Protocol (MCP) server that provides AI assistants with access to IBM Quantum computing services through Qiskit IBM Runtime. This server enables quantum circuit creation, execution, and management directly from AI conversations.
 
 ## Features
@@ -262,8 +266,9 @@ Get list of available quantum backends.
 - Number of qubits, coupling map
 - Simulator vs. hardware designation
 
-### `least_busy_backend()`
-Get the current least busy IBM Quantum backend available
+#### `least_busy_backend()`
+Get the current least busy IBM Quantum backend available.
+
 **Returns:** The backend with the fewest number of pending jobs
 
 #### `get_backend_properties(backend_name: str)`
@@ -412,6 +417,66 @@ Cancel a running or queued job.
 
 **Parameters:**
 - `job_id`: The ID of the job to cancel
+
+#### `list_saved_accounts()`
+List all IBM Quantum accounts saved on disk.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `accounts`: Dictionary of saved accounts (keyed by account name)
+- Each account contains: channel, url, token (masked for security)
+- `message`: Status message
+
+**Note:** Tokens are masked in the response, showing only the last 4 characters.
+
+#### `delete_saved_account(account_name: str)`
+Delete a saved IBM Quantum account from disk.
+
+**WARNING:** This permanently removes credentials from `~/.qiskit/qiskit-ibm.json`. The operation cannot be undone.
+
+**Parameters:**
+- `account_name`: Name of the saved account to delete. Use `list_saved_accounts()` to find available names.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `deleted`: Boolean indicating if deletion was successful
+- `message` or `error`: Status message
+
+#### `active_account_info()`
+Get information about the currently active IBM Quantum account.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `account_info`: Account details including channel, url, token (masked for security)
+
+**Note:** Tokens are masked in the response, showing only the last 4 characters.
+
+#### `active_instance_info()`
+Get the Cloud Resource Name (CRN) of the currently active instance.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `instance_crn`: The CRN string identifying the active instance
+
+#### `available_instances()`
+List all IBM Quantum instances available to the active account.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `instances`: List of available instances with CRN, plan, name, and pricing info
+- `total_instances`: Count of available instances
+
+#### `usage_info()`
+Get usage statistics and quota information for the active instance.
+
+**Returns:** Dictionary containing:
+- `status`: "success" or "error"
+- `usage`: Usage metrics including:
+  - `usage_consumed_seconds`: Time consumed this period
+  - `usage_limit_seconds`: Total quota for the period
+  - `usage_remaining_seconds`: Remaining quota
+  - `usage_limit_reached`: Boolean indicating if limit is reached
+  - `usage_period`: Current billing period
 
 
 ### Resources

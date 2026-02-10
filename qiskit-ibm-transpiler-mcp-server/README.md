@@ -1,5 +1,9 @@
 # qiskit-ibm-transpiler-mcp-server
 
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-ibm-transpiler-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=MCP%20Registry&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-ibm-transpiler-mcp-server)
+
+<!-- mcp-name: io.github.Qiskit/qiskit-ibm-transpiler-mcp-server -->
+
 MCP server for Qiskit transpiler. It supports **AI routing**, 
 **AI Clifford** synthesis, **AI Linear Function** synthesis, **AI Permutation** synthesis, and **AI Pauli Network** synthesis using QASM 3.0 as the input/output tools format.
 
@@ -200,6 +204,7 @@ ai_routing(
       "n_cnots", "n_gates", "cnot_layers", "layers", "noise"
       ] | list[Literal["n_cnots", "n_gates", "cnot_layers", "layers", "noise"]] | None = None,
    local_mode: bool = True,
+   coupling_map: list[list[int]] | None = None,
    circuit_format: str = "qasm3"
 )
 ```
@@ -213,6 +218,7 @@ ai_routing(
   - `"optimize"`: This is the default mode. It works best for general circuits where you might not have good layout guesses. This mode ignores previous layout selections
 - `optimization_preferences` (optional): Indicates what you want to reduce through optimization: number of cnot gates (n_cnots), number of gates (n_gates), number of cnots layers (cnot_layers), number of layers (layers), and/or noise (noise)
 - `local_mode` (optional): determines where the AIRouting pass runs. If False, AIRouting runs remotely through the Qiskit Transpiler Service. If True, the package tries to run the pass in your local environment with a fallback to cloud mode if the required dependencies are not found
+- `coupling_map` (optional): List of qubit pairs representing the backend topology. If provided, overrides the backend's coupling map. Useful for targeting a specific subset of qubits
 - `circuit_format` (optional): Format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3"
 
 **Returns:** Dictionary with:
@@ -223,6 +229,40 @@ ai_routing(
 - `improvements`: Calculated improvements (depth_reduction, two_qubit_gate_reduction)
 
 **Note:** Currently, only the local mode execution is available
+
+### Hybrid AI Transpile
+Transpile a quantum circuit using a hybrid pass manager that combines Qiskit's heuristic optimization with AI-powered transpiler passes. This provides end-to-end transpilation in a single unified pipeline.
+```
+hybrid_ai_transpile(
+   circuit: str,
+   backend_name: str,
+   ai_optimization_level: int = 3,
+   optimization_level: int = 3,
+   ai_layout_mode: str = "optimize",
+   initial_layout: list[int] | None = None,
+   coupling_map: list[list[int]] | None = None,
+   circuit_format: str = "qasm3"
+)
+```
+**Parameters:**
+- `circuit`: quantum circuit as QASM 3.0 string or base64-encoded QPY
+- `backend_name`: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+- `ai_optimization_level` (optional): Optimization level (1-3) for AI components. Higher values yield better results but require more computational resources
+- `optimization_level` (optional): Optimization level (1-3) for heuristic components in the PassManager
+- `ai_layout_mode` (optional): Specifies how the AI routing component handles layout selection:
+  - `"keep"`: Respects the layout set by previous transpiler passes
+  - `"improve"`: Uses prior layouts as starting points for optimization
+  - `"optimize"`: Default; ignores previous layout selections for general circuits. Note: If `initial_layout` is provided with 'optimize', it automatically converts to 'improve' to leverage the user-provided layout
+- `initial_layout` (optional): List of physical qubit indices specifying where to place virtual qubits. For example, `[0, 1, 5, 6, 7]` maps virtual qubit 0 to physical qubit 0, virtual qubit 1 to physical qubit 1, etc.
+- `coupling_map` (optional): List of qubit pairs representing the backend topology. If provided, overrides the backend's coupling map. Useful for targeting a specific subset of qubits
+- `circuit_format` (optional): Format of the input circuit ("qasm3" or "qpy"). Defaults to "qasm3"
+
+**Returns:** Dictionary with:
+- `status`: "success" or "error"
+- `circuit_qpy`: Base64-encoded QPY format
+- `original_circuit`: Metrics for the input circuit (num_qubits, depth, size, two_qubit_gates)
+- `optimized_circuit`: Metrics for the optimized circuit (num_qubits, depth, size, two_qubit_gates)
+- `improvements`: Calculated improvements (depth_reduction, two_qubit_gate_reduction)
 
 ### AI Clifford synthesis
 Synthesis for Clifford circuits (blocks of H, S, and CX gates). Currently, up to nine qubit blocks.

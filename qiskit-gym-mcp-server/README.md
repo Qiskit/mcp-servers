@@ -1,5 +1,9 @@
 # Qiskit Gym MCP Server
 
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-gym-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=MCP%20Registry&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-gym-mcp-server)
+
+<!-- mcp-name: io.github.Qiskit/qiskit-gym-mcp-server -->
+
 A Model Context Protocol (MCP) server that provides reinforcement learning-based quantum circuit synthesis capabilities using [qiskit-gym](https://github.com/AI4quantum/qiskit-gym).
 
 ## Features
