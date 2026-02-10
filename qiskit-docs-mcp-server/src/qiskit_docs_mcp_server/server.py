@@ -11,31 +11,32 @@
 # that they have been altered from the originals.
 
 from mcp.server.fastmcp import FastMCP
-from data_fetcher import *
+from typing import Any
+from .data_fetcher import *
 
 mcp = FastMCP("qiskit_docs")
 
 
 @mcp.tool()
-def list_sdk_modules() -> list[str]:
+async def list_sdk_modules() -> list[str]:
     """List all available Qiskit SDK modules (circuit, primitives, transpiler, etc.)."""
-    return get_component_list()
+    return await get_component_list()
 
 
 @mcp.tool()
-def list_addons() -> list[str]:
+async def list_addons() -> list[str]:
     """List all available Qiskit addon modules and tutorials (addon-opt-mapper, addon-vqe, etc.)."""
-    return get_pattern_list()
+    return await get_pattern_list()
 
 
 @mcp.tool()
-def list_guides() -> list[str]:
+async def list_guides() -> list[str]:
     """List all available Qiskit guides and best practices (optimization, error-mitigation, etc.)."""
-    return get_style_list()
+    return await get_style_list()
 
 
 @mcp.tool()
-def get_sdk_module_docs(module: str) -> dict:
+async def get_sdk_module_docs(module: str) -> dict[str, Any]:
     """
     Get documentation for a Qiskit SDK module.
     
@@ -47,11 +48,11 @@ def get_sdk_module_docs(module: str) -> dict:
     """
     docs = get_component_docs(module)
     if docs is None:
-        return {"error": f"Module '{module}' not found. Use list_sdk_modules() to see available modules."}
+        return {"status": "error", "message": f"Module '{module}' not found. Use list_sdk_modules() to see available modules."}
     return {"module": module, "documentation": docs}
 
 @mcp.tool()
-def get_guide(guide: str) -> dict:
+async def get_guide(guide: str) -> dict[str, Any]:
     """
     Get a Qiskit guide or best practice documentation.
     
@@ -63,12 +64,12 @@ def get_guide(guide: str) -> dict:
     """
     docs = get_guide_docs(guide)
     if docs is None:
-        return {"error": f"Guide '{guide}' not found. Use list_guides() to see available guides."}
+        return {"status": "error", "message": f"Guide '{guide}' not found. Use list_guides() to see available guides."}
     return {"guide": guide, "documentation": docs}
 
 
 @mcp.tool()
-def search_docs(query: str, module: str = "documentation") -> list[dict]:
+async def search_docs(query: str, module: str = "documentation") -> list[dict[str, Any]]:
     """
     Search Qiskit documentation for relevant modules, addons, and guides.
     
@@ -86,17 +87,17 @@ def search_docs(query: str, module: str = "documentation") -> list[dict]:
 
 ## Resource
 @mcp.resource("qdc://modules", mime_type="application/json")
-def get_component_list() -> list[str]:
+async def get_component_list() -> list[str]:
     """Get list of all Qiskit SDK modules."""
     return list(QISKIT_MODULES.keys())
 
 @mcp.resource("qdc://pattern", mime_type="application/json")
-def get_pattern_list() -> list[str]:
+async def get_pattern_list() -> list[str]:
     """Get list of all Qiskit addon modules and tutorials."""
     return list(QISKIT_ADDON_MODULES.keys())
 
 @mcp.resource("qdc://style", mime_type="application/json")
-def get_style_list() -> list[str]:
+async def get_style_list() -> list[str]:
     """Get list of Qiskit guides and best practices."""
     return [
         "optimization",

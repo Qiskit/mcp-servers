@@ -14,7 +14,7 @@
 LangChain Agent Example with Qiskit Docs MCP Server
 
 This example demonstrates how to create an AI agent using LangChain that
-connects to the qiskit-doc-mcp-server via the Model Context Protocol (MCP).
+Connects to the qiskit-docs-mcp-server via the Model Context Protocol (MCP).
 
 The agent uses the documentation MCP server to:
 - Retrieve SDK module lists and documentation pages
@@ -51,7 +51,7 @@ Usage:
 
 # System prompt tailored for the qiskit-doc-mcp-server
 SYSTEM_PROMPT = """You are a knowledgeable Qiskit documentation assistant with access to the
-qiskit-doc-mcp-server through the MCP server.
+qiskit-docs-mcp-server through the MCP server.
 
 You can help users:
 - Retrieve SDK module lists and documentation pages (list_sdk_modules, get_module_docs)
@@ -171,6 +171,54 @@ def check_api_key(provider: str) -> bool:
 def get_mcp_client() -> MultiServerMCPClient:
     """
     Create and return an MCP client configured for the Qiskit Docs server.
+    """
+    # Get the absolute path to the directory where THIS script is (examples/)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Go up one level to the project root
+    project_root = os.path.abspath(os.path.join(current_dir, ".."))
+    
+    venv_python = os.path.join(project_root, ".venv", "bin", "python")
+    src_path = os.path.join(project_root, "src")
+
+    return MultiServerMCPClient(
+        {
+            "qiskit-docs": {
+                "transport": "stdio",
+                "command": venv_python,
+                "args": ["-m", "qiskit_docs_mcp_server"],
+                "env": {
+                    **os.environ,
+                    "PYTHONPATH": src_path, # THIS is what was missing
+                    "PYTHONUNBUFFERED": "1",
+                },
+            }
+        }
+    )
+    """
+    Create and return an MCP client configured for the Qiskit Docs server.
+    """
+    # Use absolute paths to ensure the subprocess finds everything
+    base_path = "/home/luke/Desktop/mcp-servers/qiskit-docs-mcp-server"
+    venv_python = os.path.join(base_path, ".venv/bin/python")
+    src_path = os.path.join(base_path, "src")
+
+    return MultiServerMCPClient(
+        {
+            "qiskit-docs": {
+                "transport": "stdio",
+                "command": venv_python,
+                # Use -m to run the package, ensuring 'src' is in the path
+                "args": ["-m", "qiskit_docs_mcp_server"], 
+                "env": {
+                    **os.environ,
+                    "PYTHONPATH": src_path,
+                    "PYTHONUNBUFFERED": "1"
+                },
+            }
+        }
+    )
+    """
+    Create and return an MCP client configured for the Qiskit Docs server.
 
     Returns:
         Configured MultiServerMCPClient instance.
@@ -179,7 +227,7 @@ def get_mcp_client() -> MultiServerMCPClient:
         {
             "qiskit-docs": {
                 "transport": "stdio",
-                "command": "qiskit-doc-mcp-server",
+                "command": "qiskit-docs-mcp-server",
                 "args": [],
                 "env": {},
             }

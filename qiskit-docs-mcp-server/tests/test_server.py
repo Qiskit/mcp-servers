@@ -18,14 +18,14 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "qiskit-doc-mcp"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from server import (
-    list_sdk_modules,
-    list_addons,
-    list_guides,
+    # list_sdk_modules,
+    # list_addons,
+    # list_guides,
     get_sdk_module_docs,
-    get_addon_docs,
+    # get_addon_docs,
     get_guide,
     search_docs,
     get_component_list,

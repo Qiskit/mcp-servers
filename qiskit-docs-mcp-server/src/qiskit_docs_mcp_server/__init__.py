@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-import server
+from qiskit_docs_mcp_server import server
 
 def main() -> None:
     """Main entry point for the package."""
