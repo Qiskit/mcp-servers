@@ -218,7 +218,7 @@ if __name__ == "__main__":
     atexit.register(cleanup)
 
     try:
-        mcp.run(transport="stdio")
+        mcp.run(transport="stdio", show_banner=False)
     except KeyboardInterrupt:
         logger.info("Server interrupted, shutting down...")
     finally:
