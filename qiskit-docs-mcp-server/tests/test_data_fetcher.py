@@ -35,6 +35,12 @@ from qiskit_docs_mcp_server.data_fetcher import (
 class TestFetchText:
     """Test fetch_text function."""
 
+    # Clearing the cache before each test to ensure that the tests are independent
+    @pytest.fixture(autouse=True)
+    def clear_cache(self):
+        """Clear the lru_cache before each test."""
+        fetch_text.cache_clear()
+
     @patch("qiskit_docs_mcp_server.data_fetcher.httpx.Client")
     def test_fetch_text_success(self, mock_client_class):
         """Test successful text fetch."""
@@ -178,11 +184,6 @@ class TestGetComponentDocs:
         mock_fetch.return_value = None
         result = get_component_docs("circuit")
         assert result is None
-
-
-# Removed TestGetPatternDocs as get_pattern_docs is not implemented.
-# Documentation for addons is now handled via components if they are in QISKIT_MODULES.
-
 
 class TestGetGuideDocs:
     """Test get_guide_docs function."""
