@@ -253,37 +253,6 @@ def initialize_service(
         raise
 
 
-def initialize_estimator() -> tuple[EstimatorV2, Any]:
-    """Initialize the EstimatorV2 instance.
-
-    This helper creates an :class:`qiskit_ibm_runtime.EstimatorV2` that
-    interacts with Qiskit Runtime Estimator primitive service.
-    The Estimator primitive estimates expectation values of quantum circuits and observables.
-
-    The function automatically selects the least busy operational backend and creates
-    an EstimatorV2 instance in job execution mode.
-
-    Returns:
-        tuple[EstimatorV2, Any]: A tuple containing:
-            - EstimatorV2: The initialized estimator instance
-            - Backend: The selected backend for execution
-
-    Raises:
-        Exception: If service initialization or backend selection fails
-    """
-    global service
-
-    try:
-        if service is None:
-            service = initialize_service()
-        backend = service.least_busy(operational=True, simulator=False)
-        estimator_service = EstimatorV2(mode=backend)
-        return estimator_service, backend
-    except Exception as e:
-        logger.error(f"Failed to initialize EstimatorV2: {e}")
-        raise
-
-
 @with_sync
 async def setup_ibm_quantum_account(
     token: str | None = None, channel: str = "ibm_quantum_platform"
@@ -1689,6 +1658,20 @@ async def run_estimator(
         if backend_error:
             return {"status": "error", "message": backend_error}
         assert backend is not None  # Type narrowing for mypy  # nosec B101
+
+        # Validate optimization_level
+        if not 0 <= optimization_level <= 3:
+            return {
+                "status": "error",
+                "message": f"optimization_level must be between 0 and 3, got {optimization_level}",
+            }
+
+        # Validate resilience_level
+        if not 0 <= resilience_level <= 2:
+            return {
+                "status": "error",
+                "message": f"resilience_level must be between 0 and 2, got {resilience_level}",
+            }
 
         # Parse observables into SparsePauliOp
         try:

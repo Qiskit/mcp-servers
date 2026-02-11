@@ -1260,11 +1260,14 @@ cx q[0], q[1];
             patch(
                 "qiskit_ibm_runtime_mcp_server.ibm_runtime.EstimatorV2",
             ) as mock_estimator_cls,
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_estimator_backend",
+            ) as mock_get_backend,
         ):
-            # Setup
+            # Setup backend
             backend = Mock(name="backend")
             backend.name = "ibm_brisbane"
-            mock_runtime_service.backend.return_value = backend
+            mock_get_backend.return_value = (backend, None)
 
             mock_pauli = Mock(name="hamiltonian")
             mock_pauli.apply_layout.return_value = Mock()
@@ -1325,11 +1328,14 @@ cx q[0], q[1];
             patch(
                 "qiskit_ibm_runtime_mcp_server.ibm_runtime.EstimatorV2",
             ) as mock_estimator_cls,
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_estimator_backend",
+            ) as mock_get_backend,
         ):
-            # Setup
+            # Setup backend
             backend = Mock(name="backend")
             backend.name = "ibm_fez"
-            mock_runtime_service.least_busy.return_value = backend
+            mock_get_backend.return_value = (backend, None)
 
             mock_pauli = Mock(name="hamiltonian")
             mock_pauli.apply_layout.return_value = Mock()
