@@ -42,7 +42,7 @@ Quantum Volume (QV) 2^n is achieved when:
 │                 │ │                     │ │                     │
 │ Get backend     │ │ Searches ALL qubits │ │ Transpile circuit   │
 │ properties      │ │ on backend          │ │ Submit job          │
-│                 │ │                     │ │ Poll & get counts   │
+│                 │ │                     │ │ Poll for completion │
 └─────────────────┘ └─────────────────────┘ └─────────────────────┘
 ```
 
@@ -82,6 +82,7 @@ The agent reports ACTUAL results:
 from __future__ import annotations
 
 import argparse
+import json
 import asyncio
 import os
 import sys
@@ -99,8 +100,8 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (override=True so .env takes precedence over shell env)
+load_dotenv(override=True)
 
 
 # =============================================================================
@@ -245,12 +246,13 @@ You are the Quantum Volume Finder. Your job is to EXECUTE experiments and report
 
 ## REQUIRED WORKFLOW (DO ALL STEPS)
 
-1. Get backend info (backend-analyst)
-2. Find optimal qubits (qubit-chain-optimizer)
-3. **EXECUTE QV EXPERIMENT** (qv-experiment-runner) ← THIS IS MANDATORY!
-4. Report actual job ID, counts, and HOP
+1. Get backend info → **backend-analyst**
+2. Find optimal qubits for the depth → **qubit-chain-optimizer**
+3. Run experiment on hardware → **qv-experiment-runner** (transpiles, submits, polls, returns job_id)
+4. Calculate HOP → call calculate_hop(job_id=<job_id>, depth=N)
+5. If HOP above threshold: SUCCESS. If not: try depth-1 (repeat from step 2)
 
-## Subagents - COPY THESE FORMATS
+## Subagents — COPY THESE FORMATS EXACTLY
 
 ### backend-analyst
 ```
@@ -259,43 +261,29 @@ task(subagent_type="backend-analyst", description="Get ibm_boston properties")
 
 ### qubit-chain-optimizer
 ```
-task(subagent_type="qubit-chain-optimizer", description="Find qubits for depth 5 on ibm_boston")
+task(subagent_type="qubit-chain-optimizer", description="Find 5 optimal qubits for QV-5 on ibm_boston")
 ```
 
-### qv-experiment-runner ← YOU MUST CALL THIS TO RUN THE EXPERIMENT!
+### qv-experiment-runner
+Pass depth, backend, and initial_layout (qubits). The subagent transpiles the QV circuit,
+submits it to hardware, polls for completion, and returns the job_id.
 ```
-task(subagent_type="qv-experiment-runner", description="Run depth 5 on ibm_boston qubits [47,57,66,67,68]")
+task(subagent_type="qv-experiment-runner", description="Run QV experiment: depth=5, backend_name=ibm_boston, initial_layout=[47, 57, 66, 67, 68]")
 ```
 
-## Output Format
+## HOP Calculation
 
-Your final report MUST include actual execution results:
-
-```
-## QV EXPERIMENT RESULTS
-
-### Depth N (tried first)
-- Qubits used: [list of qubits]
-- Job ID: xxx
-- Shots: 4096
-- Measurement counts: {"00...": count, ...}
-- HOP: calculated value
-- Result: PASS/FAIL
-
-### Depth N-1 (if N failed)
-...
-
-## CONCLUSION
-Highest achieved QV: 2^M (where M is the highest passing depth)
-```
+After the experiment runner returns the job_id:
+1. Call calculate_hop(job_id=<job_id from runner>, depth=N)
+   This fetches the job results and looks up heavy outputs automatically.
+2. Check if above_threshold is true
 
 ## Critical Rules
 
 1. DO NOT make recommendations - RUN the experiments
 2. DO NOT stop after one failure - try lower depths
 3. DO NOT limit qubit search - use all qubits on the backend
-4. DO NOT use write_file - return results as text
-5. ALWAYS report actual measurement counts from hardware
+4. ALWAYS report actual job ID, measurement counts, and HOP
 """
 
 BACKEND_ANALYST_PROMPT = """You are the Backend Analyst, an expert in IBM Quantum hardware.
@@ -355,49 +343,30 @@ Return the top 10 qubit subsets with their scores. The coordinator will use
 these to run QV experiments, potentially trying multiple if the first fails.
 """
 
-QV_EXPERIMENT_RUNNER_PROMPT = """
-##############################################################################
-#                        CRITICAL INSTRUCTIONS                               #
-##############################################################################
+QV_EXPERIMENT_RUNNER_PROMPT = """You run QV experiments on hardware.
 
-STEP 1: Use hybrid_ai_transpile_tool (NOT ai_routing_tool!)
-STEP 2: Pass the circuit_qpy from Step 1 to run_sampler_tool
-        DO NOT call run_sampler_tool with empty arguments!
+Your task description contains: depth, backend_name, and initial_layout (qubits).
 
-##############################################################################
+## WORKFLOW — Follow these steps IN ORDER:
 
-## STEP 1: Transpile the circuit
+### STEP 1: Transpile the QV circuit
+```
+transpile_qv_circuit(depth=<depth>, backend_name=<backend>, optimization_level=3, initial_layout=<qubits>)
+```
+This generates the QV circuit and transpiles it. The result shows transpilation metrics.
 
-USE THIS TOOL: hybrid_ai_transpile_tool (NOT ai_routing_tool!)
+### STEP 2: Submit to hardware
+```
+submit_qv_job(depth=<depth>, backend_name=<backend>, shots=4096)
+```
+This submits the transpiled circuit. Returns a job_id.
 
-Call it with the QASM circuit:
-- circuit: <the QASM string>
-- backend_name: <the backend>
-- optimization_level: 3
-- ai_layout_mode: "optimize"
+### STEP 3: Wait for completion
+Poll get_job_status_tool(job_id=<id>) every call until job_status is "DONE".
 
-The response will include "circuit_qpy" - a base64 string. SAVE IT!
-
-## STEP 2: Submit to hardware
-
-CRITICAL: You MUST pass the circuit_qpy value from Step 1!
-
-Call run_sampler_tool with:
-- circuit: <THE CIRCUIT_QPY FROM STEP 1 - the base64 string starting with "UUlT...">
-- backend_name: <the backend>
-- shots: 4096
-
-DO NOT call run_sampler_tool({}) - that will FAIL!
-DO NOT forget to include the circuit parameter!
-
-## STEP 3: Wait for completion
-Poll get_job_status_tool until job_status is "DONE".
-
-## STEP 4: Get results
-Call get_job_results_tool to get the counts.
-
-## STEP 5: Report back
-Return: Backend, Depth, Qubits, Job ID, Counts
+### STEP 4: Report back
+Return ALL of: backend, depth, qubits, job_id, shots.
+The coordinator will fetch results and calculate HOP using the job_id.
 """
 
 
@@ -462,31 +431,6 @@ def get_llm(provider: str, model: str | None = None):
 # =============================================================================
 
 
-def generate_qv_qasm(num_qubits: int, depth: int | None = None, seed: int = 42) -> str:
-    """Generate a true Quantum Volume circuit in QASM 3.0 format.
-
-    Uses Qiskit's quantum_volume function which generates circuits with
-    Haar-random SU(4) two-qubit gates - the proper QV protocol.
-
-    Args:
-        num_qubits: Number of qubits (QV width)
-        depth: Circuit depth (defaults to num_qubits for standard QV)
-        seed: Random seed for reproducibility
-
-    Returns:
-        QASM 3.0 string of the decomposed QV circuit
-    """
-    from qiskit.circuit.library import quantum_volume
-    from qiskit.qasm3 import dumps
-
-    # Create true QV circuit with Haar-random SU(4) gates
-    qv_circuit = quantum_volume(num_qubits, depth=depth, seed=seed)
-
-    # Decompose to basis gates and convert to QASM3
-    decomposed = qv_circuit.decompose()
-    return dumps(decomposed)
-
-
 def generate_qv_circuit_with_ideal_distribution(
     num_qubits: int,
     depth: int | None = None,
@@ -502,7 +446,7 @@ def generate_qv_circuit_with_ideal_distribution(
     when the circuit is run on real hardware.
 
     Args:
-        num_qubits: Number of qubits for the QV circuit (2-10 recommended)
+        num_qubits: Number of qubits for the QV circuit (2-20 supported)
         depth: Depth of the QV circuit (number of SU(4) layers). If None, defaults
                to num_qubits (square QV circuit). Range: 1 to num_qubits.
         seed: Random seed for reproducible circuit generation. If None, uses
@@ -522,7 +466,7 @@ def generate_qv_circuit_with_ideal_distribution(
 
     Note:
         This function performs classical simulation which scales as O(2^n).
-        For num_qubits > 10, simulation becomes computationally expensive.
+        For num_qubits > 20, simulation becomes computationally expensive.
     """
     import logging
 
@@ -538,11 +482,11 @@ def generate_qv_circuit_with_ideal_distribution(
         # Validate and set defaults
         if num_qubits < 2:
             num_qubits = 2
-        elif num_qubits > 10:
+        elif num_qubits > 20:
             # Warn but allow - simulation will be slow
             logger.warning(
                 f"QV with {num_qubits} qubits will be slow to simulate. "
-                "Consider using <= 10 qubits."
+                "Consider using <= 20 qubits."
             )
 
         if depth is None:
@@ -574,8 +518,8 @@ def generate_qv_circuit_with_ideal_distribution(
         # Create mapping from bitstring to probability
         ideal_probs = {}
         for i, prob in enumerate(probabilities):
-            # Format as bitstring (little-endian to match Qiskit convention)
-            bitstring = format(i, f"0{num_qubits}b")[::-1]
+            # Format as bitstring matching Qiskit convention (qubit 0 = rightmost)
+            bitstring = format(i, f"0{num_qubits}b")
             ideal_probs[bitstring] = prob
 
         # Find median probability
@@ -827,6 +771,7 @@ async def create_qv_optimizer_agent(
     provider: str = "anthropic",
     model: str | None = None,
     max_qv_depth: int = 5,
+    qv_data: dict[int, dict] | None = None,
 ) -> tuple[Any, MultiServerMCPClient]:
     """Create the Quantum Volume Optimizer deep agent with all subagents.
 
@@ -834,10 +779,13 @@ async def create_qv_optimizer_agent(
         provider: LLM provider to use
         model: Optional model name override
         max_qv_depth: Maximum QV depth to evaluate
+        qv_data: Shared cache for QV circuit data, keyed by depth (populated lazily)
 
     Returns:
         Tuple of (agent, mcp_client) for cleanup
     """
+    if qv_data is None:
+        qv_data = {}
     print("\n" + "=" * 70)
     print("  QUANTUM VOLUME OPTIMIZER")
     print("  A Deep Agent Multi-MCP-Server Example")
@@ -851,7 +799,6 @@ async def create_qv_optimizer_agent(
 
     # Load tools from each server using get_tools() which creates tools that
     # manage their own sessions (new session per tool call)
-    all_tools = []
     server_tools = {}
 
     for server_name in mcp_config.keys():
@@ -859,12 +806,11 @@ async def create_qv_optimizer_agent(
             print(f"  Connecting to {server_name}...", end=" ", flush=True)
             tools = await mcp_client.get_tools(server_name=server_name)
             server_tools[server_name] = tools
-            all_tools.extend(tools)
             print(f"OK ({len(tools)} tools)")
         except Exception as e:
             print(f"FAILED: {e}")
 
-    print(f"\nTotal tools loaded: {len(all_tools)}")
+    print(f"\nTotal tools loaded: {sum(len(t) for t in server_tools.values())}")
 
     # Get the LLM
     llm = get_llm(provider, model)
@@ -885,30 +831,184 @@ async def create_qv_optimizer_agent(
         "tools": server_tools.get("qiskit-ibm-runtime", []),  # Has the QV qubit finding tools
     }
 
+    # Create local tools
+    from langchain_core.tools import tool as langchain_tool
+
+    # Find MCP tools for programmatic use (avoids passing large circuits through LLM)
+    transpiler_tools = server_tools.get("qiskit-ibm-transpiler", [])
+    runtime_tools = server_tools.get("qiskit-ibm-runtime", [])
+    hybrid_transpile_mcp = next(
+        (t for t in transpiler_tools if t.name == "hybrid_ai_transpile_tool"), None
+    )
+    run_sampler_mcp = next(
+        (t for t in runtime_tools if t.name == "run_sampler_tool"), None
+    )
+    get_job_results_mcp = next(
+        (t for t in runtime_tools if t.name == "get_job_results_tool"), None
+    )
+
+    def _parse_mcp_result(result: Any) -> dict:
+        """Parse the result from a programmatic MCP tool call into a dict."""
+        # MCP ainvoke returns: list of content blocks, a JSON string, or a dict
+        if isinstance(result, list):
+            # Raw MCP content blocks: [{'type': 'text', 'text': '{"status":...}'}]
+            text = result[0]["text"] if result else "{}"
+            return json.loads(text)
+        if isinstance(result, str):
+            return json.loads(result)
+        return result
+
+    def _ensure_qv_data(depth: int) -> dict | None:
+        """Generate QV circuit data for a depth if not already cached. Returns error dict or None."""
+        if depth < 2 or depth > 20:
+            return {"status": "error", "message": f"Depth must be between 2 and 20, got {depth}"}
+        if depth not in qv_data:
+            result = generate_qv_circuit_with_ideal_distribution(depth, seed=42 + depth)
+            if result["status"] != "success":
+                return result
+            qv_data[depth] = result
+        return None
+
+    @langchain_tool
+    async def transpile_qv_circuit(
+        depth: int,
+        backend_name: str,
+        optimization_level: int = 3,
+        initial_layout: list[int] | None = None,
+    ) -> dict:
+        """Transpile a QV circuit using the AI transpiler.
+
+        Generates the QV circuit on demand and transpiles it via the MCP transpiler.
+        The transpiled QPY is stored internally — call submit_qv_job next.
+
+        Args:
+            depth: The QV depth (e.g., 5 for QV-32, 11 for QV-2048)
+            backend_name: IBM backend name (e.g., 'ibm_boston')
+            optimization_level: Optimization level 1-3 (default: 3)
+            initial_layout: Physical qubits to map virtual qubits to
+        """
+        error = _ensure_qv_data(depth)
+        if error:
+            return error
+
+        if hybrid_transpile_mcp is None:
+            return {"status": "error", "message": "hybrid_ai_transpile_tool not available"}
+
+        circuit_qasm = qv_data[depth]["circuit_qasm"]
+
+        # Call the MCP transpiler tool programmatically (avoids QASM through LLM)
+        result = await hybrid_transpile_mcp.ainvoke({
+            "circuit": circuit_qasm,
+            "backend_name": backend_name,
+            "optimization_level": optimization_level,
+            "initial_layout": initial_layout,
+        })
+
+        result = _parse_mcp_result(result)
+
+        if result.get("status") == "success":
+            # Store QPY for submit_qv_job (avoids QPY through LLM)
+            qv_data[depth]["circuit_qpy"] = result["circuit_qpy"]
+            return {
+                "status": "success",
+                "depth": depth,
+                "backend_name": backend_name,
+                "original_circuit": result.get("original_circuit"),
+                "optimized_circuit": result.get("optimized_circuit"),
+                "improvements": result.get("improvements"),
+                "message": "Transpiled successfully. Call submit_qv_job next.",
+            }
+        return result
+
+    @langchain_tool
+    async def submit_qv_job(
+        depth: int,
+        backend_name: str,
+        shots: int = 4096,
+    ) -> dict:
+        """Submit a transpiled QV circuit to hardware via the sampler.
+
+        Uses the QPY stored by transpile_qv_circuit — must be called after it.
+
+        Args:
+            depth: The QV depth (must have been transpiled first)
+            backend_name: IBM backend name
+            shots: Number of measurement shots (default: 4096)
+        """
+        if depth not in qv_data or "circuit_qpy" not in qv_data.get(depth, {}):
+            return {
+                "status": "error",
+                "message": f"No transpiled circuit for depth {depth}. Call transpile_qv_circuit first.",
+            }
+
+        if run_sampler_mcp is None:
+            return {"status": "error", "message": "run_sampler_tool not available"}
+
+        circuit_qpy = qv_data[depth]["circuit_qpy"]
+
+        # Call the MCP sampler tool programmatically (avoids QPY through LLM)
+        result = await run_sampler_mcp.ainvoke({
+            "circuit": circuit_qpy,
+            "backend_name": backend_name,
+            "shots": shots,
+        })
+
+        return _parse_mcp_result(result)
+
+    @langchain_tool
+    async def calculate_hop(job_id: str, depth: int) -> dict:
+        """Calculate Heavy Output Probability (HOP) for QV validation.
+
+        Fetches job results automatically — just pass the job_id and depth.
+
+        Args:
+            job_id: The job ID from submit_qv_job (e.g., "d668ng8qbmes739dsh90")
+            depth: The QV depth — used to look up heavy outputs automatically
+
+        Returns:
+            Dictionary with heavy_output_probability, above_threshold, and message
+        """
+        error = _ensure_qv_data(depth)
+        if error:
+            return error
+
+        if get_job_results_mcp is None:
+            return {"status": "error", "message": "get_job_results_tool not available"}
+
+        # Fetch counts via MCP (avoids large counts dict through LLM)
+        result = await get_job_results_mcp.ainvoke({"job_id": job_id})
+        result = _parse_mcp_result(result)
+        if result.get("status") != "success":
+            return result
+
+        counts = result["counts"]
+        heavy_outputs = qv_data[depth]["heavy_outputs"]
+        return calculate_heavy_output_probability(counts, heavy_outputs)
+
+    # qv-experiment-runner: local tools + MCP tools for job monitoring
+    runner_mcp_tools = [
+        t for t in runtime_tools
+        if t.name == "get_job_status_tool"
+    ]
     qv_experiment_runner = {
         "name": "qv-experiment-runner",
-        "description": "Expert in running QV experiments on hardware. Use this agent to transpile circuits, submit jobs, retrieve results, calculate HOP, and validate QV achievement.",
+        "description": "Expert in running QV experiments on hardware. Use this agent to transpile circuits, submit jobs, and retrieve results.",
         "system_prompt": QV_EXPERIMENT_RUNNER_PROMPT,
-        "tools": (
-            server_tools.get("qiskit-ibm-runtime", [])
-            + server_tools.get("qiskit-ibm-transpiler", [])  # For hybrid_ai_transpile_tool
-        ),
+        "tools": runner_mcp_tools + [transpile_qv_circuit, submit_qv_job],
     }
 
-    # Create the coordinator agent
-    # IMPORTANT: Coordinator should NOT have job execution tools
-    # This forces it to delegate to qv-experiment-runner subagent for the full
-    # transpile -> submit -> poll -> get results workflow
-    # Tools to exclude from coordinator (must be delegated to subagents)
-    excluded_tools = {"run_sampler_tool", "run_estimator_tool"}
+    # Coordinator: runtime tools (minus execution/results) + calculate_hop
+    # get_job_results_tool excluded because calculate_hop fetches results internally
+    excluded_tools = {"run_sampler_tool", "run_estimator_tool", "get_job_results_tool"}
     coordinator_tools = [
         tool
         for tool in server_tools.get("qiskit-ibm-runtime", [])
         if tool.name not in excluded_tools
     ]
+    coordinator_tools.append(calculate_hop)
     print("\nCreating Quantum Volume Optimizer agent...")
     print(f"  Coordinator tools: {len(coordinator_tools)} (excluded: {excluded_tools})")
-    print("  qv-experiment-runner has transpilation + job submission tools")
+    print(f"  qv-experiment-runner tools: {len(runner_mcp_tools)} MCP + transpile_qv_circuit + submit_qv_job")
 
     agent = create_deep_agent(
         model=llm,
@@ -943,19 +1043,12 @@ async def run_qv_optimization(
     Returns:
         The final QV experiment report with actual results
     """
-    agent, mcp_client = await create_qv_optimizer_agent(provider, model, max_qv_depth)
+    # QV circuits are generated lazily by transpile_qv_circuit when the agent requests them
+    qv_data: dict[int, dict] = {}
 
-    # Generate QV circuits with heavy outputs for each depth we'll try
-    qv_data = {}
-    print("\nGenerating QV circuits with heavy output computation...")
-    for depth in range(max_qv_depth, 1, -1):  # From max down to 2
-        print(f"  Generating QV-{depth} circuit...", end=" ", flush=True)
-        result = generate_qv_circuit_with_ideal_distribution(depth, seed=42 + depth)
-        if result["status"] == "success":
-            qv_data[depth] = result
-            print(f"OK ({result['num_heavy_outputs']} heavy outputs)")
-        else:
-            print(f"FAILED: {result.get('message', 'Unknown error')}")
+    agent, mcp_client = await create_qv_optimizer_agent(
+        provider, model, max_qv_depth, qv_data
+    )
 
     # Build the request based on mode
     if run_experiment:
@@ -970,26 +1063,6 @@ Pick ONE backend to run experiments on."""
 Use backend: **{backend}**
 Get its properties to confirm it's available."""
 
-        # Build QV circuit info for each depth
-        qv_circuit_sections = []
-        for depth in range(max_qv_depth, 1, -1):
-            if depth in qv_data:
-                data = qv_data[depth]
-                heavy_list = data["heavy_outputs"][:20]  # Show first 20 heavy outputs
-                heavy_str = ", ".join(f'"{h}"' for h in heavy_list)
-                if len(data["heavy_outputs"]) > 20:
-                    heavy_str += f", ... ({len(data['heavy_outputs'])} total)"
-                qv_circuit_sections.append(f"""
-### QV-{depth} Circuit (for QV 2^{depth} = {2**depth})
-```qasm
-{data["circuit_qasm"]}
-```
-**Heavy outputs** (for HOP calculation): [{heavy_str}]
-**Num heavy outputs**: {data["num_heavy_outputs"]} out of {2**depth}
-""")
-
-        qv_circuits_text = "\n".join(qv_circuit_sections)
-
         request = f"""
 # FIND THE HIGHEST ACHIEVABLE QUANTUM VOLUME
 
@@ -998,59 +1071,47 @@ Your task: Find the highest QV this backend can achieve by running experiments.
 {backend_section}
 
 ## Step 2: Find Optimal Qubits
-Use qubit-chain-optimizer with find_optimal_qv_qubits_tool:
-- Get 10 candidate qubit subsets for depth {max_qv_depth}
-- The tool searches ALL qubits on the backend (not just first 10)
-- Save the top candidates for experiments
+Use qubit-chain-optimizer with find_optimal_qv_qubits_tool(num_qubits=N) for the depth you're testing.
+Get 10 candidate qubit subsets. The tool searches ALL qubits on the backend.
 
 ## Step 3: Run Iterative QV Experiments (TOP-DOWN)
 
-Start from depth {max_qv_depth} and work DOWN until you find a passing depth:
+Supported depths: 2 through {max_qv_depth} (QV {2**2} through QV {2**max_qv_depth}).
 
-### For each depth (starting at {max_qv_depth}):
-1. Transpile circuit using hybrid_ai_transpile_tool:
-   hybrid_ai_transpile_tool(circuit=<the QASM from this depth>, backend_name="{backend}", optimization_level=3, ai_layout_mode="optimize")
-2. Submit the transpiled circuit: run_sampler_tool with 4096 shots
-3. Wait for job completion (poll get_job_status_tool until DONE)
-4. Get results (get_job_results_tool)
-5. Calculate HOP:
-   - Count how many shots resulted in heavy outputs
-   - HOP = heavy_count / total_shots
-6. If HOP > 0.667: SUCCESS! Report this depth as achieved QV
-7. If HOP <= 0.667: FAILED. Try depth-1 with its circuit and heavy outputs
+Start from depth {max_qv_depth} and work DOWN:
+
+### For each depth:
+1. Find optimal qubits: task(subagent_type="qubit-chain-optimizer", description="Find N optimal qubits for QV-N on <backend>")
+2. Run experiment: task(subagent_type="qv-experiment-runner", description="Run QV experiment: depth=N, backend_name=<backend>, initial_layout=[q1, q2, ...]")
+   The runner handles: transpile → submit → poll. Returns job_id.
+3. Calculate HOP: calculate_hop(job_id=<job_id from runner>, depth=N)
+4. If above_threshold is true → SUCCESS! QV 2^N achieved
+5. If above_threshold is false → try depth N-1
 
 ### IMPORTANT:
-- You MUST report actual measurement counts from hardware
-- You MUST calculate HOP for each depth tried
+- You MUST call qv-experiment-runner for EACH depth you test
+- You MUST call calculate_hop to evaluate results
 - You MUST try lower depths if higher ones fail
 - STOP when you find a passing depth or reach depth 2
 
-## QV Circuits and Heavy Outputs
-
-{qv_circuits_text}
-
-## Expected Output Format
+## Expected Output
 
 ```
 ## QV EXPERIMENT RESULTS
 
-### Depth {max_qv_depth} (First Attempt)
+### Depth N (First Attempt)
 - Backend: <name>
-- Qubits: [<list from find_optimal_qv_qubits_tool>]
+- Qubits: [<from qubit optimizer>]
 - Job ID: <id>
 - Shots: 4096
-- Counts: {{<actual measurement counts>}}
-- Heavy output count: <number of shots in heavy outputs>
-- HOP: <calculated value>
-- Result: PASS/FAIL (HOP > 0.667?)
+- HOP: <value from calculate_hop>
+- Result: PASS/FAIL
 
-### Depth {max_qv_depth - 1} (if needed)
+### Depth N-1 (if needed)
 ...
 
 ## CONCLUSION
-Highest Achieved QV: 2^N = <value>
-Backend: <name>
-Optimal Qubits: [<list>]
+Highest Achieved QV: 2^M = <value>
 ```
 """
     else:
@@ -1073,7 +1134,7 @@ Analyze this backend for QV potential without running hardware experiments.
 
 3. **Report**: List the top 10 qubit configurations for each depth with scores
 
-Note: This is analysis only. Use --no-experiment flag was not set to run actual experiments.
+Note: This is analysis only. Run without the --no-experiment flag to execute actual experiments on hardware.
 """
 
     print("=" * 70)
