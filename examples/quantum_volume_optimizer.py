@@ -16,47 +16,23 @@ Quantum Volume (QV) 2^n is achieved when:
 - Heavy Output Probability (HOP) > 2/3
 - HOP = (shots resulting in heavy outputs) / (total shots)
 
-## Simplified vs Full QV Protocol
+## Two Modes: Quick Test vs Full Protocol
 
-**This agent implements a simplified, single-circuit QV test.** For each depth, it
-generates one random QV circuit, runs it once on hardware, and checks if HOP > 2/3.
-This gives a quick signal of whether a depth is achievable but is NOT statistically
-rigorous.
+### Single-Circuit Mode (default)
+For each depth, generates one random QV circuit, runs it once on hardware, and checks
+if HOP > 2/3. This gives a quick signal but is NOT statistically rigorous. A lucky
+circuit can yield a false positive, and a good backend can fail on one unlucky circuit.
 
-The **full QV protocol** (as defined by IBM, arXiv:1811.12926) requires:
-1. Generating 100+ **independent** random QV circuits per depth (each with a
-   different random seed)
-2. Running each circuit on hardware and computing its individual HOP
-3. Using a one-sided confidence interval test: the lower bound of the 97.5%
-   confidence interval of the mean HOP must exceed 2/3
-4. Only then is QV officially "achieved" for that depth
+### Full QV Protocol (--num-circuits N)
+Implements the standard QV protocol (arXiv:1811.12926):
+1. Generates N **independent** random QV circuits per depth (each with a different seed)
+2. Runs each circuit on hardware via the `run_qv_depth_trial` batch tool
+3. Computes individual HOP for each circuit
+4. Applies a one-sided confidence interval test: the lower bound of the 97.5% CI of
+   the mean HOP must exceed 2/3
+5. Only then is QV officially "achieved" for that depth
 
-The single-circuit approach can yield false positives (a lucky circuit passes) or
-false negatives (a good backend fails one circuit). For official QV claims, use the
-full protocol. The `analyze_qv_experiment_results()` function is included to support
-the statistical analysis needed for the full protocol — see "Future: Full QV Mode"
-below.
-
-### Future: Full QV Mode
-
-To extend this agent for the full QV protocol, the following changes would be needed:
-
-1. **New CLI flag**: `--num-circuits N` (default: 1 for current behavior, 100+ for
-   full protocol)
-2. **Loop in coordinator**: For each depth, the coordinator would dispatch N
-   experiment-runner tasks, each with a **different seed** (generating a unique
-   random QV circuit per run)
-3. **Collect HOP values**: Each runner returns a job_id, the coordinator calls
-   calculate_hop for each, collecting N HOP values
-4. **Statistical test**: Expose `analyze_qv_experiment_results()` as a local tool
-   that the coordinator calls with the list of HOP values to determine if QV is
-   achieved with statistical confidence
-5. **Batch job submission**: For efficiency, submit all N circuits as a batch job
-   (Qiskit Runtime supports PUBs — Primitive Unified Blocs) rather than N separate
-   jobs, reducing queue wait time
-
-This would make the agent suitable for real QV certification while keeping the
-current single-circuit mode as a fast "scout" option.
+Use `--num-circuits 100` (or more) for official QV certification.
 
 ## Strategy: Top-Down Search
 
@@ -101,8 +77,11 @@ current single-circuit mode as a fast "scout" option.
 
 ## Usage
 
-    # Find highest QV for a backend (default: single-circuit test)
+    # Find highest QV for a backend (single-circuit quick test)
     python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5
+
+    # Full QV protocol with 100 circuits per depth (statistically rigorous)
+    python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5 --num-circuits 100
 
     # Analysis only (no hardware execution)
     python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5 --no-experiment
@@ -382,6 +361,37 @@ find_optimal_qv_qubits_tool(
 
 Return the top 10 qubit subsets with their scores. The coordinator will use
 these to run QV experiments, potentially trying multiple if the first fails.
+"""
+
+COORDINATOR_MULTI_CIRCUIT_APPENDIX = """
+
+## Multi-Circuit QV Mode (Full Protocol)
+
+You have the run_qv_depth_trial tool for statistically rigorous QV testing.
+This runs N independent random circuits per depth and performs the full statistical
+confidence interval test (arXiv:1811.12926).
+
+### Workflow Change
+- Steps 1-2 are the same (backend analysis, find optimal qubits)
+- Step 3: Instead of qv-experiment-runner, call:
+  run_qv_depth_trial(depth=N, backend_name=<backend>, initial_layout=[q1, q2, ...], num_circuits=<N>, shots=4096)
+  This tool handles everything internally: generates N random circuits, transpiles each,
+  submits each to hardware, polls for completion, computes all HOPs, and runs the
+  statistical CI test. It prints progress as it works.
+- Step 4: Check qv_achieved in the result (replaces manual HOP check)
+  - qv_achieved=true means the lower bound of the 97.5% CI exceeds 2/3 — QV is officially achieved
+  - qv_achieved=false means it failed the statistical test — try depth-1
+- Step 5: If not achieved, try depth-1 (find new optimal qubits first)
+
+### DO NOT use qv-experiment-runner in multi-circuit mode — use run_qv_depth_trial instead.
+
+### Reading Results
+- qv_achieved: true/false (the CI test result)
+- mean_hop: average HOP across all circuits
+- ci_lower: lower bound of 97.5% confidence interval (must be > 2/3 for QV)
+- num_successful: how many circuits completed successfully
+- individual_hops: list of all HOP values
+- message: human-readable summary
 """
 
 QV_EXPERIMENT_RUNNER_PROMPT = """You run QV experiments on hardware.
@@ -701,10 +711,8 @@ def analyze_qv_experiment_results(
 ) -> dict[str, Any]:
     """Analyze results from multiple Quantum Volume circuit runs.
 
-    NOTE: This function is not currently used by the agent. It is included to
-    support a future "full QV mode" where the agent runs 100+ independent random
-    circuits per depth and uses this function for statistical validation.
-    See the module docstring "Future: Full QV Mode" section for details.
+    Used by the `run_qv_depth_trial` batch tool in multi-circuit mode (--num-circuits N)
+    to perform the statistical confidence interval test required by the full QV protocol.
 
     After running multiple QV circuits on hardware and calculating their individual
     Heavy Output Probabilities (HOP), this function performs statistical analysis
@@ -817,6 +825,7 @@ async def create_qv_optimizer_agent(
     provider: str = "anthropic",
     model: str | None = None,
     max_qv_depth: int = 5,
+    num_circuits: int = 1,
     qv_data: dict[int, dict] | None = None,
 ) -> tuple[Any, MultiServerMCPClient]:
     """Create the Quantum Volume Optimizer deep agent with all subagents.
@@ -825,6 +834,7 @@ async def create_qv_optimizer_agent(
         provider: LLM provider to use
         model: Optional model name override
         max_qv_depth: Maximum QV depth to evaluate
+        num_circuits: Number of independent QV circuits per depth (1=quick test, 100+=full protocol)
         qv_data: Shared cache for QV circuit data, keyed by depth (populated lazily)
 
     Returns:
@@ -891,6 +901,9 @@ async def create_qv_optimizer_agent(
     )
     get_job_results_mcp = next(
         (t for t in runtime_tools if t.name == "get_job_results_tool"), None
+    )
+    get_job_status_mcp = next(
+        (t for t in runtime_tools if t.name == "get_job_status_tool"), None
     )
 
     def _parse_mcp_result(result: Any) -> dict:
@@ -1031,6 +1044,162 @@ async def create_qv_optimizer_agent(
         heavy_outputs = qv_data[depth]["heavy_outputs"]
         return calculate_heavy_output_probability(counts, heavy_outputs)
 
+    @langchain_tool
+    async def run_qv_depth_trial(
+        depth: int,
+        backend_name: str,
+        initial_layout: list[int],
+        num_circuits: int = 100,
+        shots: int = 4096,
+    ) -> dict:
+        """Run a full QV trial: N independent circuits at one depth with statistical analysis.
+
+        This is the batch tool for the full QV protocol. It generates N random QV circuits
+        (each with a different seed), transpiles, submits, polls, computes HOPs, and runs
+        the statistical confidence interval test.
+
+        Args:
+            depth: The QV depth to test (e.g., 5 for QV-32)
+            backend_name: IBM backend name (e.g., 'ibm_boston')
+            initial_layout: Physical qubits to map virtual qubits to
+            num_circuits: Number of independent random circuits (default: 100)
+            shots: Number of measurement shots per circuit (default: 4096)
+
+        Returns:
+            Dictionary with qv_achieved, mean_hop, confidence interval, and per-circuit details
+        """
+        if hybrid_transpile_mcp is None or run_sampler_mcp is None:
+            return {"status": "error", "message": "Required MCP tools not available"}
+        if get_job_results_mcp is None or get_job_status_mcp is None:
+            return {"status": "error", "message": "Required MCP tools not available"}
+
+        print(f"\n[QV Trial] Starting full QV trial: depth={depth}, {num_circuits} circuits, "
+              f"backend={backend_name}, qubits={initial_layout}")
+
+        # Phase 1: Generate N circuits with different seeds
+        circuits = []  # List of {circuit_qasm, heavy_outputs, seed}
+        for i in range(num_circuits):
+            seed = depth * 1000 + i
+            result = generate_qv_circuit_with_ideal_distribution(depth, seed=seed)
+            if result["status"] != "success":
+                return {"status": "error", "message": f"Failed to generate circuit {i}: {result['message']}"}
+            circuits.append({
+                "circuit_qasm": result["circuit_qasm"],
+                "heavy_outputs": result["heavy_outputs"],
+                "seed": seed,
+            })
+        print(f"[QV Trial] Generated {num_circuits} circuits")
+
+        # Phase 2: Transpile each circuit via MCP (sequential — stdio transport)
+        for i, circ in enumerate(circuits):
+            result = await hybrid_transpile_mcp.ainvoke({
+                "circuit": circ["circuit_qasm"],
+                "backend_name": backend_name,
+                "optimization_level": 3,
+                "initial_layout": initial_layout,
+            })
+            result = _parse_mcp_result(result)
+            if result.get("status") != "success":
+                return {"status": "error", "message": f"Failed to transpile circuit {i}: {result.get('message', 'unknown error')}"}
+            circ["circuit_qpy"] = result["circuit_qpy"]
+            if (i + 1) % 10 == 0 or i == num_circuits - 1:
+                print(f"[QV Trial] Transpiled {i + 1}/{num_circuits} circuits")
+
+        # Phase 3: Submit each circuit via MCP (sequential)
+        job_ids = []
+        for i, circ in enumerate(circuits):
+            result = await run_sampler_mcp.ainvoke({
+                "circuit": circ["circuit_qpy"],
+                "backend_name": backend_name,
+                "shots": shots,
+            })
+            result = _parse_mcp_result(result)
+            if result.get("status") != "success":
+                return {"status": "error", "message": f"Failed to submit circuit {i}: {result.get('message', 'unknown error')}"}
+            job_ids.append(result["job_id"])
+            if (i + 1) % 10 == 0 or i == num_circuits - 1:
+                print(f"[QV Trial] Submitted {i + 1}/{num_circuits} jobs")
+
+        # Phase 4: Poll all jobs until completion
+        pending = set(range(num_circuits))
+        failed_jobs = {}  # index -> error message
+        while pending:
+            await asyncio.sleep(10)
+            still_pending = set()
+            for idx in pending:
+                result = await get_job_status_mcp.ainvoke({"job_id": job_ids[idx]})
+                result = _parse_mcp_result(result)
+                job_status = result.get("job_status", "UNKNOWN")
+                if job_status == "DONE":
+                    continue  # Done — will collect results in phase 5
+                elif job_status in ("ERROR", "CANCELLED"):
+                    failed_jobs[idx] = result.get("error_message", job_status)
+                else:
+                    still_pending.add(idx)
+            pending = still_pending
+            done_count = num_circuits - len(pending) - len(failed_jobs)
+            print(f"[QV Trial] depth={depth}: {done_count}/{num_circuits} jobs done, "
+                  f"{len(pending)} pending, {len(failed_jobs)} failed")
+
+        # Phase 5: Get results and compute HOPs
+        hop_values = []
+        circuit_results = []
+        for i in range(num_circuits):
+            if i in failed_jobs:
+                circuit_results.append({
+                    "circuit_index": i, "seed": circuits[i]["seed"],
+                    "job_id": job_ids[i], "status": "failed",
+                    "error": failed_jobs[i],
+                })
+                continue
+
+            result = await get_job_results_mcp.ainvoke({"job_id": job_ids[i]})
+            result = _parse_mcp_result(result)
+            if result.get("status") != "success":
+                circuit_results.append({
+                    "circuit_index": i, "seed": circuits[i]["seed"],
+                    "job_id": job_ids[i], "status": "error",
+                    "error": result.get("message", "Failed to get results"),
+                })
+                continue
+
+            counts = result["counts"]
+            hop_result = calculate_heavy_output_probability(counts, circuits[i]["heavy_outputs"])
+            hop = hop_result.get("heavy_output_probability", 0.0)
+            hop_values.append(hop)
+            circuit_results.append({
+                "circuit_index": i, "seed": circuits[i]["seed"],
+                "job_id": job_ids[i], "status": "success",
+                "hop": hop, "above_threshold": hop_result.get("above_threshold", False),
+            })
+
+        if not hop_values:
+            return {"status": "error", "message": "All circuits failed — no HOP values collected"}
+
+        # Phase 6: Statistical analysis
+        analysis = analyze_qv_experiment_results(hop_values)
+
+        print(f"[QV Trial] depth={depth}: mean_hop={analysis.get('mean_hop', 0):.4f}, "
+              f"ci_lower={analysis.get('confidence_interval', (0, 0))[0]:.4f}, "
+              f"qv_achieved={analysis.get('qv_achieved', False)}")
+
+        return {
+            "status": "success",
+            "depth": depth,
+            "num_circuits": num_circuits,
+            "num_successful": len(hop_values),
+            "num_failed": len(failed_jobs),
+            "qv_achieved": analysis.get("qv_achieved", False),
+            "mean_hop": analysis.get("mean_hop", 0.0),
+            "std_hop": analysis.get("std_hop", 0.0),
+            "ci_lower": analysis.get("confidence_interval", (0, 0))[0],
+            "ci_upper": analysis.get("confidence_interval", (0, 0))[1],
+            "confidence_level": analysis.get("confidence_level", 0.975),
+            "threshold": 2 / 3,
+            "individual_hops": hop_values,
+            "message": analysis.get("message", ""),
+        }
+
     # qv-experiment-runner: local tools + MCP tools for job monitoring
     runner_mcp_tools = [
         t for t in runtime_tools
@@ -1052,14 +1221,22 @@ async def create_qv_optimizer_agent(
         if tool.name not in excluded_tools
     ]
     coordinator_tools.append(calculate_hop)
+
+    # Multi-circuit mode: add batch tool and extended prompt
+    system_prompt = COORDINATOR_SYSTEM_PROMPT
+    if num_circuits > 1:
+        coordinator_tools.append(run_qv_depth_trial)
+        system_prompt = COORDINATOR_SYSTEM_PROMPT + COORDINATOR_MULTI_CIRCUIT_APPENDIX
+
     print("\nCreating Quantum Volume Optimizer agent...")
+    print(f"  Mode: {'multi-circuit (' + str(num_circuits) + ' circuits/depth)' if num_circuits > 1 else 'single-circuit'}")
     print(f"  Coordinator tools: {len(coordinator_tools)} (excluded: {excluded_tools})")
     print(f"  qv-experiment-runner tools: {len(runner_mcp_tools)} MCP + transpile_qv_circuit + submit_qv_job")
 
     agent = create_deep_agent(
         model=llm,
         tools=coordinator_tools,
-        system_prompt=COORDINATOR_SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         subagents=[backend_analyst, qubit_chain_optimizer, qv_experiment_runner],
     )
 
@@ -1072,6 +1249,7 @@ async def run_qv_optimization(
     provider: str = "anthropic",
     model: str | None = None,
     max_qv_depth: int = 5,
+    num_circuits: int = 1,
     backend: str | None = None,
     verbose: bool = True,
     run_experiment: bool = True,
@@ -1082,6 +1260,7 @@ async def run_qv_optimization(
         provider: LLM provider to use
         model: Optional model name override
         max_qv_depth: Maximum QV depth to try (2-20)
+        num_circuits: Number of independent QV circuits per depth (1=quick test, 100+=full protocol)
         backend: Specific backend to test (required for experiments)
         verbose: Show detailed activity logging (tool calls, LLM activity)
         run_experiment: Actually run QV circuits on hardware (default: True)
@@ -1093,7 +1272,7 @@ async def run_qv_optimization(
     qv_data: dict[int, dict] = {}
 
     agent, mcp_client = await create_qv_optimizer_agent(
-        provider, model, max_qv_depth, qv_data
+        provider, model, max_qv_depth, num_circuits, qv_data
     )
 
     # Build the request based on mode
@@ -1109,7 +1288,66 @@ Pick ONE backend to run experiments on."""
 Use backend: **{backend}**
 Get its properties to confirm it's available."""
 
-        request = f"""
+        if num_circuits > 1:
+            # Multi-circuit mode: full QV protocol
+            request = f"""
+# FIND THE HIGHEST ACHIEVABLE QUANTUM VOLUME (Full Protocol — {num_circuits} circuits/depth)
+
+Your task: Find the highest QV this backend can achieve using the full QV protocol
+with {num_circuits} independent random circuits per depth and statistical CI testing.
+
+{backend_section}
+
+## Step 2: Find Optimal Qubits
+Use qubit-chain-optimizer with find_optimal_qv_qubits_tool(num_qubits=N) for the depth you're testing.
+Get 10 candidate qubit subsets. The tool searches ALL qubits on the backend.
+
+## Step 3: Run Iterative QV Experiments (TOP-DOWN)
+
+Supported depths: 2 through {max_qv_depth} (QV {2**2} through QV {2**max_qv_depth}).
+
+Start from depth {max_qv_depth} and work DOWN:
+
+### For each depth:
+1. Find optimal qubits: task(subagent_type="qubit-chain-optimizer", description="Find N optimal qubits for QV-N on <backend>")
+2. Run full QV trial:
+   run_qv_depth_trial(depth=N, backend_name=<backend>, initial_layout=[q1, q2, ...], num_circuits={num_circuits}, shots=4096)
+   This tool runs all {num_circuits} circuits programmatically and returns the statistical result.
+3. Check qv_achieved in the result:
+   - If qv_achieved is true → SUCCESS! QV 2^N is statistically achieved
+   - If qv_achieved is false → try depth N-1
+
+### IMPORTANT:
+- Use run_qv_depth_trial (NOT qv-experiment-runner) for each depth
+- The tool handles transpile, submit, poll, HOP, and CI test internally
+- You MUST try lower depths if higher ones fail
+- STOP when you find a passing depth or reach depth 2
+
+## Expected Output
+
+```
+## QV EXPERIMENT RESULTS (Full Protocol)
+
+### Depth N (First Attempt)
+- Backend: <name>
+- Qubits: [<from qubit optimizer>]
+- Circuits: {num_circuits}
+- Mean HOP: <value>
+- CI Lower Bound: <value>
+- QV Achieved: YES/NO
+- Result: PASS/FAIL (statistical test)
+
+### Depth N-1 (if needed)
+...
+
+## CONCLUSION
+Highest Achieved QV: 2^M = <value>
+Protocol: Full ({num_circuits} circuits, 97.5% CI)
+```
+"""
+        else:
+            # Single-circuit mode: quick test
+            request = f"""
 # FIND THE HIGHEST ACHIEVABLE QUANTUM VOLUME
 
 Your task: Find the highest QV this backend can achieve by running experiments.
@@ -1188,6 +1426,10 @@ Note: This is analysis only. Run without the --no-experiment flag to execute act
     print("=" * 70)
     print(f"\nBackend: {backend or 'Auto-select least busy'}")
     print(f"Max QV depth to try: {max_qv_depth} (QV 2^{max_qv_depth} = {2**max_qv_depth})")
+    if num_circuits > 1:
+        print(f"Protocol: Full QV ({num_circuits} circuits/depth, 97.5% CI test)")
+    else:
+        print("Protocol: Single-circuit quick test")
     print(f"Mode: {'EXPERIMENT (will run on hardware)' if run_experiment else 'ANALYSIS ONLY'}")
     print("\nThis may take several minutes...")
     print("-" * 70)
@@ -1307,8 +1549,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Find highest QV for ibm_brisbane (runs experiments by default)
+  # Find highest QV for ibm_brisbane (single-circuit quick test)
   python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5
+
+  # Full QV protocol with 100 circuits per depth (statistically rigorous)
+  python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5 --num-circuits 100
 
   # Try higher QV depth
   python quantum_volume_optimizer.py --backend ibm_brisbane --depth 8
@@ -1361,6 +1606,13 @@ Examples:
         action="store_true",
         help="Skip running QV circuits on hardware (default: runs experiment)",
     )
+    parser.add_argument(
+        "--num-circuits",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of independent QV circuits per depth (1=quick test, 100+=full protocol)",
+    )
 
     args = parser.parse_args()
 
@@ -1388,7 +1640,8 @@ Examples:
     else:
         result = asyncio.run(
             run_qv_optimization(
-                args.provider, args.model, args.depth, args.backend, verbose, not args.no_experiment
+                args.provider, args.model, args.depth, args.num_circuits,
+                args.backend, verbose, not args.no_experiment,
             )
         )
         print(result)
