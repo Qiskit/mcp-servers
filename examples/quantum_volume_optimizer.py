@@ -16,6 +16,48 @@ Quantum Volume (QV) 2^n is achieved when:
 - Heavy Output Probability (HOP) > 2/3
 - HOP = (shots resulting in heavy outputs) / (total shots)
 
+## Simplified vs Full QV Protocol
+
+**This agent implements a simplified, single-circuit QV test.** For each depth, it
+generates one random QV circuit, runs it once on hardware, and checks if HOP > 2/3.
+This gives a quick signal of whether a depth is achievable but is NOT statistically
+rigorous.
+
+The **full QV protocol** (as defined by IBM, arXiv:1811.12926) requires:
+1. Generating 100+ **independent** random QV circuits per depth (each with a
+   different random seed)
+2. Running each circuit on hardware and computing its individual HOP
+3. Using a one-sided confidence interval test: the lower bound of the 97.5%
+   confidence interval of the mean HOP must exceed 2/3
+4. Only then is QV officially "achieved" for that depth
+
+The single-circuit approach can yield false positives (a lucky circuit passes) or
+false negatives (a good backend fails one circuit). For official QV claims, use the
+full protocol. The `analyze_qv_experiment_results()` function is included to support
+the statistical analysis needed for the full protocol — see "Future: Full QV Mode"
+below.
+
+### Future: Full QV Mode
+
+To extend this agent for the full QV protocol, the following changes would be needed:
+
+1. **New CLI flag**: `--num-circuits N` (default: 1 for current behavior, 100+ for
+   full protocol)
+2. **Loop in coordinator**: For each depth, the coordinator would dispatch N
+   experiment-runner tasks, each with a **different seed** (generating a unique
+   random QV circuit per run)
+3. **Collect HOP values**: Each runner returns a job_id, the coordinator calls
+   calculate_hop for each, collecting N HOP values
+4. **Statistical test**: Expose `analyze_qv_experiment_results()` as a local tool
+   that the coordinator calls with the list of HOP values to determine if QV is
+   achieved with statistical confidence
+5. **Batch job submission**: For efficiency, submit all N circuits as a batch job
+   (Qiskit Runtime supports PUBs — Primitive Unified Blocs) rather than N separate
+   jobs, reducing queue wait time
+
+This would make the agent suitable for real QV certification while keeping the
+current single-circuit mode as a fast "scout" option.
+
 ## Strategy: Top-Down Search
 
 1. Start at max_depth (e.g., 5)
@@ -59,7 +101,7 @@ Quantum Volume (QV) 2^n is achieved when:
 
 ## Usage
 
-    # Find highest QV for a backend (default: runs experiments)
+    # Find highest QV for a backend (default: single-circuit test)
     python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5
 
     # Analysis only (no hardware execution)
@@ -73,8 +115,7 @@ Quantum Volume (QV) 2^n is achieved when:
 The agent reports ACTUAL results:
 - Each depth attempted
 - Qubits used (from find_optimal_qv_qubits_tool)
-- Job ID, measurement counts
-- Calculated HOP
+- Job ID, HOP value
 - PASS/FAIL for each depth
 - Final achieved QV
 """
@@ -660,11 +701,16 @@ def analyze_qv_experiment_results(
 ) -> dict[str, Any]:
     """Analyze results from multiple Quantum Volume circuit runs.
 
+    NOTE: This function is not currently used by the agent. It is included to
+    support a future "full QV mode" where the agent runs 100+ independent random
+    circuits per depth and uses this function for statistical validation.
+    See the module docstring "Future: Full QV Mode" section for details.
+
     After running multiple QV circuits on hardware and calculating their individual
     Heavy Output Probabilities (HOP), this function performs statistical analysis
     to determine if the QV benchmark is achieved.
 
-    QV Success Criteria:
+    QV Success Criteria (per the standard QV protocol, arXiv:1811.12926):
     - Mean HOP must be > 2/3
     - The lower bound of the confidence interval must be > 2/3 (with given confidence)
 
