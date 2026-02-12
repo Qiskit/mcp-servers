@@ -30,10 +30,10 @@ mcp = FastMCP("qiskit_docs")
 async def get_sdk_module_docs(module: str) -> dict[str, Any]:
     """
     Get documentation for a Qiskit SDK module.
-    
+
     Args:
         module: Module name (e.g., 'circuit', 'primitives', 'transpiler', 'quantum_info')
-    
+
     Returns:
         Module documentation including API reference and usage examples.
     """
@@ -46,10 +46,10 @@ async def get_sdk_module_docs(module: str) -> dict[str, Any]:
 async def get_guide(guide: str) -> dict[str, Any]:
     """
     Get a Qiskit guide or best practice documentation.
-    
+
     Args:
         guide: Guide name (e.g., 'optimization', 'error-mitigation', 'dynamic-circuits', 'performance-tuning')
-    
+
     Returns:
         Complete guide documentation with best practices and implementation patterns.
     """
@@ -63,11 +63,11 @@ async def get_guide(guide: str) -> dict[str, Any]:
 async def search_docs(query: str, module: str = "documentation") -> dict[str, Any]:
     """
     Search Qiskit documentation for relevant modules, addons, and guides.
-    
+
     Args:
         query: Search query (e.g., 'optimization', 'circuit', 'error')
         module: Search module (e.g. 'documentation', 'API' etc)
-    
+
     Returns:
         List of matching documentation entries with URLs and types.
     """

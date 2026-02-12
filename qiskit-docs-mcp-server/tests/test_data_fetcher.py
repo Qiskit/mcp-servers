@@ -176,7 +176,7 @@ class TestGetComponentDocs:
         """Test getting docs for all valid modules."""
         mock_fetch.return_value = "Documentation"
 
-        for module in QISKIT_MODULES.keys():
+        for module in QISKIT_MODULES:
             result = get_component_docs(module)
             assert result == "Documentation"
 

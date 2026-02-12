@@ -46,10 +46,10 @@ SEARCH_PATH = "endpoints-docs-learning/api/search"
 def fetch_text(url: str) -> str | None:
     """
     Fetch text content from a URL using httpx.
-    
+
     Args:
         url: The URL to fetch
-        
+
     Returns:
         The text content of the page, or None if fetch fails
     """
@@ -68,10 +68,10 @@ def fetch_text(url: str) -> str | None:
 def get_component_docs(component: str) -> str | None:
     """
     Fetch documentation for a Qiskit SDK module.
-    
+
     Args:
         component: Module name (e.g., 'circuit', 'primitives', 'transpiler')
-        
+
     Returns:
         The documentation content or None if not found
     """
@@ -86,10 +86,10 @@ def get_component_docs(component: str) -> str | None:
 def get_guide_docs(style: str) -> str | None:
     """
     Fetch documentation for a Qiskit guide or best practice.
-    
+
     Args:
         style: Guide name (e.g., 'optimization', 'error-mitigation')
-        
+
     Returns:
         The documentation content or None if not found
     """
@@ -114,7 +114,7 @@ def get_guide_docs(style: str) -> str | None:
 def search_qiskit_docs(query: str, module: str = "documentation") -> list[dict]:
     """
     Search Qiskit documentation for relevant results.
-    
+
     Args:
         query: Search query string
         module: Search module string
@@ -132,10 +132,10 @@ def search_qiskit_docs(query: str, module: str = "documentation") -> list[dict]:
 def fetch_text_json(url: str) -> list[dict]:
     """
     Fetch text content from a URL using httpx.
-    
+
     Args:
         url: The URL to fetch
-        
+
     Returns:
         The text content of the page, or None if fetch fails
     """
