@@ -12,24 +12,13 @@
 
 """Tests for the qiskit-docs-mcp-server."""
 
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from qiskit_docs_mcp_server.data_fetcher import (
-    QISKIT_ADDON_MODULES,
-    QISKIT_MODULES,
-)
+from qiskit_docs_mcp_server.data_fetcher import QISKIT_MODULES
 from qiskit_docs_mcp_server.server import (
     get_component_list,
     get_guide,
-    get_pattern_list,
     get_sdk_module_docs,
     get_style_list,
     search_docs,
@@ -163,17 +152,6 @@ class TestResourceFunctions:
         """Test that get_component_list matches QISKIT_MODULES."""
         result = await get_component_list()
         expected = list(QISKIT_MODULES.keys())
-        assert result == expected
-
-    async def test_get_pattern_list_returns_list(self):
-        """Test that get_pattern_list returns a list."""
-        result = await get_pattern_list()
-        assert isinstance(result, list)
-
-    async def test_get_pattern_list_matches_addons(self):
-        """Test that get_pattern_list matches QISKIT_ADDON_MODULES."""
-        result = await get_pattern_list()
-        expected = list(QISKIT_ADDON_MODULES.keys())
         assert result == expected
 
     async def test_get_style_list_returns_list(self):
