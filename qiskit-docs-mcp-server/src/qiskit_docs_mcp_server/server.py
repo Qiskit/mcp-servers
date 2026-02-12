@@ -39,8 +39,12 @@ async def get_sdk_module_docs(module: str) -> dict[str, Any]:
     """
     docs = get_component_docs(module)
     if docs is None:
-        return {"status": "error", "message": f"Module '{module}' not found. Use resource qdc://modules to see available modules."}
+        return {
+            "status": "error",
+            "message": f"Module '{module}' not found. Use resource qdc://modules to see available modules.",
+        }
     return {"module": module, "documentation": docs}
+
 
 @mcp.tool()
 async def get_guide(guide: str) -> dict[str, Any]:
@@ -55,7 +59,10 @@ async def get_guide(guide: str) -> dict[str, Any]:
     """
     docs = get_guide_docs(guide)
     if docs is None:
-        return {"status": "error", "message": f"Guide '{guide}' not found. Use resource qdc://style to see available guides."}
+        return {
+            "status": "error",
+            "message": f"Guide '{guide}' not found. Use resource qdc://style to see available guides.",
+        }
     return {"guide": guide, "documentation": docs}
 
 
@@ -76,16 +83,19 @@ async def search_docs(query: str, module: str = "documentation") -> dict[str, An
         return [{"info": f"No results found for '{query}'"}]
     return results
 
+
 ## Resource
 @mcp.resource("qiskit-docs://modules", mime_type="application/json")
 async def get_component_list() -> list[str]:
     """Get list of all Qiskit SDK modules."""
     return list(QISKIT_MODULES.keys())
 
+
 @mcp.resource("qiskit-docs://addon", mime_type="application/json")
 async def get_addon_list() -> list[str]:
     """Get list of all Qiskit addon modules and tutorials."""
     return list(QISKIT_ADDON_MODULES.keys())
+
 
 @mcp.resource("qiskit-docs://style", mime_type="application/json")
 async def get_style_list() -> list[str]:
@@ -96,5 +106,5 @@ async def get_style_list() -> list[str]:
         "error-mitigation",
         "dynamic-circuits",
         "parametric-compilation",
-        "performance-tuning"
+        "performance-tuning",
     ]

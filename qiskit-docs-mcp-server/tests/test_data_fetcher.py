@@ -187,6 +187,7 @@ class TestGetComponentDocs:
         result = get_component_docs("circuit")
         assert result is None
 
+
 class TestGetGuideDocs:
     """Test get_guide_docs function."""
 

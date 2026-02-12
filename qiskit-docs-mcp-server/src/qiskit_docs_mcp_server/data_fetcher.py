@@ -42,6 +42,7 @@ QISKIT_ADDON_MODULES = {
 
 SEARCH_PATH = "endpoints-docs-learning/api/search"
 
+
 @lru_cache(maxsize=100)
 def fetch_text(url: str) -> str | None:
     """
@@ -65,6 +66,7 @@ def fetch_text(url: str) -> str | None:
         logger.error(f"Unexpected error fetching {url}: {e}")
         return None
 
+
 def get_component_docs(component: str) -> str | None:
     """
     Fetch documentation for a Qiskit SDK module.
@@ -82,6 +84,7 @@ def get_component_docs(component: str) -> str | None:
     url = f"{QISKIT_SDK_DOCS}{path}"
     logger.info(f"Fetching component docs for {component} from {url}")
     return fetch_text(url)
+
 
 def get_guide_docs(style: str) -> str | None:
     """

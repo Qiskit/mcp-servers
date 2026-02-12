@@ -93,8 +93,16 @@ class TestSearchDocs:
     async def test_search_docs_with_results(self, mock_search):
         """Test search_docs with results."""
         mock_search.return_value = [
-            {"type": "module", "name": "circuit", "url": "https://docs.quantum.ibm.com/api/qiskit/circuit"},
-            {"type": "guide", "name": "optimization", "url": "https://docs.quantum.ibm.com/guides/optimization"},
+            {
+                "type": "module",
+                "name": "circuit",
+                "url": "https://docs.quantum.ibm.com/api/qiskit/circuit",
+            },
+            {
+                "type": "guide",
+                "name": "optimization",
+                "url": "https://docs.quantum.ibm.com/guides/optimization",
+            },
         ]
         result = await search_docs("circuit")
 
