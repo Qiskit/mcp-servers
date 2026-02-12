@@ -15,7 +15,7 @@ from . import server
 
 def main() -> None:
     """Main entry point for the package."""
-    server.mcp.run(transport="stdio")
+    server.mcp.run(transport="stdio", show_banner=False)
 
 
 # Optionally expose other important items at package level
