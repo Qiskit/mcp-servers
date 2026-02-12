@@ -10,7 +10,7 @@ The Quantum Volume Finder is a multi-agent system that **finds the highest achie
 
 Unlike simple analysis tools, this agent:
 - **Runs experiments** on real quantum hardware
-- **Reports actual results** (measurement counts, HOP values)
+- **Reports actual results** (HOP values, job IDs)
 - Uses **top-down search**: starts at max depth, works down until success
 - Searches **ALL qubits** on the backend (not just first 10)
 
@@ -91,6 +91,9 @@ pip install langchain-anthropic
 
 # Install all Qiskit MCP servers
 pip install qiskit-mcp-servers
+
+# Required for --num-circuits statistical analysis
+pip install scipy
 ```
 
 ### Environment Variables
@@ -127,6 +130,7 @@ python quantum_volume_optimizer.py --backend ibm_brisbane --depth 5 --num-circui
 | `--quiet` | Disable verbose activity logging | Verbose on |
 | `--interactive` | Interactive mode for follow-ups | Off |
 | `--provider` | LLM: `anthropic`, `openai`, `google` | `anthropic` |
+| `--model MODEL` | Model name (provider-specific) | Provider default |
 
 **Examples:**
 

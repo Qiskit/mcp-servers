@@ -69,6 +69,7 @@ Use `--num-circuits 100` (or more) for official QV certification.
     pip install deepagents langchain langchain-mcp-adapters python-dotenv
     pip install langchain-anthropic  # or your preferred LLM provider
     pip install qiskit-mcp-servers
+    pip install scipy  # required for --num-circuits statistical analysis
 
 ## Environment Variables
 
@@ -102,8 +103,8 @@ The agent reports ACTUAL results:
 from __future__ import annotations
 
 import argparse
-import json
 import asyncio
+import json
 import os
 import sys
 from datetime import datetime
@@ -303,7 +304,7 @@ After the experiment runner returns the job_id:
 1. DO NOT make recommendations - RUN the experiments
 2. DO NOT stop after one failure - try lower depths
 3. DO NOT limit qubit search - use all qubits on the backend
-4. ALWAYS report actual job ID, measurement counts, and HOP
+4. ALWAYS report actual job ID and HOP
 """
 
 BACKEND_ANALYST_PROMPT = """You are the Backend Analyst, an expert in IBM Quantum hardware.
@@ -390,7 +391,6 @@ confidence interval test (arXiv:1811.12926).
 - mean_hop: average HOP across all circuits
 - ci_lower: lower bound of 97.5% confidence interval (must be > 2/3 for QV)
 - num_successful: how many circuits completed successfully
-- individual_hops: list of all HOP values
 - message: human-readable summary
 """
 
@@ -1120,11 +1120,21 @@ async def create_qv_optimizer_agent(
             if (i + 1) % 10 == 0 or i == num_circuits - 1:
                 print(f"[QV Trial] Submitted {i + 1}/{num_circuits} jobs")
 
-        # Phase 4: Poll all jobs until completion
+        # Phase 4: Poll all jobs until completion (timeout after 2 hours)
+        max_poll_seconds = 7200
+        elapsed = 0
+        poll_interval = 10
         pending = set(range(num_circuits))
         failed_jobs = {}  # index -> error message
         while pending:
-            await asyncio.sleep(10)
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+            if elapsed >= max_poll_seconds:
+                return {
+                    "status": "error",
+                    "message": f"Polling timeout after {max_poll_seconds}s. "
+                    f"{len(pending)} jobs still pending: {[job_ids[i] for i in sorted(pending)]}",
+                }
             still_pending = set()
             for idx in pending:
                 result = await get_job_status_mcp.ainvoke({"job_id": job_ids[idx]})
@@ -1196,7 +1206,6 @@ async def create_qv_optimizer_agent(
             "ci_upper": analysis.get("confidence_interval", (0, 0))[1],
             "confidence_level": analysis.get("confidence_level", 0.975),
             "threshold": 2 / 3,
-            "individual_hops": hop_values,
             "message": analysis.get("message", ""),
         }
 
@@ -1466,7 +1475,7 @@ async def interactive_mode(
     """Run interactive mode where users can ask follow-up questions."""
     from langchain_core.messages import HumanMessage
 
-    agent, mcp_client = await create_qv_optimizer_agent(provider, model, 20)
+    agent, mcp_client = await create_qv_optimizer_agent(provider, model, max_qv_depth=20)
 
     # Create callback handler for observability
     callback_handler = AgentActivityHandler(verbose=verbose)
