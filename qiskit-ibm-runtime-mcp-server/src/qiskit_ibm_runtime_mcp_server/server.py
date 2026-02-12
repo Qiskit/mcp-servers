@@ -535,7 +535,7 @@ def get_superposition_resource() -> dict[str, Any]:
 
 def main() -> None:
     """Run the server."""
-    mcp.run()
+    mcp.run(show_banner=False)
 
 
 if __name__ == "__main__":
