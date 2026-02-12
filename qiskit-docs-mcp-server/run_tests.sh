@@ -51,4 +51,3 @@ uv run pytest tests/ --cov=src --cov-report=html --cov-report=xml
 echo ""
 echo "✅ All tests completed successfully!"
 echo "📋 Coverage report generated in htmlcov/index.html"
-

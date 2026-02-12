@@ -10,15 +10,18 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-from mcp.server.fastmcp import FastMCP
 from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+
 from .data_fetcher import (
+    QISKIT_ADDON_MODULES,
+    QISKIT_MODULES,
     get_component_docs,
     get_guide_docs,
     search_qiskit_docs,
-    QISKIT_MODULES,
-    QISKIT_ADDON_MODULES,
 )
+
 
 mcp = FastMCP("qiskit_docs")
 

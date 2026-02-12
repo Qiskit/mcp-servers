@@ -10,10 +10,11 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-import httpx
 import logging
 from functools import lru_cache
-from typing import Optional
+
+import httpx
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ QISKIT_ADDON_MODULES = {
 SEARCH_PATH = "endpoints-docs-learning/api/search"
 
 @lru_cache(maxsize=100)
-def fetch_text(url: str) -> Optional[str]: 
+def fetch_text(url: str) -> str | None:
     """
     Fetch text content from a URL using httpx.
     
@@ -64,7 +65,7 @@ def fetch_text(url: str) -> Optional[str]:
         logger.error(f"Unexpected error fetching {url}: {e}")
         return None
 
-def get_component_docs(component: str) -> Optional[str]:
+def get_component_docs(component: str) -> str | None:
     """
     Fetch documentation for a Qiskit SDK module.
     
@@ -76,13 +77,13 @@ def get_component_docs(component: str) -> Optional[str]:
     """
     if component not in QISKIT_MODULES:
         return None
-    
+
     path = QISKIT_MODULES[component]
     url = f"{QISKIT_SDK_DOCS}{path}"
     logger.info(f"Fetching component docs for {component} from {url}")
     return fetch_text(url)
 
-def get_guide_docs(style: str) -> Optional[str]:
+def get_guide_docs(style: str) -> str | None:
     """
     Fetch documentation for a Qiskit guide or best practice.
     
@@ -100,10 +101,10 @@ def get_guide_docs(style: str) -> Optional[str]:
         "parametric-compilation": "guides/parametric-compilation",
         "performance-tuning": "guides/performance-tuning",
     }
-    
+
     if style not in guide_paths:
         return None
-    
+
     path = guide_paths[style]
     url = f"{QISKIT_DOCS_BASE}{path}"
     logger.info(f"Fetching style docs for {style} from {url}")
@@ -124,11 +125,11 @@ def search_qiskit_docs(query: str, module: str = "documentation") -> list[dict]:
 
     url = f"{BASE_URL}{SEARCH_PATH}?query={query}&module={module}"
     logger.info(f"Querying from {query} which gives {url} from {module}")
-    
+
     return fetch_text_json(url)
 
 
-def fetch_text_json(url: str) -> list[dict]: 
+def fetch_text_json(url: str) -> list[dict]:
     """
     Fetch text content from a URL using httpx.
     

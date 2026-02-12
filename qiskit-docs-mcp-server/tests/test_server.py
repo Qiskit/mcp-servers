@@ -12,25 +12,27 @@
 
 """Tests for the qiskit-docs-mcp-server."""
 
-import pytest
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+import pytest
+
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from qiskit_docs_mcp_server.server import (
-    get_sdk_module_docs,
-    get_guide,
-    search_docs,
-    get_component_list,
-    get_pattern_list,
-    get_style_list,
-)
 from qiskit_docs_mcp_server.data_fetcher import (
-    QISKIT_MODULES,
     QISKIT_ADDON_MODULES,
+    QISKIT_MODULES,
+)
+from qiskit_docs_mcp_server.server import (
+    get_component_list,
+    get_guide,
+    get_pattern_list,
+    get_sdk_module_docs,
+    get_style_list,
+    search_docs,
 )
 
 

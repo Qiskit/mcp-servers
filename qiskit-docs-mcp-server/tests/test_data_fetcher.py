@@ -12,23 +12,25 @@
 
 """Tests for data_fetcher module."""
 
-import pytest
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import httpx
+import pytest
+
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from qiskit_docs_mcp_server.data_fetcher import (
+    QISKIT_ADDON_MODULES,
+    QISKIT_MODULES,
     fetch_text,
     fetch_text_json,
     get_component_docs,
     get_guide_docs,
     search_qiskit_docs,
-    QISKIT_MODULES,
-    QISKIT_ADDON_MODULES,
 )
 
 
