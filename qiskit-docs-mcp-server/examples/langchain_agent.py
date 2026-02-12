@@ -49,7 +49,7 @@ Usage:
 """
 
 
-# System prompt tailored for the qiskit-doc-mcp-server
+# System prompt tailored for the qiskit-docs-mcp-server
 SYSTEM_PROMPT = """You are a knowledgeable Qiskit documentation assistant with access to the
 qiskit-docs-mcp-server through the MCP server.
 
@@ -301,7 +301,7 @@ async def interactive_session(provider: str, model: str | None):
     print("Qiskit Docs Assistant Agent with LangChain + MCP")
     print("=" * 50)
     print(f"Provider: {provider}" + (f" (model: {model})" if model else ""))
-    print("This agent connects to the qiskit-doc-mcp-server")
+    print("This agent connects to the qiskit-docs-mcp-server")
     print("to help you find and understand Qiskit documentation.")
     print("Type 'quit' to exit, 'clear' to reset conversation history.\n")
 

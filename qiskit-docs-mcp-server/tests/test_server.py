@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Tests for the qiskit-doc-mcp server."""
+"""Tests for the qiskit-docs-mcp-server."""
 
 import pytest
 import sys

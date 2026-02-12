@@ -10,4 +10,4 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Tests for qiskit-doc-mcp-server."""
+"""Tests for qiskit-docs-mcp-server."""
