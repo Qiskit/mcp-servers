@@ -10,11 +10,12 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-from qiskit_docs_mcp_server import server
+from . import server
+
 
 def main() -> None:
     """Main entry point for the package."""
-    server.mcp.run()
+    server.mcp.run(transport="stdio")
 
 if __name__ == "__main__":
     main()
