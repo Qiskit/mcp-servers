@@ -48,8 +48,20 @@ Usage:
     python langchain_agent.py --single
 """
 
+import argparse
+import asyncio
+import os
 
-# System prompt tailored for the qiskit-docs-mcp-server
+from dotenv import load_dotenv
+from langchain.agents import create_agent
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+
+
+# Load environment variables
+load_dotenv()
+
 SYSTEM_PROMPT = """You are a knowledgeable Qiskit documentation assistant with access to the
 qiskit-docs-mcp-server through the MCP server.
 
@@ -64,20 +76,6 @@ When answering:
 - For code examples, indicate the documented origin and recommend how to run them
 - If a topic is not found, explain the search steps and suggest related documentation pages
 """
-
-import argparse
-import asyncio
-import os
-
-from dotenv import load_dotenv
-from langchain.agents import create_agent
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_mcp_adapters.tools import load_mcp_tools
-
-
-# Load environment variables
-load_dotenv()
 
 
 def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
@@ -153,7 +151,7 @@ def check_api_key(provider: str) -> bool:
         "watsonx": ["WATSONX_APIKEY", "WATSONX_PROJECT_ID"],
     }
 
-    required_keys = key_map.get(provider, [])
+    required_keys = [*key_map.get(provider, [])]
     missing_keys = [key for key in required_keys if not os.getenv(key)]
 
     if not missing_keys:
@@ -169,54 +167,6 @@ def check_api_key(provider: str) -> bool:
 
 
 def get_mcp_client() -> MultiServerMCPClient:
-    """
-    Create and return an MCP client configured for the Qiskit Docs server.
-    """
-    # Get the absolute path to the directory where THIS script is (examples/)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    # Go up one level to the project root
-    project_root = os.path.abspath(os.path.join(current_dir, ".."))
-    
-    venv_python = os.path.join(project_root, ".venv", "bin", "python")
-    src_path = os.path.join(project_root, "src")
-
-    return MultiServerMCPClient(
-        {
-            "qiskit-docs": {
-                "transport": "stdio",
-                "command": venv_python,
-                "args": ["-m", "qiskit_docs_mcp_server"],
-                "env": {
-                    **os.environ,
-                    "PYTHONPATH": src_path, # THIS is what was missing
-                    "PYTHONUNBUFFERED": "1",
-                },
-            }
-        }
-    )
-    """
-    Create and return an MCP client configured for the Qiskit Docs server.
-    """
-    # Use absolute paths to ensure the subprocess finds everything
-    base_path = "/home/luke/Desktop/mcp-servers/qiskit-docs-mcp-server"
-    venv_python = os.path.join(base_path, ".venv/bin/python")
-    src_path = os.path.join(base_path, "src")
-
-    return MultiServerMCPClient(
-        {
-            "qiskit-docs": {
-                "transport": "stdio",
-                "command": venv_python,
-                # Use -m to run the package, ensuring 'src' is in the path
-                "args": ["-m", "qiskit_docs_mcp_server"], 
-                "env": {
-                    **os.environ,
-                    "PYTHONPATH": src_path,
-                    "PYTHONUNBUFFERED": "1"
-                },
-            }
-        }
-    )
     """
     Create and return an MCP client configured for the Qiskit Docs server.
 
