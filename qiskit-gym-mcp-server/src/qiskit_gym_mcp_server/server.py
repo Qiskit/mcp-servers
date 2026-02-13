@@ -52,7 +52,7 @@ __all__ = ["main", "mcp"]
 
 def main() -> None:
     """Run the server."""
-    mcp.run()
+    mcp.run(show_banner=False)
 
 
 if __name__ == "__main__":

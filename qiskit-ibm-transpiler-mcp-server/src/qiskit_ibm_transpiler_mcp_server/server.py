@@ -295,7 +295,7 @@ async def hybrid_ai_transpile_tool(
 
 def main() -> None:
     """Run the server."""
-    mcp.run(transport="stdio")
+    mcp.run(transport="stdio", show_banner=False)
 
 
 if __name__ == "__main__":

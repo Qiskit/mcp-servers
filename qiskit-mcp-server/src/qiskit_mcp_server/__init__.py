@@ -35,7 +35,7 @@ from qiskit_mcp_server.utils import with_sync
 
 def main() -> None:
     """Main entry point for the package."""
-    server.mcp.run(transport="stdio")
+    server.mcp.run(transport="stdio", show_banner=False)
 
 
 __all__ = [
