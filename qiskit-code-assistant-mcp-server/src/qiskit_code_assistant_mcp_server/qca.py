@@ -241,8 +241,11 @@ async def get_completion(prompt: str) -> dict[str, Any]:
 
     try:
         logger.info(f"Requesting code completion for prompt (length: {len(prompt)})")
-        url = f"{QCA_TOOL_API_BASE}/v1/completions"
-        body = {"model": _SELECTED_MODEL_NAME, "prompt": prompt.strip()}
+        url = f"{QCA_TOOL_API_BASE}/v1/chat/completions"
+        body = {
+            "model": _SELECTED_MODEL_NAME,
+            "messages": [{"role": "user", "content": prompt.strip()}],
+        }
         data = await make_qca_request(url, method="POST", body=body)
 
         if "error" in data:
@@ -257,7 +260,7 @@ async def get_completion(prompt: str) -> dict[str, Any]:
             return {"status": "error", "message": "No choices for this prompt."}
         else:
             # Extract the primary code from the first choice for easy LLM access
-            primary_code = choices[0].get("text", "") if choices else ""
+            primary_code = choices[0].get("message", {}).get("content", "") if choices else ""
             logger.info(
                 f"Successfully generated completion with {len(choices)} choices (ID: {completion_id})"
             )
@@ -305,8 +308,12 @@ async def get_rag_completion(prompt: str) -> dict[str, Any]:
         }
     """
     try:
-        url = f"{QCA_TOOL_API_BASE}/v1/completions"
-        body = {"model": _SELECTED_MODEL_NAME, "prompt": prompt, "mode": "rag"}
+        url = f"{QCA_TOOL_API_BASE}/v1/chat/completions"
+        body = {
+            "model": _SELECTED_MODEL_NAME,
+            "mode": "rag",
+            "messages": [{"role": "user", "content": prompt.strip()}],
+        }
         data = await make_qca_request(url, method="POST", body=body)
 
         if "error" in data:
@@ -317,7 +324,7 @@ async def get_rag_completion(prompt: str) -> dict[str, Any]:
             return {"status": "error", "message": "No choices for this prompt."}
         else:
             # Extract the primary answer from the first choice for easy LLM access
-            primary_answer = choices[0].get("text", "") if choices else ""
+            primary_answer = choices[0].get("message", {}).get("content", "") if choices else ""
             return {
                 "status": "success",
                 "answer": primary_answer,
