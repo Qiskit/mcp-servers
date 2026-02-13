@@ -43,7 +43,7 @@ async def get_sdk_module_docs(module: str) -> dict[str, Any]:
             "status": "error",
             "message": f"Module '{module}' not found. Use resource qdc://modules to see available modules.",
         }
-    return {"module": module, "documentation": docs}
+    return {"status": "success", "module": module, "documentation": docs}
 
 
 @mcp.tool()
@@ -63,7 +63,7 @@ async def get_guide(guide: str) -> dict[str, Any]:
             "status": "error",
             "message": f"Guide '{guide}' not found. Use resource qdc://style to see available guides.",
         }
-    return {"guide": guide, "documentation": docs}
+    return {"status": "success", "guide": guide, "documentation": docs}
 
 
 @mcp.tool()
@@ -79,28 +79,28 @@ async def search_docs(query: str, module: str = "documentation") -> dict[str, An
         List of matching documentation entries with URLs and types.
     """
     results = search_qiskit_docs(query, module)
-    if not results:
-        return [{"info": f"No results found for '{query}'"}]
-    return results
+    return {"status": "success", "results": results}
 
 
 ## Resource
 @mcp.resource("qiskit-docs://modules", mime_type="application/json")
-async def get_component_list() -> list[str]:
+async def get_component_list() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules."""
-    return list(QISKIT_MODULES.keys())
+    modules = list(QISKIT_MODULES.keys())
+    return {"status": "success", "modules": modules}
 
 
 @mcp.resource("qiskit-docs://addon", mime_type="application/json")
-async def get_addon_list() -> list[str]:
+async def get_addon_list() -> dict[str, Any]:
     """Get list of all Qiskit addon modules and tutorials."""
-    return list(QISKIT_ADDON_MODULES.keys())
+    addons = list(QISKIT_ADDON_MODULES.keys())
+    return {"status": "success", "addons": addons}
 
 
 @mcp.resource("qiskit-docs://style", mime_type="application/json")
-async def get_style_list() -> list[str]:
+async def get_style_list() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices."""
-    return [
+    guides = [
         "optimization",
         "quantum-circuits",
         "error-mitigation",
@@ -108,3 +108,4 @@ async def get_style_list() -> list[str]:
         "parametric-compilation",
         "performance-tuning",
     ]
+    return {"status": "success", "guides": guides}

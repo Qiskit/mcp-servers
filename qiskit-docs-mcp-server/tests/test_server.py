@@ -95,8 +95,7 @@ class TestSearchDocs:
         ]
         result = await search_docs("circuit")
 
-        assert isinstance(result, list)
-        assert len(result) == 2
+        assert len(result["results"]) == 2
         mock_search.assert_called_once_with("circuit", "documentation")
 
     @patch("qiskit_docs_mcp_server.server.search_qiskit_docs")
@@ -105,18 +104,15 @@ class TestSearchDocs:
         mock_search.return_value = []
         result = await search_docs("nonexistent-query")
 
-        assert isinstance(result, list)
-        assert len(result) == 1
-        assert "info" in result[0]
-        assert "No results found" in result[0]["info"]
+        assert len(result["results"]) == 0
 
     @patch("qiskit_docs_mcp_server.server.search_qiskit_docs")
-    async def test_search_docs_returns_list(self, mock_search):
-        """Test that search_docs returns a list."""
-        mock_search.return_value = [{"name": "test"}]
+    async def test_search_docs_returns_dict(self, mock_search):
+        """Test that search_docs returns a dict."""
+        mock_search.return_value = {"results": ["test"]}
         result = await search_docs("test")
 
-        assert isinstance(result, list)
+        assert isinstance(result, dict)
 
     @patch("qiskit_docs_mcp_server.server.search_qiskit_docs")
     async def test_search_docs_optimization_query(self, mock_search):
@@ -127,7 +123,7 @@ class TestSearchDocs:
         ]
         result = await search_docs("optimization")
 
-        assert len(result) == 2
+        assert len(result["results"]) == 2
 
     @patch("qiskit_docs_mcp_server.server.search_qiskit_docs")
     async def test_search_docs_empty_query_result(self, mock_search):
@@ -135,8 +131,7 @@ class TestSearchDocs:
         mock_search.return_value = []
         result = await search_docs("xyz")
 
-        assert isinstance(result, list)
-        assert result[0]["info"] == "No results found for 'xyz'"
+        assert len(result["results"]) == 0
 
 
 @pytest.mark.asyncio
@@ -146,18 +141,18 @@ class TestResourceFunctions:
     async def test_get_component_list_returns_list(self):
         """Test that get_component_list returns a list."""
         result = await get_component_list()
-        assert isinstance(result, list)
+        assert isinstance(result["modules"], list)
 
     async def test_get_component_list_matches_modules(self):
         """Test that get_component_list matches QISKIT_MODULES."""
         result = await get_component_list()
         expected = list(QISKIT_MODULES.keys())
-        assert result == expected
+        assert result["modules"] == expected
 
     async def test_get_style_list_returns_list(self):
         """Test that get_style_list returns a list."""
         result = await get_style_list()
-        assert isinstance(result, list)
+        assert isinstance(result["guides"], list)
 
     async def test_get_style_list_contains_all_guides(self):
         """Test that get_style_list contains all expected guides."""
@@ -170,7 +165,7 @@ class TestResourceFunctions:
             "parametric-compilation",
             "performance-tuning",
         ]
-        assert result == expected_guides
+        assert result["guides"] == expected_guides
 
 
 @pytest.mark.asyncio
@@ -198,12 +193,12 @@ class TestEdgeCases:
         """Test search_docs with empty query string."""
         mock_search.return_value = []
         result = await search_docs("")
-        assert isinstance(result, list)
+        assert isinstance(result["results"], list)
 
     @patch("qiskit_docs_mcp_server.server.search_qiskit_docs")
     async def test_search_docs_special_characters(self, mock_search):
         """Test search_docs with special characters."""
         mock_search.return_value = []
         result = await search_docs("circuit&transpiler")
-        assert isinstance(result, list)
+        assert isinstance(result["results"], list)
         mock_search.assert_called_once_with("circuit&transpiler", "documentation")
