@@ -169,7 +169,7 @@ def mock_http_responses(mock_env_vars):
         )
 
         # Mock model details endpoint
-        respx_mock.get(f"{TEST_QCA_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit").mock(
+        respx_mock.get(f"{TEST_QCA_API_BASE}/v1/models/mistral-small-3.2-24b-qiskit").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -182,7 +182,7 @@ def mock_http_responses(mock_env_vars):
 
         # Mock model disclaimer endpoint
         respx_mock.get(
-            f"{TEST_QCA_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit/disclaimer"
+            f"{TEST_QCA_API_BASE}/v1/models/mistral-small-3.2-24b-qiskit/disclaimer"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -212,7 +212,7 @@ def mock_http_responses(mock_env_vars):
 
         # Mock disclaimer acceptance endpoint
         respx_mock.post(
-            f"{TEST_QCA_API_BASE}/v1/model/mistral-small-3.2-24b-qiskit/disclaimer"
+            f"{TEST_QCA_API_BASE}/v1/models/mistral-small-3.2-24b-qiskit/disclaimer"
         ).mock(return_value=httpx.Response(200, json={"success": True}))
 
         # Mock completion acceptance endpoint

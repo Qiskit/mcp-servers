@@ -131,7 +131,7 @@ async def get_model(model_id: str) -> dict[str, Any]:
 
     try:
         logger.info(f"Fetching model info for model_id: {model_id}")
-        url = f"{QCA_TOOL_API_BASE}/v1/model/{model_id}"
+        url = f"{QCA_TOOL_API_BASE}/v1/models/{model_id}"
         data = await make_qca_request(url, method="GET")
 
         if "error" in data:
@@ -156,7 +156,7 @@ async def get_model_disclaimer(model_id: str) -> dict[str, Any]:
         model_id: The ID of the model for which we want to retrieve the disclaimer
     """
     try:
-        url = f"{QCA_TOOL_API_BASE}/v1/model/{model_id}/disclaimer"
+        url = f"{QCA_TOOL_API_BASE}/v1/models/{model_id}/disclaimer"
         data = await make_qca_request(url, method="GET")
 
         if "error" in data:
@@ -185,7 +185,7 @@ async def accept_model_disclaimer(model_id: str, disclaimer_id: str) -> dict[str
         Disclaimer acceptance status
     """
     try:
-        url = f"{QCA_TOOL_API_BASE}/v1/model/{model_id}/disclaimer"
+        url = f"{QCA_TOOL_API_BASE}/v1/models/{model_id}/disclaimer"
         body = {"disclaimer": disclaimer_id, "accepted": "true"}
         data = await make_qca_request(url, method="POST", body=body)
 
