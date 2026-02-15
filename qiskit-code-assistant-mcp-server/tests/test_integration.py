@@ -180,7 +180,7 @@ class TestErrorHandling:
     async def test_server_error_handling(self, mock_env_vars):
         """Test handling of server errors."""
         with respx.mock() as respx_mock:
-            respx_mock.post(f"{TEST_QCA_API_BASE}/v1/completions").mock(
+            respx_mock.post(f"{TEST_QCA_API_BASE}/v1/chat/completions").mock(
                 return_value=httpx.Response(500, json={"detail": "Internal server error"})
             )
 

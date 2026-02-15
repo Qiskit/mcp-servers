@@ -195,14 +195,17 @@ def mock_http_responses(mock_env_vars):
         )
 
         # Mock completion endpoint
-        respx_mock.post(f"{TEST_QCA_API_BASE}/v1/completions").mock(
+        respx_mock.post(f"{TEST_QCA_API_BASE}/v1/chat/completions").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "id": "completion_456",
                     "choices": [
                         {
-                            "text": "# Create a quantum circuit\nqc = QuantumCircuit(2, 2)",
+                            "message": {
+                                "role": "assistant",
+                                "content": "# Create a quantum circuit\nqc = QuantumCircuit(2, 2)",
+                            },
                             "index": 0,
                         }
                     ],
@@ -236,7 +239,7 @@ def mock_http_error_responses(mock_env_vars):
         )
 
         # Mock 500 Server Error
-        respx_mock.post(f"{TEST_QCA_API_BASE}/v1/completions").mock(
+        respx_mock.post(f"{TEST_QCA_API_BASE}/v1/chat/completions").mock(
             return_value=httpx.Response(500, json={"detail": "Internal server error"})
         )
 
