@@ -19,9 +19,11 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
-from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+from qiskit.quantum_info import SparsePauliOp
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+from qiskit_ibm_runtime import EstimatorV2, QiskitRuntimeService, SamplerV2
 from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
-from qiskit_ibm_runtime.options import SamplerOptions
+from qiskit_ibm_runtime.options import EstimatorOptions, SamplerOptions
 from qiskit_mcp_server.circuit_serialization import CircuitFormat, load_circuit
 
 from qiskit_ibm_runtime_mcp_server.utils import with_sync
@@ -1538,6 +1540,239 @@ async def get_service_status() -> str:
         logger.error(f"Failed to check service status: {e}")
         status_info = {"connected": False, "error": str(e), "service": "IBM Quantum"}
         return f"IBM Quantum Service Status: {status_info}"
+
+
+def _get_estimator_backend(
+    svc: QiskitRuntimeService, backend_name: str | None
+) -> tuple[Any | None, str | None]:
+    """Get the backend for estimator execution.
+
+    Returns:
+        Tuple of (backend, error_message). If successful, error_message is None.
+    """
+    if backend_name:
+        try:
+            return svc.backend(backend_name), None
+        except Exception as e:
+            return None, f"Failed to get backend '{backend_name}': {e!s}"
+
+    # Find least busy backend
+    backends = svc.backends(simulator=False)
+    backend = least_busy(backends)
+    if backend is None:
+        return (
+            None,
+            "No operational backend available. Please specify a backend_name or try again later.",
+        )
+    return backend, None
+
+
+@with_sync
+async def run_estimator(
+    circuit: str,
+    observables: str | list[str] | list[tuple[str, float]],
+    parameter_values: list[float] | None = None,
+    backend_name: str | None = None,
+    circuit_format: CircuitFormat = "auto",
+    optimization_level: int = 1,
+    resilience_level: int = 1,
+    zne_mitigation: bool = True,
+    zne_noise_factors: tuple[float, ...] | None = None,
+) -> dict[str, Any]:
+    """Run a quantum circuit using the Qiskit Runtime EstimatorV2 primitive.
+
+    The Estimator primitive computes expectation values of observables for quantum circuits.
+    This is useful for variational algorithms (VQE, QAOA), quantum chemistry simulations,
+    and any application requiring expectation value estimation.
+
+    Error Mitigation:
+        This function includes built-in error mitigation techniques:
+        - Resilience Levels: Automatic error mitigation strategies
+        - ZNE (Zero Noise Extrapolation): Extrapolates to zero-noise limit
+
+    Args:
+        circuit: The quantum circuit to execute. Accepts:
+                - OpenQASM 3.0 string (recommended)
+                - OpenQASM 2.0 string (legacy, auto-detected)
+                - Base64-encoded QPY binary (for tool chaining)
+                The circuit can be parameterized (use parameter_values to bind).
+        observables: Observable(s) to measure. Accepts:
+                    - Single Pauli string (e.g., "IIXY")
+                    - List of Pauli strings (e.g., ["IIXY", "ZZII"])
+                    - List of (Pauli string, coefficient) tuples for weighted sums
+                      (e.g., [("IIXY", 0.5), ("ZZII", -0.3)])
+        parameter_values: Values for parameterized circuits. If the circuit has parameters,
+                         provide a list of float values in the same order as circuit.parameters.
+                         Optional if circuit has no parameters.
+        backend_name: Name of the IBM Quantum backend to use (e.g., 'ibm_brisbane').
+                     If not provided, uses the least busy operational backend.
+        circuit_format: Format of the circuit input. Options:
+                       - "auto" (default): Automatically detect format
+                       - "qasm3": OpenQASM 3.0/2.0 text format
+                       - "qpy": Base64-encoded QPY binary format
+        optimization_level: Qiskit transpilation optimization level (0-3). Default is 1.
+                           Higher levels may produce better circuits but take longer.
+        resilience_level: Error mitigation resilience level (0-2). Default is 1.
+                         - 0: No error mitigation
+                         - 1: Light error mitigation (default, recommended)
+                         - 2: Heavy error mitigation (slower but more accurate)
+        zne_mitigation: Enable Zero Noise Extrapolation (ZNE). Default is True.
+                       ZNE extrapolates results to the zero-noise limit for better accuracy.
+        zne_noise_factors: Noise amplification factors for ZNE. Default is (1, 1.5, 2).
+                          Only used if zne_mitigation is True.
+
+    Returns:
+        Dictionary containing:
+        - status: "success" or "error"
+        - job_id: The ID of the submitted job (can be used to check status later)
+        - backend: Name of the backend used
+        - creation_date: Job creation timestamp
+        - tags: Job tags (if any)
+        - error_mitigation: Summary of enabled error mitigation techniques
+        - message: Status message
+        - note: Information about how to retrieve results
+
+    Note:
+        This function submits the job and returns immediately. Use get_job_status_tool
+        to check completion, then get_job_results_tool to retrieve expectation values.
+
+    Example observables:
+        - Single observable: "IIXY"
+        - Multiple observables: ["IIXY", "ZZII", "XXYY"]
+        - Weighted Hamiltonian: [("IIXY", 0.5), ("ZZII", -0.3), ("XXYY", 0.2)]
+    """
+    global service
+
+    try:
+        if service is None:
+            service = initialize_service()
+
+        # Load the circuit using the shared serialization module
+        load_result = load_circuit(circuit, circuit_format)
+        if load_result["status"] == "error":
+            return {"status": "error", "message": load_result["message"]}
+        qc = load_result["circuit"]
+
+        # Get the backend
+        backend, backend_error = _get_estimator_backend(service, backend_name)
+        if backend_error:
+            return {"status": "error", "message": backend_error}
+        assert backend is not None  # Type narrowing for mypy  # nosec B101
+
+        # Validate optimization_level
+        if not 0 <= optimization_level <= 3:
+            return {
+                "status": "error",
+                "message": f"optimization_level must be between 0 and 3, got {optimization_level}",
+            }
+
+        # Validate resilience_level
+        if not 0 <= resilience_level <= 2:
+            return {
+                "status": "error",
+                "message": f"resilience_level must be between 0 and 2, got {resilience_level}",
+            }
+
+        # Parse observables into SparsePauliOp
+        try:
+            if isinstance(observables, str):
+                # Single Pauli string
+                hamiltonian = SparsePauliOp(observables)
+            elif isinstance(observables, list):
+                if not observables:
+                    return {
+                        "status": "error",
+                        "message": "observables list cannot be empty",
+                    }
+
+                # Check if it's a list of tuples (weighted) or strings
+                if isinstance(observables[0], tuple):
+                    # List of (Pauli, coefficient) tuples
+                    hamiltonian = SparsePauliOp.from_list(observables)
+                else:
+                    # List of Pauli strings (equal weights)
+                    hamiltonian = SparsePauliOp.from_list(
+                        [(obs, 1.0) for obs in observables]
+                    )
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to parse observables: {e!s}",
+            }
+
+        # Transpile circuit to backend's instruction set
+        pm = generate_preset_pass_manager(
+            backend=backend, optimization_level=optimization_level
+        )
+        isa_circuit = pm.run(qc)
+
+        # Apply layout to observables
+        isa_observables = hamiltonian.apply_layout(isa_circuit.layout)
+
+        # Configure error mitigation options
+        options = EstimatorOptions()
+        options.resilience_level = resilience_level
+
+        # Zero Noise Extrapolation (ZNE)
+        if zne_mitigation and resilience_level > 0:
+            options.resilience.zne_mitigation = True
+            if zne_noise_factors is not None:
+                options.resilience.zne.noise_factors = zne_noise_factors
+
+        # Build error mitigation summary for response
+        error_mitigation: dict[str, Any] = {
+            "resilience_level": resilience_level,
+            "zne_mitigation": {
+                "enabled": zne_mitigation and resilience_level > 0,
+                "noise_factors": (
+                    list(zne_noise_factors) if zne_noise_factors else [1, 1.5, 2]
+                ),
+            },
+        }
+
+        # Create EstimatorV2 with options and submit job
+        estimator = EstimatorV2(mode=backend, options=options)
+
+        # Build PUB (Primitive Unified Bloc)
+        # Type: tuple[QuantumCircuit, SparsePauliOp] | tuple[QuantumCircuit, SparsePauliOp, list[list[float]]]
+        pub: tuple[Any, ...]
+        if parameter_values is not None:
+            # Parameterized circuit with values
+            pub = (isa_circuit, isa_observables, [parameter_values])
+        else:
+            # Non-parameterized circuit
+            pub = (isa_circuit, isa_observables)
+
+        job = estimator.run([pub])
+
+        # Get error_message - it might be a method or an attribute
+        error_msg = getattr(job, "error_message", None)
+        if callable(error_msg):
+            error_msg = error_msg()
+
+        # Get tags safely
+        tags = getattr(job, "tags", None)
+        if tags is None:
+            tags = []
+        else:
+            tags = list(tags) if not isinstance(tags, list) else tags
+
+        return {
+            "status": "success",
+            "job_id": job.job_id(),
+            "backend": backend.name,
+            "creation_date": str(getattr(job, "creation_date", "Unknown")),
+            "tags": tags,
+            "error_message": error_msg,
+            "error_mitigation": error_mitigation,
+            "message": f"Estimator job submitted successfully to {backend.name}",
+            "note": "Use get_job_status_tool with the job_id to check completion. "
+            "Results will contain expectation values for the specified observables.",
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to run estimator: {e}")
+        return {"status": "error", "message": f"Failed to run estimator: {e!s}"}
 
 
 def _clamp(value: int, min_val: int, max_val: int) -> int:
