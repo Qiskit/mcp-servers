@@ -1542,10 +1542,10 @@ async def get_service_status() -> str:
         return f"IBM Quantum Service Status: {status_info}"
 
 
-def _get_estimator_backend(
+def _get_backend(
     svc: QiskitRuntimeService, backend_name: str | None
 ) -> tuple[Any | None, str | None]:
-    """Get the backend for estimator execution.
+    """Get a backend for primitive execution (estimator or sampler).
 
     Returns:
         Tuple of (backend, error_message). If successful, error_message is None.
@@ -1643,6 +1643,18 @@ async def run_estimator(
     """
     global service
 
+    # Validate inputs before any network calls
+    if not 0 <= optimization_level <= 3:
+        return {
+            "status": "error",
+            "message": f"optimization_level must be between 0 and 3, got {optimization_level}",
+        }
+    if not 0 <= resilience_level <= 2:
+        return {
+            "status": "error",
+            "message": f"resilience_level must be between 0 and 2, got {resilience_level}",
+        }
+
     try:
         if service is None:
             service = initialize_service()
@@ -1654,24 +1666,10 @@ async def run_estimator(
         qc = load_result["circuit"]
 
         # Get the backend
-        backend, backend_error = _get_estimator_backend(service, backend_name)
+        backend, backend_error = _get_backend(service, backend_name)
         if backend_error:
             return {"status": "error", "message": backend_error}
         assert backend is not None  # Type narrowing for mypy  # nosec B101
-
-        # Validate optimization_level
-        if not 0 <= optimization_level <= 3:
-            return {
-                "status": "error",
-                "message": f"optimization_level must be between 0 and 3, got {optimization_level}",
-            }
-
-        # Validate resilience_level
-        if not 0 <= resilience_level <= 2:
-            return {
-                "status": "error",
-                "message": f"resilience_level must be between 0 and 2, got {resilience_level}",
-            }
 
         # Parse observables into SparsePauliOp
         try:
@@ -1953,7 +1951,7 @@ async def find_optimal_qv_qubits(
 
     Args:
         backend_name: Name of the backend (e.g., 'ibm_brisbane')
-        num_qubits: Number of qubits in the subgraph (default: 5, range: 2-20)
+        num_qubits: Number of qubits in the subgraph (default: 5, range: 2-10)
         num_results: Number of top subgraphs to return (default: 5, max: 20)
         metric: Scoring metric to optimize:
             - "qv_optimized": Balanced scoring for QV (connectivity + errors + coherence)
@@ -1973,8 +1971,9 @@ async def find_optimal_qv_qubits(
     global service
 
     try:
-        # Validate inputs - limit num_qubits to 20 for performance
-        num_qubits = _clamp(num_qubits, 2, 20)
+        # Validate inputs - limit num_qubits to 10 for performance
+        # (subgraph enumeration is combinatorially expensive for larger values)
+        num_qubits = _clamp(num_qubits, 2, 10)
         num_results = _clamp(num_results, 1, 20)
 
         # Check for fake backends early
@@ -1982,7 +1981,8 @@ async def find_optimal_qv_qubits(
             return {
                 "status": "error",
                 "message": f"Fake backends like '{backend_name}' are not supported. "
-                "This tool requires real-time calibration data from IBM Quantum backends.",
+                "This tool requires real-time calibration data from IBM Quantum backends. "
+                "Use get_coupling_map_tool for connectivity information on fake backends.",
             }
 
         # Initialize service if needed
@@ -2073,31 +2073,6 @@ async def find_optimal_qv_qubits(
         }
 
 
-def _get_sampler_backend(
-    svc: QiskitRuntimeService, backend_name: str | None
-) -> tuple[Any | None, str | None]:
-    """Get the backend for sampler execution.
-
-    Returns:
-        Tuple of (backend, error_message). If successful, error_message is None.
-    """
-    if backend_name:
-        try:
-            return svc.backend(backend_name), None
-        except Exception as e:
-            return None, f"Failed to get backend '{backend_name}': {e!s}"
-
-    # Find least busy backend
-    backends = svc.backends(simulator=False)
-    backend = least_busy(backends)
-    if backend is None:
-        return (
-            None,
-            "No operational backend available. Please specify a backend_name or try again later.",
-        )
-    return backend, None
-
-
 @with_sync
 async def run_sampler(
     circuit: str,
@@ -2164,6 +2139,10 @@ async def run_sampler(
     """
     global service
 
+    # Validate inputs before any network calls
+    if shots < 1:
+        return {"status": "error", "message": "shots must be at least 1"}
+
     try:
         if service is None:
             service = initialize_service()
@@ -2175,14 +2154,10 @@ async def run_sampler(
         qc = load_result["circuit"]
 
         # Get the backend
-        backend, backend_error = _get_sampler_backend(service, backend_name)
+        backend, backend_error = _get_backend(service, backend_name)
         if backend_error:
             return {"status": "error", "message": backend_error}
         assert backend is not None  # Type narrowing for mypy  # nosec B101
-
-        # Validate shots
-        if shots < 1:
-            return {"status": "error", "message": "shots must be at least 1"}
 
         # Configure error mitigation options
         options = SamplerOptions()

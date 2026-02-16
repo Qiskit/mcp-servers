@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-#!/usr/bin/env python3
+
 """
 Qiskit IBM Runtime MCP Server
 
