@@ -31,6 +31,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-mcp-server
+      run: |
+        PACKAGE=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['identifier'])")
+        VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['version'])")
+        echo "Waiting for $PACKAGE==$VERSION on PyPI..."
+        for i in $(seq 1 30); do
+          if curl -sf "https://pypi.org/pypi/$PACKAGE/$VERSION/json" > /dev/null 2>&1; then
+            echo "✓ $PACKAGE==$VERSION is available on PyPI (attempt $i)"
+            exit 0
+          fi
+          echo "Attempt $i/30: not yet available, waiting 20s..."
+          sleep 20
+        done
+        echo "✗ Timed out waiting for $PACKAGE==$VERSION on PyPI after 10 minutes"
+        exit 1
+
     - name: Download mcp-publisher
       run: |
         curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
@@ -55,6 +72,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-code-assistant-mcp-server
+      run: |
+        PACKAGE=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['identifier'])")
+        VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['version'])")
+        echo "Waiting for $PACKAGE==$VERSION on PyPI..."
+        for i in $(seq 1 30); do
+          if curl -sf "https://pypi.org/pypi/$PACKAGE/$VERSION/json" > /dev/null 2>&1; then
+            echo "✓ $PACKAGE==$VERSION is available on PyPI (attempt $i)"
+            exit 0
+          fi
+          echo "Attempt $i/30: not yet available, waiting 20s..."
+          sleep 20
+        done
+        echo "✗ Timed out waiting for $PACKAGE==$VERSION on PyPI after 10 minutes"
+        exit 1
 
     - name: Download mcp-publisher
       run: |
@@ -81,6 +115,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-ibm-runtime-mcp-server
+      run: |
+        PACKAGE=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['identifier'])")
+        VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['version'])")
+        echo "Waiting for $PACKAGE==$VERSION on PyPI..."
+        for i in $(seq 1 30); do
+          if curl -sf "https://pypi.org/pypi/$PACKAGE/$VERSION/json" > /dev/null 2>&1; then
+            echo "✓ $PACKAGE==$VERSION is available on PyPI (attempt $i)"
+            exit 0
+          fi
+          echo "Attempt $i/30: not yet available, waiting 20s..."
+          sleep 20
+        done
+        echo "✗ Timed out waiting for $PACKAGE==$VERSION on PyPI after 10 minutes"
+        exit 1
+
     - name: Download mcp-publisher
       run: |
         curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
@@ -106,6 +157,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-ibm-transpiler-mcp-server
+      run: |
+        PACKAGE=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['identifier'])")
+        VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['version'])")
+        echo "Waiting for $PACKAGE==$VERSION on PyPI..."
+        for i in $(seq 1 30); do
+          if curl -sf "https://pypi.org/pypi/$PACKAGE/$VERSION/json" > /dev/null 2>&1; then
+            echo "✓ $PACKAGE==$VERSION is available on PyPI (attempt $i)"
+            exit 0
+          fi
+          echo "Attempt $i/30: not yet available, waiting 20s..."
+          sleep 20
+        done
+        echo "✗ Timed out waiting for $PACKAGE==$VERSION on PyPI after 10 minutes"
+        exit 1
+
     - name: Download mcp-publisher
       run: |
         curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
@@ -130,6 +198,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-gym-mcp-server
+      run: |
+        PACKAGE=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['identifier'])")
+        VERSION=$(python3 -c "import json; print(json.load(open('server.json'))['packages'][0]['version'])")
+        echo "Waiting for $PACKAGE==$VERSION on PyPI..."
+        for i in $(seq 1 30); do
+          if curl -sf "https://pypi.org/pypi/$PACKAGE/$VERSION/json" > /dev/null 2>&1; then
+            echo "✓ $PACKAGE==$VERSION is available on PyPI (attempt $i)"
+            exit 0
+          fi
+          echo "Attempt $i/30: not yet available, waiting 20s..."
+          sleep 20
+        done
+        echo "✗ Timed out waiting for $PACKAGE==$VERSION on PyPI after 10 minutes"
+        exit 1
 
     - name: Download mcp-publisher
       run: |
