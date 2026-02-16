@@ -202,6 +202,8 @@ async def start_training(
     policy: Literal["basic", "conv1d"] = "basic",
     num_iterations: int = 100,
     initial_difficulty: int = 1,
+    depth_slope: int = 2,
+    max_depth: int = 128,
     tensorboard_experiment: str | None = None,
     background: bool = False,
 ) -> dict[str, Any]:
@@ -219,6 +221,8 @@ async def start_training(
             - "conv1d": 1D convolutional network (better for larger problems)
         num_iterations: Number of training iterations (default: 100)
         initial_difficulty: Starting difficulty level (default: 1)
+        depth_slope: How fast difficulty increases (default: 2)
+        max_depth: Maximum circuit depth for training (default: 128)
         tensorboard_experiment: Name for TensorBoard experiment logging (optional)
         background: If True, run training in background and return immediately.
             Use get_training_status to poll for completion, or wait_for_training
@@ -228,10 +232,6 @@ async def start_training(
         Dict with session_id. If background=False, also includes final status
         and training metrics. If background=True, returns immediately with
         session_id for polling.
-
-    TODO: Add training curriculum parameters (currently using qiskit-gym defaults):
-        - depth_slope: How fast difficulty increases (default: 2)
-        - max_depth: Maximum circuit depth (default: 128)
     """
     try:
         # Validate iteration count (only if limit is explicitly set)
@@ -251,6 +251,16 @@ async def start_training(
             return {
                 "status": "error",
                 "message": "initial_difficulty must be at least 1",
+            }
+        if depth_slope < 1:
+            return {
+                "status": "error",
+                "message": "depth_slope must be at least 1",
+            }
+        if max_depth < 1:
+            return {
+                "status": "error",
+                "message": "max_depth must be at least 1",
             }
 
         # Get environment
