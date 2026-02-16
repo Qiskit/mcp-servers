@@ -349,6 +349,7 @@ async def interactive_session(provider: str, model: str | None) -> None:
                 print(f"\nError: {type(e).__name__}: {e}")
                 # Show more details for debugging
                 import traceback
+
                 traceback.print_exc()
                 print("Please try again.\n")
 
@@ -385,9 +386,7 @@ Use synchronous training since it's only 20 iterations."""
 
 def main() -> None:
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="LangChain Agent for Qiskit Gym MCP Server"
-    )
+    parser = argparse.ArgumentParser(description="LangChain Agent for Qiskit Gym MCP Server")
     parser.add_argument(
         "--provider",
         choices=["openai", "anthropic", "google", "ollama", "watsonx"],
