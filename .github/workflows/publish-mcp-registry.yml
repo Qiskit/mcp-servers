@@ -31,6 +31,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-mcp-server
+      run: ${{ github.workspace }}/.github/scripts/wait-for-pypi.sh
+
     - name: Download mcp-publisher
       run: |
         curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
@@ -55,6 +59,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-code-assistant-mcp-server
+      run: ${{ github.workspace }}/.github/scripts/wait-for-pypi.sh
 
     - name: Download mcp-publisher
       run: |
@@ -81,6 +89,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-ibm-runtime-mcp-server
+      run: ${{ github.workspace }}/.github/scripts/wait-for-pypi.sh
+
     - name: Download mcp-publisher
       run: |
         curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
@@ -106,6 +118,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-ibm-transpiler-mcp-server
+      run: ${{ github.workspace }}/.github/scripts/wait-for-pypi.sh
+
     - name: Download mcp-publisher
       run: |
         curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
@@ -130,6 +146,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Wait for PyPI availability
+      working-directory: ./qiskit-gym-mcp-server
+      run: ${{ github.workspace }}/.github/scripts/wait-for-pypi.sh
 
     - name: Download mcp-publisher
       run: |
