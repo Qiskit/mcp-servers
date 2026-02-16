@@ -112,7 +112,9 @@ class TestSyncMethodExecution:
         mock_response = {
             "status": "success",
             "completion_id": "comp_123",
-            "choices": [{"text": "from qiskit import QuantumCircuit"}],
+            "choices": [
+                {"message": {"role": "assistant", "content": "from qiskit import QuantumCircuit"}}
+            ],
         }
 
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
@@ -129,7 +131,9 @@ class TestSyncMethodExecution:
         mock_response = {
             "status": "success",
             "completion_id": "rag_123",
-            "choices": [{"text": "Quantum entanglement is..."}],
+            "choices": [
+                {"message": {"role": "assistant", "content": "Quantum entanglement is..."}}
+            ],
         }
 
         with patch("qiskit_code_assistant_mcp_server.utils._run_async") as mock_run:
