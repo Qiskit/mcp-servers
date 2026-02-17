@@ -2,6 +2,12 @@
 
 This directory contains examples demonstrating the full power of combining multiple Qiskit MCP servers with advanced AI agent frameworks.
 
+## Quick Start
+
+1. From the repository root, install dependencies: `uv sync --group examples`
+2. Set environment variables in a `.env` file (see [Environment Variables](#environment-variables))
+3. Run: `uv run python examples/quantum_volume_optimizer.py --backend ibm_brisbane --depth 5`
+
 ## Quantum Volume Finder
 
 **A Deep Agent for Actual QV Measurement**
@@ -82,19 +88,13 @@ Try depth 4 (QV-16)
 
 ### Prerequisites
 
+From the repository root, install all example dependencies (including the MCP servers) with:
+
 ```bash
-# Install Deep Agents and LangChain
-pip install deepagents langchain langchain-mcp-adapters python-dotenv
-
-# Install your LLM provider
-pip install langchain-anthropic
-
-# Install all Qiskit MCP servers
-pip install qiskit-mcp-servers
-
-# Required for --num-circuits statistical analysis
-pip install scipy
+uv sync --group examples
 ```
+
+This installs `deepagents`, `langchain`, `langchain-mcp-adapters`, `langchain-anthropic`, `scipy`, and all Qiskit MCP servers.
 
 ### Environment Variables
 
@@ -103,7 +103,8 @@ pip install scipy
 export QISKIT_IBM_TOKEN="your-ibm-quantum-token"
 export ANTHROPIC_API_KEY="your-anthropic-api-key"
 
-# Optional (faster startup)
+# Optional (faster startup — skips instance discovery)
+# Find your CRN at https://quantum.cloud.ibm.com/instances
 export QISKIT_IBM_RUNTIME_MCP_INSTANCE="your-instance-crn"
 ```
 
@@ -241,7 +242,7 @@ Protocol: Full (100 circuits, 97.5% CI)
 - Hardware noise affects larger circuits more
 
 **"MCP server not found"**
-- Install servers: `pip install qiskit-mcp-servers`
+- Install from repo root: `uv sync --group examples`
 
 ## Individual Server Examples
 

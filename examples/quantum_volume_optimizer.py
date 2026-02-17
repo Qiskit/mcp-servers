@@ -66,10 +66,8 @@ Use `--num-circuits 100` (or more) for official QV certification.
 
 ## Prerequisites
 
-    pip install deepagents langchain langchain-mcp-adapters python-dotenv
-    pip install langchain-anthropic  # or your preferred LLM provider
-    pip install qiskit-mcp-servers
-    pip install scipy  # required for --num-circuits statistical analysis
+    # From the repository root:
+    uv sync --group examples
 
 ## Environment Variables
 
