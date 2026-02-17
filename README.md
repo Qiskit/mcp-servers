@@ -87,6 +87,10 @@ Each examples directory contains:
 - **Jupyter Notebook** (`langchain_agent.ipynb`) - Interactive tutorial with step-by-step examples
 - **Python Script** (`langchain_agent.py`) - Command-line agent with multiple LLM provider support
 
+### Advanced: Quantum Volume Finder
+
+The [`examples/`](./examples/) directory contains a multi-agent system that combines multiple MCP servers to **find the highest achievable Quantum Volume** for IBM Quantum backends through actual hardware execution. It demonstrates multi-server orchestration, local tool wrappers to keep large data out of the LLM context, and both single-circuit and full statistical protocol modes. See the [examples README](./examples/README.md) for details.
+
 ## 🚀 Quick Start
 
 ### Prerequisites

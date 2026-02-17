@@ -3,7 +3,7 @@
   "name": "io.github.Qiskit/qiskit-code-assistant-mcp-server",
   "title": "Qiskit Code Assistant MCP Server",
   "description": "MCP server for the Qiskit Code Assistant intelligent code completion",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-code-assistant-mcp-server",
   "repository": {
     "url": "https://github.com/Qiskit/mcp-servers",
@@ -15,7 +15,7 @@
     {
       "registryType": "pypi",
       "identifier": "qiskit-code-assistant-mcp-server",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

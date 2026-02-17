@@ -123,7 +123,9 @@ def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
         try:
             from langchain_anthropic import ChatAnthropic
         except ImportError:
-            raise ValueError("Install langchain-anthropic: pip install langchain-anthropic")
+            raise ValueError(
+                "Install langchain-anthropic: pip install langchain-anthropic"
+            )
         return ChatAnthropic(model=model or "claude-sonnet-4-5-20250929", temperature=0)
 
     elif provider == "ollama":
@@ -137,8 +139,12 @@ def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
         except ImportError:
-            raise ValueError("Install langchain-google-genai: pip install langchain-google-genai")
-        return ChatGoogleGenerativeAI(model=model or "gemini-3-pro-preview", temperature=0)
+            raise ValueError(
+                "Install langchain-google-genai: pip install langchain-google-genai"
+            )
+        return ChatGoogleGenerativeAI(
+            model=model or "gemini-3-pro-preview", temperature=0
+        )
 
     elif provider == "watsonx":
         try:
@@ -294,7 +300,9 @@ async def create_quantum_agent_with_session(
     return agent
 
 
-async def run_agent_query(agent, query: str, history: list | None = None) -> tuple[str, list]:
+async def run_agent_query(
+    agent, query: str, history: list | None = None
+) -> tuple[str, list]:
     """
     Run a query through the agent with conversation history.
 
@@ -399,7 +407,8 @@ async def single_query_example(provider: str, model: str | None):
 
         # Run a sample query
         response, _ = await run_agent_query(
-            agent, "List all available quantum backends and tell me which one is least busy"
+            agent,
+            "List all available quantum backends and tell me which one is least busy",
         )
         print(f"\nResponse:\n{response}")
 
