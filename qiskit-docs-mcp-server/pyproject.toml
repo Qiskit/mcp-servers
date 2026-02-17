@@ -16,9 +16,6 @@ dependencies = [
     "httpx>=0.28.1",
     "idna>=3.10",
     "jiter>=0.8.2",
-    "langchain>=1.2.7",
-    "langchain-mcp-adapters>=0.2.1",
-    "langchain-openai>=1.1.7",
     "modelcontextprotocol>=0.4.0",
     "openai>=1.61.1",
     "pydantic>=2.10.6",
@@ -83,8 +80,6 @@ test = [
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.11.0",
 ]
-
-[project.optional-dependencies]
 examples = [
     "fastmcp>=2.14.0",
     "jupyter>=1.1.1",

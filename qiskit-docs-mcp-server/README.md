@@ -1,4 +1,4 @@
-# Qiskit-Doc-MCP
+# Qiskit-Docs-MCP
 
 A **Model Context Protocol (MCP) server** providing access to **Qiskit documentation and tooling** via a standardized MCP interface.  
 This project enables tools and AI clients to query Qiskit docs and potentially interact with quantum computing workflows programmatically through MCP.
