@@ -98,5 +98,4 @@ def mock_runtime_service():
     return mock_service
 
 
-
 # Assisted by watsonx Code Assistant
