@@ -22,7 +22,9 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     delete_saved_account,
     find_optimal_qubit_chains,
     find_optimal_qv_qubits,
+    get_backend_calibration,
     get_backend_properties,
+    get_coupling_map,
     get_job_results,
     get_job_status,
     get_service_status,
@@ -30,6 +32,8 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     list_backends,
     list_my_jobs,
     list_saved_accounts,
+    run_estimator,
+    run_sampler,
     setup_ibm_quantum_account,
     usage_info,
 )
@@ -122,6 +126,26 @@ class TestWithSyncDecorator:
         """Test usage_info has .sync attribute."""
         assert hasattr(usage_info, "sync")
         assert callable(usage_info.sync)
+
+    def test_get_coupling_map_has_sync(self):
+        """Test get_coupling_map has .sync attribute."""
+        assert hasattr(get_coupling_map, "sync")
+        assert callable(get_coupling_map.sync)
+
+    def test_get_backend_calibration_has_sync(self):
+        """Test get_backend_calibration has .sync attribute."""
+        assert hasattr(get_backend_calibration, "sync")
+        assert callable(get_backend_calibration.sync)
+
+    def test_run_estimator_has_sync(self):
+        """Test run_estimator has .sync attribute."""
+        assert hasattr(run_estimator, "sync")
+        assert callable(run_estimator.sync)
+
+    def test_run_sampler_has_sync(self):
+        """Test run_sampler has .sync attribute."""
+        assert hasattr(run_sampler, "sync")
+        assert callable(run_sampler.sync)
 
 
 class TestSyncMethodExecution:
@@ -350,6 +374,77 @@ class TestSyncMethodExecution:
             assert result["num_qubits"] == 5
             assert len(result["subgraphs"]) == 1
             assert result["subgraphs"][0]["connectivity_ratio"] == 0.6
+
+    def test_get_coupling_map_sync_success(self):
+        """Test successful coupling map retrieval with .sync method."""
+        mock_response = {
+            "status": "success",
+            "backend_name": "ibm_brisbane",
+            "num_qubits": 127,
+            "num_edges": 144,
+            "edges": [[0, 1], [1, 2]],
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = get_coupling_map.sync("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert result["backend_name"] == "ibm_brisbane"
+            assert result["num_edges"] == 144
+
+    def test_get_backend_calibration_sync_success(self):
+        """Test successful backend calibration retrieval with .sync method."""
+        mock_response = {
+            "status": "success",
+            "backend_name": "ibm_brisbane",
+            "num_qubits": 127,
+            "qubits": [{"qubit": 0, "t1": 200.0, "t2": 100.0}],
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = get_backend_calibration.sync("ibm_brisbane")
+
+            assert result["status"] == "success"
+            assert result["backend_name"] == "ibm_brisbane"
+            assert len(result["qubits"]) == 1
+
+    def test_run_estimator_sync_success(self):
+        """Test successful estimator execution with .sync method."""
+        mock_response = {
+            "status": "success",
+            "job_id": "job_456",
+            "backend": "ibm_brisbane",
+            "message": "Estimator job submitted successfully to ibm_brisbane",
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = run_estimator.sync(circuit="OPENQASM 3;", observables="ZZ")
+
+            assert result["status"] == "success"
+            assert result["job_id"] == "job_456"
+
+    def test_run_sampler_sync_success(self):
+        """Test successful sampler execution with .sync method."""
+        mock_response = {
+            "status": "success",
+            "job_id": "job_789",
+            "backend": "ibm_brisbane",
+            "message": "Sampler job submitted successfully to ibm_brisbane",
+        }
+
+        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
+            mock_run.return_value = mock_response
+
+            result = run_sampler.sync(circuit="OPENQASM 3;")
+
+            assert result["status"] == "success"
+            assert result["job_id"] == "job_789"
 
     def test_delete_saved_account_sync_success(self):
         """Test successful account deletion with .sync method."""
