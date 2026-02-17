@@ -2140,7 +2140,7 @@ class TestDeleteSavedAccount:
 
             assert result["status"] == "error"
             assert result["deleted"] is False
-            assert "not found" in result["error"]
+            assert "not found" in result["message"]
 
     @pytest.mark.asyncio
     async def test_delete_saved_account_exception(self):
@@ -2154,7 +2154,7 @@ class TestDeleteSavedAccount:
 
             assert result["status"] == "error"
             assert result["deleted"] is False
-            assert "Permission denied" in result["error"]
+            assert "Permission denied" in result["message"]
 
 
 class TestListSavedAccounts:
@@ -2219,7 +2219,7 @@ class TestListSavedAccounts:
             result = await list_saved_accounts()
 
             assert result["status"] == "error"
-            assert "File not found" in result["error"]
+            assert "File not found" in result["message"]
 
 
 class TestActiveAccountInfo:
@@ -2280,7 +2280,7 @@ class TestActiveAccountInfo:
             result = await active_account_info()
 
             assert result["status"] == "error"
-            assert "Service not initialized" in result["error"]
+            assert "Service not initialized" in result["message"]
 
 
 class TestActiveInstanceInfo:
@@ -2331,7 +2331,7 @@ class TestActiveInstanceInfo:
             result = await active_instance_info()
 
             assert result["status"] == "error"
-            assert "Instance lookup failed" in result["error"]
+            assert "Instance lookup failed" in result["message"]
 
 
 class TestAvailableInstances:
@@ -2401,7 +2401,7 @@ class TestAvailableInstances:
             result = await available_instances()
 
             assert result["status"] == "error"
-            assert "Failed to fetch instances" in result["error"]
+            assert "Failed to fetch instances" in result["message"]
 
 
 class TestUsageInfo:
@@ -2471,7 +2471,7 @@ class TestUsageInfo:
             result = await usage_info()
 
             assert result["status"] == "error"
-            assert "Usage data unavailable" in result["error"]
+            assert "Usage data unavailable" in result["message"]
 
 
 class TestAccountManagementToolsExist:

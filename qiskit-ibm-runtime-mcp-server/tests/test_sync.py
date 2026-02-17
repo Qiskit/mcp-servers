@@ -373,7 +373,7 @@ class TestSyncMethodExecution:
         mock_response = {
             "status": "error",
             "deleted": False,
-            "error": "Account name not found or could not be deleted",
+            "message": "Account name not found or could not be deleted",
         }
 
         with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
@@ -383,7 +383,7 @@ class TestSyncMethodExecution:
 
             assert result["status"] == "error"
             assert result["deleted"] is False
-            assert "not found" in result["error"]
+            assert "not found" in result["message"]
 
     def test_list_saved_accounts_sync_success(self):
         """Test successful saved accounts listing with .sync method."""
@@ -518,7 +518,7 @@ class TestSyncMethodExecution:
 
     def test_list_saved_accounts_sync_error(self):
         """Test error handling in list_saved_accounts .sync method."""
-        mock_response = {"status": "error", "error": "File not found"}
+        mock_response = {"status": "error", "message": "File not found"}
 
         with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
@@ -526,11 +526,11 @@ class TestSyncMethodExecution:
             result = list_saved_accounts.sync()
 
             assert result["status"] == "error"
-            assert "File not found" in result["error"]
+            assert "File not found" in result["message"]
 
     def test_active_account_info_sync_error(self):
         """Test error handling in active_account_info .sync method."""
-        mock_response = {"status": "error", "error": "Service not initialized"}
+        mock_response = {"status": "error", "message": "Service not initialized"}
 
         with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
@@ -538,11 +538,11 @@ class TestSyncMethodExecution:
             result = active_account_info.sync()
 
             assert result["status"] == "error"
-            assert "Service not initialized" in result["error"]
+            assert "Service not initialized" in result["message"]
 
     def test_active_instance_info_sync_error(self):
         """Test error handling in active_instance_info .sync method."""
-        mock_response = {"status": "error", "error": "Instance lookup failed"}
+        mock_response = {"status": "error", "message": "Instance lookup failed"}
 
         with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
@@ -550,11 +550,11 @@ class TestSyncMethodExecution:
             result = active_instance_info.sync()
 
             assert result["status"] == "error"
-            assert "Instance lookup failed" in result["error"]
+            assert "Instance lookup failed" in result["message"]
 
     def test_available_instances_sync_error(self):
         """Test error handling in available_instances .sync method."""
-        mock_response = {"status": "error", "error": "Failed to fetch instances"}
+        mock_response = {"status": "error", "message": "Failed to fetch instances"}
 
         with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
@@ -562,11 +562,11 @@ class TestSyncMethodExecution:
             result = available_instances.sync()
 
             assert result["status"] == "error"
-            assert "Failed to fetch instances" in result["error"]
+            assert "Failed to fetch instances" in result["message"]
 
     def test_usage_info_sync_error(self):
         """Test error handling in usage_info .sync method."""
-        mock_response = {"status": "error", "error": "Usage data unavailable"}
+        mock_response = {"status": "error", "message": "Usage data unavailable"}
 
         with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
             mock_run.return_value = mock_response
@@ -574,4 +574,4 @@ class TestSyncMethodExecution:
             result = usage_info.sync()
 
             assert result["status"] == "error"
-            assert "Usage data unavailable" in result["error"]
+            assert "Usage data unavailable" in result["message"]

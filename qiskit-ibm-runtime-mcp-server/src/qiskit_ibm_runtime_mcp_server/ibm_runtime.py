@@ -2396,8 +2396,8 @@ async def delete_saved_account(account_name: str) -> dict[str, Any]:
     Returns:
         Dictionary containing deletion status:
         - On success: {"status": "success", "deleted": True, "message": "Account successfully deleted"}
-        - On failure: {"status": "error", "deleted": False, "error": "Account name not found or could not be deleted"}
-        - On error: {"status": "error", "deleted": False, "error": error_message}
+        - On failure: {"status": "error", "deleted": False, "message": "Account name not found or could not be deleted"}
+        - On error: {"status": "error", "deleted": False, "message": error_message}
 
     """
     try:
@@ -2413,12 +2413,12 @@ async def delete_saved_account(account_name: str) -> dict[str, Any]:
             return {
                 "status": "error",
                 "deleted": False,
-                "error": "Account name not found or could not be deleted",
+                "message": "Account name not found or could not be deleted",
             }
 
     except Exception as e:
         logger.error(f"Failed to delete account: {e}")
-        return {"status": "error", "deleted": False, "error": str(e)}
+        return {"status": "error", "deleted": False, "message": str(e)}
 
 
 @with_sync
@@ -2435,7 +2435,7 @@ async def list_saved_accounts() -> dict[str, Any]:
         - On success with accounts: {"status": "success", "accounts": {account_name: account_info, ...}}
           Each account_info dict contains: channel, url, token (masked), and other metadata
         - On success with no accounts: {"status": "success", "accounts": {}, "message": "No accounts found"}
-        - On error: {"status": "error", "error": error_message}
+        - On error: {"status": "error", "message": error_message}
     """
     try:
         accounts_list = QiskitRuntimeService.saved_accounts()
@@ -2455,7 +2455,7 @@ async def list_saved_accounts() -> dict[str, Any]:
             return {"status": "success", "accounts": {}, "message": "No accounts found"}
     except Exception as e:
         logger.error(f"Failed to collect accounts: {e}")
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "message": str(e)}
 
 
 @with_sync
@@ -2476,7 +2476,7 @@ async def active_account_info() -> dict[str, Any]:
           * "token": API token (masked for security, showing only last 4 characters)
           * "verify"
           * "private_endpoint"
-        - On error: {"status": "error", "error": error_message}
+        - On error: {"status": "error", "message": error_message}
     """
     global service
 
@@ -2493,7 +2493,7 @@ async def active_account_info() -> dict[str, Any]:
         return account_data
     except Exception as e:
         logger.error(f"Failed to collect active account: {e}")
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "message": str(e)}
 
 
 @with_sync
@@ -2509,7 +2509,7 @@ async def active_instance_info() -> dict[str, Any]:
     Returns:
         Dictionary containing instance CRN information:
         - On success: {"status": "success", "instance_crn": "crn:v1:bluemix:public:quantum-computing:..."}
-        - On error: {"status": "error", "error": error_message}
+        - On error: {"status": "error", "message": error_message}
     """
     global service
 
@@ -2523,7 +2523,7 @@ async def active_instance_info() -> dict[str, Any]:
         return instance_details
     except Exception as e:
         logger.error(f"Failed to collect instance crn: {e}")
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "message": str(e)}
 
 
 @with_sync
@@ -2544,7 +2544,7 @@ async def available_instances() -> dict[str, Any]:
           * "name": Human-readable instance name
           * "tags"
           * "pricing_type"
-        - On error: {"status": "error", "error": error_message}
+        - On error: {"status": "error", "message": error_message}
     """
     global service
 
@@ -2562,7 +2562,7 @@ async def available_instances() -> dict[str, Any]:
         logger.error(
             f"Failed to collect available instances for the active account: {e}"
         )
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "message": str(e)}
 
 
 @with_sync
@@ -2585,7 +2585,7 @@ async def usage_info() -> dict[str, Any]:
           * usage_limit_seconds
           * usage_limit_reached
           * usage_remaining_seconds
-        - On error: {"status": "error", "error": error_message}
+        - On error: {"status": "error", "message": error_message}
     """
     global service
 
@@ -2597,7 +2597,7 @@ async def usage_info() -> dict[str, Any]:
         return usage_data
     except Exception as e:
         logger.error(f"Failed to collect usage information: {e}")
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "message": str(e)}
 
 
 # Assisted by watsonx Code Assistant
