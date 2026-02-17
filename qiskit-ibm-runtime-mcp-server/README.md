@@ -8,7 +8,9 @@ A comprehensive Model Context Protocol (MCP) server that provides AI assistants 
 
 ## Features
 
-- **Quantum Backend Management**: List and inspect available quantum backends
+- **Circuit Execution with Primitives**: Run circuits using EstimatorV2 (expectation values) and SamplerV2 (measurement sampling) with built-in error mitigation
+- **Quantum Backend Management**: List, inspect, and get calibration data for quantum backends
+- **Qubit Optimization**: Find optimal qubit chains and subgraphs based on real-time calibration data
 - **Job Management**: Monitor, cancel, and retrieve job results
 - **Account Management**: Easy setup and configuration of IBM Quantum accounts
 
@@ -156,9 +158,12 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     list_backends,
     least_busy_backend,
     get_backend_properties,
+    get_backend_calibration,
     get_coupling_map,
     find_optimal_qubit_chains,
     find_optimal_qv_qubits,
+    run_estimator,
+    run_sampler,
     list_my_jobs,
     get_job_status,
     get_job_results,
@@ -300,6 +305,24 @@ Use `fake_` prefix for offline testing (e.g., `fake_sherbrooke`, `fake_brisbane`
 - SWAP gate minimization planning
 - Offline testing with fake backends
 
+#### `get_backend_calibration(backend_name: str, qubit_indices: list[int] | None = None)`
+Get calibration data for a backend including T1, T2 coherence times and error rates.
+
+**Parameters:**
+- `backend_name`: Name of the backend (e.g., `ibm_brisbane`)
+- `qubit_indices` (optional): List of specific qubit indices. If not provided, returns data for the first 10 qubits.
+
+**Returns:** Calibration data including:
+- T1 and T2 coherence times (in microseconds)
+- Qubit frequency (in GHz)
+- Readout errors for each qubit
+- Gate errors for common gates (x, sx, cx, etc.)
+- `faulty_qubits`: List of non-operational qubit indices
+- `faulty_gates`: List of non-operational gates with affected qubits
+- Last calibration timestamp
+
+**Note:** For static backend info (processor_type, backend_version, quantum_volume), use `get_backend_properties` instead.
+
 #### `find_optimal_qubit_chains(backend_name, chain_length, num_results, metric)`
 Find optimal linear qubit chains for quantum experiments based on connectivity and calibration data.
 
@@ -418,6 +441,44 @@ Cancel a running or queued job.
 **Parameters:**
 - `job_id`: The ID of the job to cancel
 
+#### `run_estimator(circuit, observables, ...)`
+Run a quantum circuit using the Qiskit Runtime EstimatorV2 primitive. Computes expectation values of observables with built-in error mitigation.
+
+**Parameters:**
+- `circuit`: Quantum circuit (OpenQASM 3.0/2.0 string or base64-encoded QPY)
+- `observables`: Observable(s) to measure. Accepts:
+  - Single Pauli string: `"ZZ"`
+  - List of Pauli strings: `["IIXY", "ZZII"]`
+  - Weighted Hamiltonian: `[("XX", 0.5), ("ZZ", -0.3)]`
+- `parameter_values` (optional): Values for parameterized circuits
+- `backend_name` (optional): Backend name. If not provided, uses the least busy backend.
+- `circuit_format`: `"auto"` (default), `"qasm3"`, or `"qpy"`
+- `optimization_level`: Transpilation level 0-3 (default: 1)
+- `resilience_level`: Error mitigation level 0-2 (default: 1)
+- `zne_mitigation`: Enable Zero Noise Extrapolation (default: True)
+- `zne_noise_factors` (optional): Noise factors for ZNE (default: (1, 1.5, 2))
+
+**Returns:** Job submission status including `job_id`, `backend`, and `error_mitigation` summary.
+
+**Note:** Jobs run asynchronously. Use `get_job_status` to monitor and `get_job_results` to retrieve expectation values.
+
+#### `run_sampler(circuit, ...)`
+Run a quantum circuit using the Qiskit Runtime SamplerV2 primitive. Returns measurement outcome samples with built-in error mitigation.
+
+**Parameters:**
+- `circuit`: Quantum circuit (OpenQASM 3.0/2.0 string or base64-encoded QPY). Must include measurement operations.
+- `backend_name` (optional): Backend name. If not provided, uses the least busy backend.
+- `shots`: Number of measurement repetitions (default: 4096)
+- `circuit_format`: `"auto"` (default), `"qasm3"`, or `"qpy"`
+- `dynamical_decoupling`: Suppress decoherence during idle periods (default: True)
+- `dd_sequence`: DD pulse sequence: `"XX"`, `"XpXm"`, or `"XY4"` (default)
+- `twirling`: Pauli twirling on 2-qubit gates (default: True)
+- `measure_twirling`: Measurement twirling for readout error mitigation (default: True)
+
+**Returns:** Job submission status including `job_id`, `backend`, `shots`, and `error_mitigation` summary.
+
+**Note:** Jobs run asynchronously. Use `get_job_status` to monitor and `get_job_results` to retrieve measurement counts.
+
 #### `list_saved_accounts()`
 List all IBM Quantum accounts saved on disk.
 
@@ -440,7 +501,7 @@ Delete a saved IBM Quantum account from disk.
 **Returns:** Dictionary containing:
 - `status`: "success" or "error"
 - `deleted`: Boolean indicating if deletion was successful
-- `message` or `error`: Status message
+- `message`: Status message
 
 #### `active_account_info()`
 Get information about the currently active IBM Quantum account.
@@ -481,8 +542,20 @@ Get usage statistics and quota information for the active instance.
 
 ### Resources
 
-#### `ibm_quantum://status`
-Get current service status and connection info.
+#### `ibm://status`
+Get current IBM Quantum service status and connection info.
+
+#### `circuits://bell-state`
+Pre-built 2-qubit Bell state circuit creating |Phi+> = (|00> + |11>)/sqrt(2). Pass the returned `circuit` field directly to `run_sampler`. Expected results: ~50% '00' and ~50% '11'.
+
+#### `circuits://ghz-state`
+Pre-built 3-qubit GHZ state circuit creating (|000> + |111>)/sqrt(2). Expected results: ~50% '000' and ~50% '111'.
+
+#### `circuits://random`
+Pre-built 4-qubit quantum random number generator. Each qubit is put in superposition and measured. Expected results: all 16 outcomes with ~6.25% probability each.
+
+#### `circuits://superposition`
+Simplest quantum circuit: single qubit Hadamard gate creating (|0> + |1>)/sqrt(2). Expected results: ~50% '0' and ~50% '1'.
 
 
 ## Security Considerations
@@ -501,8 +574,7 @@ Get current service status and connection info.
 
 Contributions are welcome! Areas for improvement:
 
-- Support for Primitives
-- Support for error mitigation/correction/cancellation techniques
+- Additional error mitigation/correction techniques
 - Other qiskit-ibm-runtime features
 
 
@@ -573,10 +645,11 @@ uv run pytest tests/test_server.py -v
 
 The test suite covers:
 - ✅ Service initialization and account setup
-- ✅ Backend listing and analysis
+- ✅ Backend listing, calibration, and analysis
+- ✅ Circuit execution with EstimatorV2 and SamplerV2 primitives
 - ✅ Job management and monitoring
 - ✅ Synchronous execution (`.sync` methods)
-- ✅ Error handling and validation
+- ✅ Error handling and input validation
 - ✅ Integration scenarios
 - ✅ Resource and tool handlers
 

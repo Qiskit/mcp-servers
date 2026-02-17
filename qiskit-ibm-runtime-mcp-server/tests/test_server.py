@@ -1192,7 +1192,7 @@ cx q[0], q[1];
                 "qiskit_ibm_runtime_mcp_server.ibm_runtime.EstimatorV2",
             ) as mock_estimator_cls,
             patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_estimator_backend",
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_backend",
             ) as mock_get_backend,
         ):
             # Setup backend
@@ -1261,7 +1261,7 @@ cx q[0], q[1];
                 "qiskit_ibm_runtime_mcp_server.ibm_runtime.EstimatorV2",
             ) as mock_estimator_cls,
             patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_estimator_backend",
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_backend",
             ) as mock_get_backend,
         ):
             # Setup backend
@@ -1329,7 +1329,7 @@ cx q[0], q[1];
                 "qiskit_ibm_runtime_mcp_server.ibm_runtime.EstimatorV2",
             ) as mock_estimator_cls,
             patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_estimator_backend",
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_backend",
             ) as mock_get_backend,
         ):
             # Setup backend
@@ -1369,58 +1369,56 @@ cx q[0], q[1];
             )
 
     @pytest.mark.asyncio
-    async def test_run_estimator_invalid_optimization_level(self, mock_runtime_service):
-        """Test run_estimator with invalid optimization_level."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service",
-            mock_runtime_service,
-        ):
-            # Test optimization_level too high
-            result = await run_estimator(
-                circuit=self.SAMPLE_QASM3,
-                observables="ZZ",
-                optimization_level=5,  # Invalid: must be 0-3
-            )
-            assert result["status"] == "error"
-            assert "optimization_level must be between 0 and 3" in result["message"]
-            assert "got 5" in result["message"]
+    async def test_run_estimator_invalid_optimization_level(self):
+        """Test run_estimator with invalid optimization_level.
 
-            # Test optimization_level negative
-            result = await run_estimator(
-                circuit=self.SAMPLE_QASM3,
-                observables="ZZ",
-                optimization_level=-1,  # Invalid: must be 0-3
-            )
-            assert result["status"] == "error"
-            assert "optimization_level must be between 0 and 3" in result["message"]
-            assert "got -1" in result["message"]
+        Validation happens before any network calls, so no mocking is needed.
+        """
+        # Test optimization_level too high
+        result = await run_estimator(
+            circuit=self.SAMPLE_QASM3,
+            observables="ZZ",
+            optimization_level=5,  # Invalid: must be 0-3
+        )
+        assert result["status"] == "error"
+        assert "optimization_level must be between 0 and 3" in result["message"]
+        assert "got 5" in result["message"]
+
+        # Test optimization_level negative
+        result = await run_estimator(
+            circuit=self.SAMPLE_QASM3,
+            observables="ZZ",
+            optimization_level=-1,  # Invalid: must be 0-3
+        )
+        assert result["status"] == "error"
+        assert "optimization_level must be between 0 and 3" in result["message"]
+        assert "got -1" in result["message"]
 
     @pytest.mark.asyncio
-    async def test_run_estimator_invalid_resilience_level(self, mock_runtime_service):
-        """Test run_estimator with invalid resilience_level."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.service",
-            mock_runtime_service,
-        ):
-            # Test resilience_level too high
-            result = await run_estimator(
-                circuit=self.SAMPLE_QASM3,
-                observables="ZZ",
-                resilience_level=3,  # Invalid: must be 0-2
-            )
-            assert result["status"] == "error"
-            assert "resilience_level must be between 0 and 2" in result["message"]
-            assert "got 3" in result["message"]
+    async def test_run_estimator_invalid_resilience_level(self):
+        """Test run_estimator with invalid resilience_level.
 
-            # Test resilience_level negative
-            result = await run_estimator(
-                circuit=self.SAMPLE_QASM3,
-                observables="ZZ",
-                resilience_level=-1,  # Invalid: must be 0-2
-            )
-            assert result["status"] == "error"
-            assert "resilience_level must be between 0 and 2" in result["message"]
-            assert "got -1" in result["message"]
+        Validation happens before any network calls, so no mocking is needed.
+        """
+        # Test resilience_level too high
+        result = await run_estimator(
+            circuit=self.SAMPLE_QASM3,
+            observables="ZZ",
+            resilience_level=3,  # Invalid: must be 0-2
+        )
+        assert result["status"] == "error"
+        assert "resilience_level must be between 0 and 2" in result["message"]
+        assert "got 3" in result["message"]
+
+        # Test resilience_level negative
+        result = await run_estimator(
+            circuit=self.SAMPLE_QASM3,
+            observables="ZZ",
+            resilience_level=-1,  # Invalid: must be 0-2
+        )
+        assert result["status"] == "error"
+        assert "resilience_level must be between 0 and 2" in result["message"]
+        assert "got -1" in result["message"]
 
     @pytest.mark.asyncio
     async def test_run_estimator_circuit_load_failure(self, mock_runtime_service):
@@ -1482,10 +1480,6 @@ cx q[0], q[1];
                     "circuit": Mock(name="circuit"),
                 },
             ),
-            patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime.SparsePauliOp",
-                return_value=Mock(name="hamiltonian"),
-            ),
         ):
             mock_runtime_service.backend.side_effect = Exception("Backend not found")
 
@@ -1528,10 +1522,13 @@ cx q[0], q[1];
             patch(
                 "qiskit_ibm_runtime_mcp_server.ibm_runtime.EstimatorV2",
             ) as mock_estimator_cls,
+            patch(
+                "qiskit_ibm_runtime_mcp_server.ibm_runtime._get_backend",
+            ) as mock_get_backend,
         ):
             backend = Mock(name="backend")
             backend.name = "ibm_example"
-            mock_runtime_service.least_busy.return_value = backend
+            mock_get_backend.return_value = (backend, None)
 
             mock_estimator = Mock()
             mock_estimator.run.side_effect = Exception("Job submission error")
@@ -2143,7 +2140,7 @@ class TestDeleteSavedAccount:
 
             assert result["status"] == "error"
             assert result["deleted"] is False
-            assert "not found" in result["error"]
+            assert "not found" in result["message"]
 
     @pytest.mark.asyncio
     async def test_delete_saved_account_exception(self):
@@ -2157,7 +2154,7 @@ class TestDeleteSavedAccount:
 
             assert result["status"] == "error"
             assert result["deleted"] is False
-            assert "Permission denied" in result["error"]
+            assert "Permission denied" in result["message"]
 
 
 class TestListSavedAccounts:
@@ -2222,7 +2219,7 @@ class TestListSavedAccounts:
             result = await list_saved_accounts()
 
             assert result["status"] == "error"
-            assert "File not found" in result["error"]
+            assert "File not found" in result["message"]
 
 
 class TestActiveAccountInfo:
@@ -2283,7 +2280,7 @@ class TestActiveAccountInfo:
             result = await active_account_info()
 
             assert result["status"] == "error"
-            assert "Service not initialized" in result["error"]
+            assert "Service not initialized" in result["message"]
 
 
 class TestActiveInstanceInfo:
@@ -2334,7 +2331,7 @@ class TestActiveInstanceInfo:
             result = await active_instance_info()
 
             assert result["status"] == "error"
-            assert "Instance lookup failed" in result["error"]
+            assert "Instance lookup failed" in result["message"]
 
 
 class TestAvailableInstances:
@@ -2404,7 +2401,7 @@ class TestAvailableInstances:
             result = await available_instances()
 
             assert result["status"] == "error"
-            assert "Failed to fetch instances" in result["error"]
+            assert "Failed to fetch instances" in result["message"]
 
 
 class TestUsageInfo:
@@ -2474,7 +2471,7 @@ class TestUsageInfo:
             result = await usage_info()
 
             assert result["status"] == "error"
-            assert "Usage data unavailable" in result["error"]
+            assert "Usage data unavailable" in result["message"]
 
 
 class TestAccountManagementToolsExist:
