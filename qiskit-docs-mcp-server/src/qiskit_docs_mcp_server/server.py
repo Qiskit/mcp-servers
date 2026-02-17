@@ -10,11 +10,19 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+"""
+Qiskit Documentation MCP Server
+
+A Model Context Protocol server that provides access to IBM Qiskit documentation
+for querying and retrieving Qiskit documentation content and summaries.
+"""
+
+import logging
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
-from .data_fetcher import (
+from qiskit_docs_mcp_server.data_fetcher import (
     QISKIT_ADDON_MODULES,
     QISKIT_MODULES,
     get_component_docs,
@@ -23,7 +31,20 @@ from .data_fetcher import (
 )
 
 
-mcp = FastMCP("qiskit_docs")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize FastMCP server
+mcp = FastMCP("Qiskit Documentation")
+
+logger.info("Qiskit Documentation MCP Server initialized")
+
+
+##################################################
+## MCP Tools
+## - https://modelcontextprotocol.io/docs/concepts/tools
+##################################################
 
 
 @mcp.tool()
@@ -82,7 +103,12 @@ async def search_docs(query: str, module: str = "documentation") -> dict[str, An
     return {"status": "success", "results": results}
 
 
-## Resource
+##################################################
+## MCP Resources
+## - https://modelcontextprotocol.io/docs/concepts/resources
+##################################################
+
+
 @mcp.resource("qiskit-docs://modules", mime_type="application/json")
 async def get_component_list() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules."""
