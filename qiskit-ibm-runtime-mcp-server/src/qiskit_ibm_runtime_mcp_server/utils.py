@@ -59,12 +59,9 @@ def _run_async(coro: Coroutine[Any, Any, T]) -> T:
     """
     try:
         loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # We're in a running loop (e.g., Jupyter), use run_until_complete
-            # This works because nest_asyncio allows nested loops
-            return loop.run_until_complete(coro)
-        else:
-            return loop.run_until_complete(coro)
+        # In a running loop (e.g., Jupyter), this works because
+        # nest_asyncio allows nested run_until_complete calls
+        return loop.run_until_complete(coro)
     except RuntimeError:
         # No event loop exists, create one
         return asyncio.run(coro)

@@ -231,9 +231,22 @@ The agent has access to these tools provided by the MCP server:
 | `list_backends_tool` | List all available quantum backends |
 | `least_busy_backend_tool` | Find the least busy operational backend |
 | `get_backend_properties_tool` | Get detailed properties of a specific backend |
+| `get_backend_calibration_tool` | Get calibration data (T1, T2, error rates) for a backend |
+| `get_coupling_map_tool` | Get qubit connectivity map for a backend |
+| `find_optimal_qubit_chains_tool` | Find optimal linear qubit chains based on calibration data |
+| `find_optimal_qv_qubits_tool` | Find optimal qubit subgraphs for Quantum Volume experiments |
+| `run_estimator_tool` | Run a circuit with EstimatorV2 (compute expectation values) |
+| `run_sampler_tool` | Run a circuit with SamplerV2 (measurement sampling) |
 | `list_my_jobs_tool` | List user's recent quantum jobs |
 | `get_job_status_tool` | Get status of a specific job |
+| `get_job_results_tool` | Retrieve results from a completed job |
 | `cancel_job_tool` | Cancel a running or queued job |
+| `delete_saved_account_tool` | Delete a saved IBM Quantum account from disk |
+| `list_saved_accounts_tool` | List all saved IBM Quantum accounts |
+| `active_account_info_tool` | Get info about the currently active account |
+| `active_instance_info_tool` | Get the CRN of the active instance |
+| `available_instances_tool` | List all instances available to the active account |
+| `usage_info_tool` | Get usage statistics and quota for the active instance |
 
 ### Using as a Library
 

@@ -10,7 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-#!/usr/bin/env python3
+
 """
 Qiskit IBM Runtime MCP Server
 
@@ -632,7 +632,7 @@ def get_superposition_resource() -> dict[str, Any]:
 
 def main() -> None:
     """Run the server."""
-    mcp.run(show_banner=False)
+    mcp.run(transport="stdio", show_banner=False)
 
 
 if __name__ == "__main__":
