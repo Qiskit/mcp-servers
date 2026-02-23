@@ -74,22 +74,6 @@ QISKIT_ADDON_MODULES = {
 SEARCH_PATH = "endpoints-docs-learning/api/search"
 
 
-def _get_preview(content: str, length: int = 500) -> str:
-    """
-    Get a preview of the content.
-
-    Args:
-        content: Content string
-        length: Preview length in characters
-
-    Returns:
-        First N characters of content
-    """
-    if not content:
-        return ""
-    return content[:length].rstrip() + ("..." if len(content) > length else "")
-
-
 def _find_similar(query: str, available: list[str], cutoff: float = 0.6) -> list[str]:
     """
     Find similar strings using difflib SequenceMatcher.
@@ -191,7 +175,6 @@ def get_component_docs(component: str) -> dict[str, Any]:
             "content_type": "markdown",
             "content_length": len(docs) if docs else 0,
         },
-        "preview": _get_preview(docs) if docs else None,
     }
 
 
@@ -244,7 +227,6 @@ def get_guide_docs(guide: str) -> dict[str, Any]:
             "content_type": "markdown",
             "content_length": len(docs) if docs else 0,
         },
-        "preview": _get_preview(docs) if docs else None,
     }
 
 

@@ -29,7 +29,6 @@ from qiskit_docs_mcp_server.data_fetcher import (
     QISKIT_MODULES,
     _find_similar,
     _get_env_float,
-    _get_preview,
     fetch_text,
     fetch_text_json,
     get_component_docs,
@@ -169,7 +168,6 @@ class TestGetComponentDocs:
         assert result["module"] == "circuit"
         assert "Circuit documentation" in result["documentation"]
         assert "metadata" in result
-        assert "preview" in result
         mock_fetch.assert_called_once()
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
@@ -224,7 +222,6 @@ class TestGetGuideDocs:
         assert result["guide"] == "optimization"
         assert "Optimization guide" in result["documentation"]
         assert "metadata" in result
-        assert "preview" in result
         mock_fetch.assert_called_once()
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
@@ -381,26 +378,7 @@ class TestFuzzyMatching:
 
 
 class TestMetadataHandling:
-    """Test metadata and preview functionality."""
-
-    def test_get_preview_with_long_content(self):
-        """Test preview generation with content longer than 500 chars."""
-        long_content = "a" * 1000
-        preview = _get_preview(long_content)
-        assert len(preview) <= 504  # 500 chars + "..."
-        assert preview.endswith("...")
-
-    def test_get_preview_with_short_content(self):
-        """Test preview generation with content shorter than 500 chars."""
-        short_content = "Short content"
-        preview = _get_preview(short_content)
-        assert preview == short_content
-        assert not preview.endswith("...")
-
-    def test_get_preview_with_empty_content(self):
-        """Test preview generation with empty content."""
-        preview = _get_preview("")
-        assert preview == ""
+    """Test metadata functionality."""
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
     def test_component_docs_has_metadata(self, mock_fetch):
@@ -439,16 +417,6 @@ class TestMetadataHandling:
         assert "url" in metadata
         assert "timestamp" in metadata
         assert metadata["content_type"] == "json"
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    def test_component_docs_has_preview(self, mock_fetch):
-        """Test that component docs response includes preview."""
-        mock_fetch.return_value = "a" * 1000
-        result = get_component_docs("circuit")
-
-        assert "preview" in result
-        assert result["preview"] is not None
-        assert len(result["preview"]) <= 504
 
 
 class TestEnvironmentConfiguration:
