@@ -181,15 +181,6 @@ wheels = [
 ]
 
 [[package]]
-name = "backoff"
-version = "2.2.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/47/d7/5bbeb12c44d7c4f2fb5b56abce497eb5ed9f34d85701de869acedd602619/backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba", size = 17001, upload-time = "2022-10-05T19:19:32.061Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8", size = 15148, upload-time = "2022-10-05T19:19:30.546Z" },
-]
-
-[[package]]
 name = "backports-asyncio-runner"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -953,6 +944,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
+name = "html2text"
+version = "2025.4.15"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/27/e158d86ba1e82967cc2f790b0cb02030d4a8bef58e0c79a8590e9678107f/html2text-2025.4.15.tar.gz", hash = "sha256:948a645f8f0bc3abe7fd587019a2197a12436cd73d0d4908af95bfc8da337588", size = 64316, upload-time = "2025-04-15T04:02:30.045Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/84/1a0f9555fd5f2b1c924ff932d99b40a0f8a6b12f6dd625e2a47f415b00ea/html2text-2025.4.15-py3-none-any.whl", hash = "sha256:00569167ffdab3d7767a4cdf589b7f57e777a5ed28d12907d8c58769ec734acc", size = 34656, upload-time = "2025-04-15T04:02:28.44Z" },
 ]
 
 [[package]]
@@ -1985,19 +1985,6 @@ wheels = [
 ]
 
 [[package]]
-name = "loguru"
-version = "0.7.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-    { name = "win32-setctime", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3a/05/a1dae3dffd1116099471c643b8924f5aa6524411dc6c63fdae648c4f1aca/loguru-0.7.3.tar.gz", hash = "sha256:19480589e77d47b8d85b2c827ad95d49bf31b0dcde16593892eb51dd18706eb6", size = 63559, upload-time = "2024-12-06T11:20:56.608Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0c/29/0348de65b8cc732daa3e33e67806420b2ae89bdce2b04af740289c5c6c8c/loguru-0.7.3-py3-none-any.whl", hash = "sha256:31a33c10c8e1e10422bfd431aeb5d351c7cf7fa671e3c4df004162264b28220c", size = 61595, upload-time = "2024-12-06T11:20:54.538Z" },
-]
-
-[[package]]
 name = "lomond"
 version = "0.3.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2236,23 +2223,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9d/55/d01f0c4b45ade6536c51170b9043db8b2ec6ddf4a35c7ea3f5f559ac935b/mistune-3.2.0.tar.gz", hash = "sha256:708487c8a8cdd99c9d90eb3ed4c3ed961246ff78ac82f03418f5183ab70e398a", size = 95467, upload-time = "2025-12-23T11:36:34.994Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9b/f7/4a5e785ec9fbd65146a27b6b70b6cdc161a66f2024e4b04ac06a67f5578b/mistune-3.2.0-py3-none-any.whl", hash = "sha256:febdc629a3c78616b94393c6580551e0e34cc289987ec6c35ed3f4be42d0eee1", size = 53598, upload-time = "2025-12-23T11:36:33.211Z" },
-]
-
-[[package]]
-name = "modelcontextprotocol"
-version = "1.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "jinja2" },
-    { name = "loguru" },
-    { name = "mcp" },
-    { name = "posthog" },
-    { name = "rich" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/0e/2a/c3d213769c64bc24a24dc0a57985fb42e5ebfe0b2fda4b26bb6e196df9f1/modelcontextprotocol-1.0.1.tar.gz", hash = "sha256:0d552129b5cd24241fdfee91182e231000c988935ee0620e4e71b3d7dc438b01", size = 15869, upload-time = "2025-11-26T22:34:51.914Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/4b/f22e56b5e73761d73ae616458742b984facfc7c0c81c8adab3072e1a94da/modelcontextprotocol-1.0.1-py3-none-any.whl", hash = "sha256:a72db01d26e50ed4da935efcaedc151b89dff93e1a6d6b91616db4c443ca2efd", size = 25060, upload-time = "2025-11-26T22:34:48.071Z" },
 ]
 
 [[package]]
@@ -3030,23 +3000,6 @@ wheels = [
 ]
 
 [[package]]
-name = "posthog"
-version = "7.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "backoff" },
-    { name = "distro" },
-    { name = "python-dateutil" },
-    { name = "requests" },
-    { name = "six" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/d4/b9afe855a8a7a1bf4459c28ae4c300b40338122dc850acabefcf2c3df24d/posthog-7.0.1.tar.gz", hash = "sha256:21150562c2630a599c1d7eac94bc5c64eb6f6acbf3ff52ccf1e57345706db05a", size = 126985, upload-time = "2025-11-15T12:44:22.465Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/0c/8b6b20b0be71725e6e8a32dcd460cdbf62fe6df9bc656a650150dc98fedd/posthog-7.0.1-py3-none-any.whl", hash = "sha256:efe212d8d88a9ba80a20c588eab4baf4b1a5e90e40b551160a5603bb21e96904", size = 145234, upload-time = "2025-11-15T12:44:21.247Z" },
-]
-
-[[package]]
 name = "pre-commit"
 version = "4.5.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3702,28 +3655,10 @@ name = "qiskit-docs-mcp-server"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "annotated-types" },
-    { name = "anyio" },
-    { name = "certifi" },
-    { name = "click" },
-    { name = "distro" },
     { name = "fastmcp" },
-    { name = "h11" },
-    { name = "httpcore" },
+    { name = "html2text" },
     { name = "httpx" },
-    { name = "idna" },
-    { name = "jiter" },
-    { name = "modelcontextprotocol" },
-    { name = "openai" },
-    { name = "pydantic" },
-    { name = "pydantic-core" },
-    { name = "pytest" },
-    { name = "python-dotenv" },
-    { name = "sniffio" },
-    { name = "starlette" },
-    { name = "tqdm" },
-    { name = "typing-extensions" },
-    { name = "uvicorn" },
+    { name = "nest-asyncio" },
 ]
 
 [package.dev-dependencies]
@@ -3753,28 +3688,10 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "annotated-types", specifier = ">=0.7.0" },
-    { name = "anyio", specifier = ">=4.8.0" },
-    { name = "certifi", specifier = ">=2025.1.31" },
-    { name = "click", specifier = ">=8.1.8" },
-    { name = "distro", specifier = ">=1.9.0" },
     { name = "fastmcp", specifier = ">=2.8.1,<3" },
-    { name = "h11", specifier = ">=0.14.0" },
-    { name = "httpcore", specifier = ">=1.0.7" },
+    { name = "html2text", specifier = ">=2020.1.16" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "idna", specifier = ">=3.10" },
-    { name = "jiter", specifier = ">=0.8.2" },
-    { name = "modelcontextprotocol", specifier = ">=0.4.0" },
-    { name = "openai", specifier = ">=1.61.1" },
-    { name = "pydantic", specifier = ">=2.10.6" },
-    { name = "pydantic-core", specifier = ">=2.27.2" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "sniffio", specifier = ">=1.3.1" },
-    { name = "starlette", specifier = ">=0.45.3" },
-    { name = "tqdm", specifier = ">=4.67.1" },
-    { name = "typing-extensions", specifier = ">=4.12.2" },
-    { name = "uvicorn", specifier = ">=0.34.0" },
+    { name = "nest-asyncio", specifier = ">=1.5.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -4742,15 +4659,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bd/f4/c67440c7fb409a71b7404b7aefcd7569a9c0d6bd071299bf4198ae7a5d95/widgetsnbextension-4.0.15.tar.gz", hash = "sha256:de8610639996f1567952d763a5a41af8af37f2575a41f9852a38f947eb82a3b9", size = 1097402, upload-time = "2025-11-01T21:15:55.178Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3f/0e/fa3b193432cfc60c93b42f3be03365f5f909d2b3ea410295cf36df739e31/widgetsnbextension-4.0.15-py3-none-any.whl", hash = "sha256:8156704e4346a571d9ce73b84bee86a29906c9abfd7223b7228a28899ccf3366", size = 2196503, upload-time = "2025-11-01T21:15:53.565Z" },
-]
-
-[[package]]
-name = "win32-setctime"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b3/8f/705086c9d734d3b663af0e9bb3d4de6578d08f46b1b101c2442fd9aecaa2/win32_setctime-1.2.0.tar.gz", hash = "sha256:ae1fdf948f5640aae05c511ade119313fb6a30d7eabe25fef9764dca5873c4c0", size = 4867, upload-time = "2024-12-07T15:28:28.314Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e1/07/c6fe3ad3e685340704d314d765b7912993bcb8dc198f0e7a89382d37974b/win32_setctime-1.2.0-py3-none-any.whl", hash = "sha256:95d644c4e708aba81dc3704a116d8cbc974d70b3bdb8be1d150e36be6e9d1390", size = 4083, upload-time = "2024-12-07T15:28:26.465Z" },
 ]
 
 [[package]]

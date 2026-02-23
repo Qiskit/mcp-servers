@@ -23,10 +23,11 @@ from typing import Any
 from fastmcp import FastMCP
 
 from qiskit_docs_mcp_server.data_fetcher import (
-    QISKIT_ADDON_MODULES,
-    QISKIT_MODULES,
     get_component_docs,
     get_guide_docs,
+    get_list_of_addons,
+    get_list_of_guides,
+    get_list_of_modules,
     search_qiskit_docs,
 )
 
@@ -58,13 +59,7 @@ async def get_sdk_module_docs(module: str) -> dict[str, Any]:
     Returns:
         Module documentation including API reference and usage examples.
     """
-    docs = get_component_docs(module)
-    if docs is None:
-        return {
-            "status": "error",
-            "message": f"Module '{module}' not found. Use resource qdc://modules to see available modules.",
-        }
-    return {"status": "success", "module": module, "documentation": docs}
+    return get_component_docs(module)
 
 
 @mcp.tool()
@@ -78,13 +73,7 @@ async def get_guide(guide: str) -> dict[str, Any]:
     Returns:
         Complete guide documentation with best practices and implementation patterns.
     """
-    docs = get_guide_docs(guide)
-    if docs is None:
-        return {
-            "status": "error",
-            "message": f"Guide '{guide}' not found. Use resource qdc://style to see available guides.",
-        }
-    return {"status": "success", "guide": guide, "documentation": docs}
+    return get_guide_docs(guide)
 
 
 @mcp.tool()
@@ -99,8 +88,7 @@ async def search_docs(query: str, module: str = "documentation") -> dict[str, An
     Returns:
         List of matching documentation entries with URLs and types.
     """
-    results = search_qiskit_docs(query, module)
-    return {"status": "success", "results": results}
+    return search_qiskit_docs(query, module)
 
 
 ##################################################
@@ -110,28 +98,18 @@ async def search_docs(query: str, module: str = "documentation") -> dict[str, An
 
 
 @mcp.resource("qiskit-docs://modules", mime_type="application/json")
-async def get_component_list() -> dict[str, Any]:
+async def get_modules_list() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules."""
-    modules = list(QISKIT_MODULES.keys())
-    return {"status": "success", "modules": modules}
+    return get_list_of_modules()
 
 
-@mcp.resource("qiskit-docs://addon", mime_type="application/json")
-async def get_addon_list() -> dict[str, Any]:
+@mcp.resource("qiskit-docs://addons", mime_type="application/json")
+async def get_addons_list() -> dict[str, Any]:
     """Get list of all Qiskit addon modules and tutorials."""
-    addons = list(QISKIT_ADDON_MODULES.keys())
-    return {"status": "success", "addons": addons}
+    return get_list_of_addons()
 
 
-@mcp.resource("qiskit-docs://style", mime_type="application/json")
-async def get_style_list() -> dict[str, Any]:
+@mcp.resource("qiskit-docs://guides", mime_type="application/json")
+async def get_guides_list() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices."""
-    guides = [
-        "optimization",
-        "quantum-circuits",
-        "error-mitigation",
-        "dynamic-circuits",
-        "parametric-compilation",
-        "performance-tuning",
-    ]
-    return {"status": "success", "guides": guides}
+    return get_list_of_guides()
