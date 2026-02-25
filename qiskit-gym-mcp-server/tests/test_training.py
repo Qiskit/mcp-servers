@@ -141,6 +141,86 @@ class TestStartTraining:
         assert result["status"] == "error"
         assert result["message"] == "initial_difficulty must be at least 1"
 
+    @pytest.mark.asyncio
+    async def test_start_training_applies_curriculum_overrides(
+        self,
+        mock_permutation_gym,
+        mock_rls_synthesis,
+        mock_ppo_config,
+        mock_basic_policy_config,
+    ):
+        """Test that depth_slope/max_depth overrides are applied before RLSynthesis is instantiated."""
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        result = await start_training(
+            env_id=env_id,
+            algorithm="ppo",
+            policy="basic",
+            num_iterations=10,
+            depth_slope=3,
+            max_depth=64,
+            background=False,
+        )
+
+        assert result["status"] == "success"
+
+        mock_rls_synthesis.assert_called_once()
+        (passed_env, *_), _ = mock_rls_synthesis.call_args
+
+        if hasattr(passed_env, "depth_slope"):
+            assert passed_env.depth_slope == 3
+        if hasattr(passed_env, "max_depth"):
+            assert passed_env.max_depth == 64
+
+        cfg = getattr(passed_env, "config", None)
+        if isinstance(cfg, dict):
+            assert cfg.get("depth_slope") == 3
+            assert cfg.get("max_depth") == 64
+
+        raw_env = getattr(passed_env, "_raw_env", None)
+        if raw_env is not None:
+            if hasattr(raw_env, "depth_slope"):
+                assert raw_env.depth_slope == 3
+            if hasattr(raw_env, "max_depth"):
+                assert raw_env.max_depth == 64
+            raw_cfg = getattr(raw_env, "config", None)
+            if isinstance(raw_cfg, dict):
+                assert raw_cfg.get("depth_slope") == 3
+                assert raw_cfg.get("max_depth") == 64
+
+    @pytest.mark.asyncio
+    async def test_start_training_invalid_depth_slope(self, mock_permutation_gym):
+        """Test error when depth_slope is less than 1."""
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        result = await start_training(
+            env_id=env_id,
+            num_iterations=10,
+            depth_slope=0,
+            max_depth=128,
+        )
+
+        assert result["status"] == "error"
+        assert result["message"] == "depth_slope must be at least 1"
+
+    @pytest.mark.asyncio
+    async def test_start_training_invalid_max_depth(self, mock_permutation_gym):
+        """Test error when max_depth is less than 1."""
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        result = await start_training(
+            env_id=env_id,
+            num_iterations=10,
+            depth_slope=2,
+            max_depth=0,
+        )
+
+        assert result["status"] == "error"
+        assert result["message"] == "max_depth must be at least 1"
+
 
 class TestTrainingStatus:
     """Tests for training status retrieval."""
