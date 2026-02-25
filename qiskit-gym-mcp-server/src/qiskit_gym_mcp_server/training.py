@@ -195,6 +195,55 @@ def _run_training_in_background(
         GymStateProvider().set_training_status(session_id, "error", str(e))
 
 
+def _apply_curriculum_overrides(
+    gym_instance: Any,
+    *,
+    depth_slope: int,
+    max_depth: int,
+) -> Any:
+    """Apply curriculum overrides to a qiskit-gym synthesis environment instance.
+
+    Args:
+        gym_instance: The qiskit-gym environment instance.
+        depth_slope: How fast difficulty increases (default: 2). Must be >= 1.
+        max_depth: Maximum circuit depth for training (default: 128). Must be >= 1.
+
+    Returns:
+        The same `gym_instance` passed in, after applying the overrides.
+
+    Raises:
+        ValueError: If `depth_slope` or `max_depth` are less than 1.
+    """
+    if depth_slope < 1:
+        raise ValueError("depth_slope must be at least 1")
+    if max_depth < 1:
+        raise ValueError("max_depth must be at least 1")
+
+    def _set_if_present(obj: Any, name: str, value: int) -> None:
+        if obj is not None and hasattr(obj, name):
+            setattr(obj, name, value)
+
+    def _set_in_config(obj: Any, name: str, value: int) -> None:
+        cfg = getattr(obj, "config", None)
+        if isinstance(cfg, dict):
+            cfg[name] = value
+
+    # Update wrapper env
+    _set_if_present(gym_instance, "depth_slope", depth_slope)
+    _set_if_present(gym_instance, "max_depth", max_depth)
+    _set_in_config(gym_instance, "depth_slope", depth_slope)
+    _set_in_config(gym_instance, "max_depth", max_depth)
+
+    # Update underlying backend env if present
+    raw_env = getattr(gym_instance, "_raw_env", None)
+    _set_if_present(raw_env, "depth_slope", depth_slope)
+    _set_if_present(raw_env, "max_depth", max_depth)
+    _set_in_config(raw_env, "depth_slope", depth_slope)
+    _set_in_config(raw_env, "max_depth", max_depth)
+
+    return gym_instance
+
+
 @with_sync
 async def start_training(
     env_id: str,
@@ -271,6 +320,13 @@ async def start_training(
                 "status": "error",
                 "message": f"Environment '{env_id}' not found. Use list_environments to see available.",
             }
+
+        # Apply curriculum overrides (depth_slope and max_depth)
+        _apply_curriculum_overrides(
+            env.gym_instance,
+            depth_slope=depth_slope,
+            max_depth=max_depth,
+        )
 
         # Create training session first to get session_id
         session_id = state.create_training_session(
