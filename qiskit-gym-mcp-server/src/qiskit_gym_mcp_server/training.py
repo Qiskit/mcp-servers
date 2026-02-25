@@ -244,6 +244,37 @@ def _apply_curriculum_overrides(
     return gym_instance
 
 
+def _validate_training_params(
+    num_iterations: int,
+    initial_difficulty: int,
+    depth_slope: int,
+    max_depth: int,
+) -> dict[str, Any] | None:
+    """Validate training-related parameters for a training session."""
+
+    # Validate iteration count (only if limit is explicitly set)
+    if QISKIT_GYM_MAX_ITERATIONS > 0 and num_iterations > QISKIT_GYM_MAX_ITERATIONS:
+        return {
+            "status": "error",
+            "message": f"num_iterations ({num_iterations}) exceeds maximum ({QISKIT_GYM_MAX_ITERATIONS}). "
+            "Set QISKIT_GYM_MAX_ITERATIONS=0 to remove limit.",
+        }
+
+    if num_iterations < 1:
+        return {"status": "error", "message": "num_iterations must be at least 1"}
+
+    if initial_difficulty < 1:
+        return {"status": "error", "message": "initial_difficulty must be at least 1"}
+
+    if depth_slope < 1:
+        return {"status": "error", "message": "depth_slope must be at least 1"}
+
+    if max_depth < 1:
+        return {"status": "error", "message": "max_depth must be at least 1"}
+
+    return None
+
+
 @with_sync
 async def start_training(
     env_id: str,
@@ -283,34 +314,11 @@ async def start_training(
         session_id for polling.
     """
     try:
-        # Validate iteration count (only if limit is explicitly set)
-        if QISKIT_GYM_MAX_ITERATIONS > 0 and num_iterations > QISKIT_GYM_MAX_ITERATIONS:
-            return {
-                "status": "error",
-                "message": f"num_iterations ({num_iterations}) exceeds maximum ({QISKIT_GYM_MAX_ITERATIONS}). "
-                "Set QISKIT_GYM_MAX_ITERATIONS=0 to remove limit.",
-            }
-
-        if num_iterations < 1:
-            return {
-                "status": "error",
-                "message": "num_iterations must be at least 1",
-            }
-        if initial_difficulty < 1:
-            return {
-                "status": "error",
-                "message": "initial_difficulty must be at least 1",
-            }
-        if depth_slope < 1:
-            return {
-                "status": "error",
-                "message": "depth_slope must be at least 1",
-            }
-        if max_depth < 1:
-            return {
-                "status": "error",
-                "message": "max_depth must be at least 1",
-            }
+        error = _validate_training_params(
+            num_iterations, initial_difficulty, depth_slope, max_depth
+        )
+        if error:
+            return error
 
         # Get environment
         state = GymStateProvider()
