@@ -13,7 +13,7 @@
 import difflib
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
 
@@ -171,7 +171,7 @@ def get_component_docs(component: str) -> dict[str, Any]:
         "documentation": docs,
         "metadata": {
             "url": url,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "content_type": "markdown",
             "content_length": len(docs) if docs else 0,
         },
@@ -223,7 +223,7 @@ def get_guide_docs(guide: str) -> dict[str, Any]:
         "documentation": docs,
         "metadata": {
             "url": url,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "content_type": "markdown",
             "content_length": len(docs) if docs else 0,
         },
@@ -255,7 +255,7 @@ def search_qiskit_docs(query: str, module: str = "documentation") -> dict[str, A
         "total_results": len(results) if results else 0,
         "metadata": {
             "url": url,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "content_type": "json",
         },
     }

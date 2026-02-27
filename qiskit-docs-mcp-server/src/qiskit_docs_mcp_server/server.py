@@ -113,3 +113,8 @@ async def get_addons_list() -> dict[str, Any]:
 async def get_guides_list() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices."""
     return get_list_of_guides()
+
+
+## Main function runs the MCP server
+def main():
+    mcp.run(transport="stdio", show_banner=False)
