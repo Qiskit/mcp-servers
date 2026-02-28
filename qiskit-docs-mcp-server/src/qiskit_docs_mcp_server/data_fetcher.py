@@ -10,11 +10,11 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+import asyncio
 import difflib
 import logging
 import os
 from datetime import datetime, timezone
-from functools import lru_cache
 from typing import Any
 
 import html2text
@@ -93,7 +93,6 @@ def _find_similar(query: str, available: list[str], cutoff: float = 0.6) -> list
     return matches
 
 
-@lru_cache(maxsize=50)
 def convert_html_to_markdown(html: str) -> str:
     """
     Convert HTML content to Markdown format.
@@ -111,8 +110,7 @@ def convert_html_to_markdown(html: str) -> str:
     return h.handle(html)
 
 
-@lru_cache(maxsize=100)
-def fetch_text(url: str) -> str | None:
+async def fetch_text(url: str) -> str | None:
     """
     Fetch text content from a URL using httpx.
 
@@ -123,8 +121,8 @@ def fetch_text(url: str) -> str | None:
         The text content of the page, or None if fetch fails
     """
     try:
-        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-            response = client.get(url, follow_redirects=True)
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            response = await client.get(url, follow_redirects=True)
             response.raise_for_status()
             return response.text
     except httpx.HTTPError as e:
@@ -134,8 +132,29 @@ def fetch_text(url: str) -> str | None:
         logger.error(f"Unexpected error fetching {url}: {e}")
         return None
 
+async def fetch_text_json(url: str) -> list[dict]:
+    """
+    Fetch text content from a URL using httpx.
 
-def get_component_docs(component: str) -> dict[str, Any]:
+    Args:
+        url: The URL to fetch
+
+    Returns:
+        The text content of the page, or None if fetch fails
+    """
+    try:
+        async with httpx.Client(timeout=HTTP_TIMEOUT) as client:
+            response = await client.get(url, follow_redirects=True)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPError as e:
+        logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error fetching {url}: {e}")
+        return None
+
+async def get_component_docs(component: str) -> dict[str, Any]:
     """
     Fetch documentation for a Qiskit SDK module and convert to Markdown.
 
@@ -159,11 +178,8 @@ def get_component_docs(component: str) -> dict[str, Any]:
     path = QISKIT_MODULES[component]
     url = f"{QISKIT_SDK_DOCS}{path}"
     logger.info(f"Fetching component docs for {component} from {url}")
-    html = fetch_text(url)
-    if html:
-        docs = convert_html_to_markdown(html)
-    else:
-        docs = None
+    html = await fetch_text(url)
+    docs = await asyncio.to_thread(convert_html_to_markdown, html) if html else None
 
     return {
         "status": "success",
@@ -178,7 +194,7 @@ def get_component_docs(component: str) -> dict[str, Any]:
     }
 
 
-def get_guide_docs(guide: str) -> dict[str, Any]:
+async def get_guide_docs(guide: str) -> dict[str, Any]:
     """
     Fetch documentation for a Qiskit guide or best practice and convert to Markdown.
 
@@ -211,11 +227,8 @@ def get_guide_docs(guide: str) -> dict[str, Any]:
     path = guide_paths[guide]
     url = f"{QISKIT_DOCS_BASE}{path}"
     logger.info(f"Fetching style docs for {guide} from {url}")
-    html = fetch_text(url)
-    if html:
-        docs = convert_html_to_markdown(html)
-    else:
-        docs = None
+    html = await fetch_text(url)
+    docs = await asyncio.to_thread(convert_html_to_markdown, html) if html else None
 
     return {
         "status": "success",
@@ -230,7 +243,7 @@ def get_guide_docs(guide: str) -> dict[str, Any]:
     }
 
 
-def search_qiskit_docs(query: str, module: str = "documentation") -> dict[str, Any]:
+async def search_qiskit_docs(query: str, module: str = "documentation") -> dict[str, Any]:
     """
     Search Qiskit documentation for relevant results.
 
@@ -245,7 +258,7 @@ def search_qiskit_docs(query: str, module: str = "documentation") -> dict[str, A
     url = f"{BASE_URL}{SEARCH_PATH}?query={query}&module={module}"
     logger.info(f"Querying from {query} which gives {url} from {module}")
 
-    results = fetch_text_json(url)
+    results =  await fetch_text_json(url)
 
     return {
         "status": "success",
@@ -259,30 +272,6 @@ def search_qiskit_docs(query: str, module: str = "documentation") -> dict[str, A
             "content_type": "json",
         },
     }
-
-
-def fetch_text_json(url: str) -> list[dict]:
-    """
-    Fetch text content from a URL using httpx.
-
-    Args:
-        url: The URL to fetch
-
-    Returns:
-        The text content of the page, or None if fetch fails
-    """
-    try:
-        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-            response = client.get(url, follow_redirects=True)
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPError as e:
-        logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
-        return None
-    except Exception as e:
-        logger.error(f"Unexpected error fetching {url}: {e}")
-        return None
-
 
 def get_list_of_modules() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules."""
