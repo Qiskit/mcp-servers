@@ -35,6 +35,7 @@ dependencies = [
 # Install individual servers
 qiskit = ["qiskit-mcp-server>=0.1.2"]
 code-assistant = ["qiskit-code-assistant-mcp-server>=0.3.0"]
+docs = ["qiskit-docs-mcp-server>=0.1.0"]
 runtime = ["qiskit-ibm-runtime-mcp-server>=0.5.0"]
 transpiler = ["qiskit-ibm-transpiler-mcp-server>=0.3.1"]
 gym = ["qiskit-gym-mcp-server>=0.2.0"]
@@ -42,6 +43,7 @@ gym = ["qiskit-gym-mcp-server>=0.2.0"]
 all = [
     "qiskit-mcp-server>=0.1.2",
     "qiskit-code-assistant-mcp-server>=0.3.0",
+    "qiskit-docs-mcp-server>=0.1.0",
     "qiskit-ibm-runtime-mcp-server>=0.5.0",
     "qiskit-ibm-transpiler-mcp-server>=0.3.1",
     "qiskit-gym-mcp-server>=0.2.0",
@@ -73,6 +75,7 @@ members = [
     "qiskit-ibm-runtime-mcp-server",
     "qiskit-ibm-transpiler-mcp-server",
     "qiskit-gym-mcp-server",
+    "qiskit-docs-mcp-server",
 ]
 
 # Source configuration for workspace dependencies
@@ -82,6 +85,7 @@ qiskit-code-assistant-mcp-server = { workspace = true }
 qiskit-ibm-runtime-mcp-server = { workspace = true }
 qiskit-ibm-transpiler-mcp-server = { workspace = true }
 qiskit-gym-mcp-server = { workspace = true }
+qiskit-docs-mcp-server = { workspace = true }
 
 # Shared tool configurations
 [tool.ruff]

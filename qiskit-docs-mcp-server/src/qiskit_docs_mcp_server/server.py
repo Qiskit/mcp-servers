@@ -49,7 +49,7 @@ logger.info("Qiskit Documentation MCP Server initialized")
 
 
 @mcp.tool()
-async def get_sdk_module_docs(module: str) -> dict[str, Any]:
+async def get_sdk_module_docs_tool(module: str) -> dict[str, Any]:
     """
     Get documentation for a Qiskit SDK module.
 
@@ -63,7 +63,7 @@ async def get_sdk_module_docs(module: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def get_guide(guide: str) -> dict[str, Any]:
+async def get_guide_tool(guide: str) -> dict[str, Any]:
     """
     Get a Qiskit guide or best practice documentation.
 
@@ -77,7 +77,7 @@ async def get_guide(guide: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def search_docs(query: str, module: str = "documentation") -> dict[str, Any]:
+async def search_docs_tool(query: str, module: str = "documentation") -> dict[str, Any]:
     """
     Search Qiskit documentation for relevant modules, addons, and guides.
 
@@ -98,18 +98,18 @@ async def search_docs(query: str, module: str = "documentation") -> dict[str, An
 
 
 @mcp.resource("qiskit-docs://modules", mime_type="application/json")
-async def modules_resource() -> dict[str, Any]:
+def modules_resource() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules."""
     return get_list_of_modules()
 
 
 @mcp.resource("qiskit-docs://addons", mime_type="application/json")
-async def addons_resource() -> dict[str, Any]:
+def addons_resource() -> dict[str, Any]:
     """Get list of all Qiskit addon modules and tutorials."""
     return get_list_of_addons()
 
 
 @mcp.resource("qiskit-docs://guides", mime_type="application/json")
-async def guides_resource() -> dict[str, Any]:
+def guides_resource() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices."""
     return get_list_of_guides()
