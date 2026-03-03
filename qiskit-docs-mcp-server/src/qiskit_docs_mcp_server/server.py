@@ -98,23 +98,18 @@ async def search_docs(query: str, module: str = "documentation") -> dict[str, An
 
 
 @mcp.resource("qiskit-docs://modules", mime_type="application/json")
-async def get_modules_list() -> dict[str, Any]:
+async def modules_resource() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules."""
-    return await get_list_of_modules()
+    return get_list_of_modules()
 
 
 @mcp.resource("qiskit-docs://addons", mime_type="application/json")
-async def get_addons_list() -> dict[str, Any]:
+async def addons_resource() -> dict[str, Any]:
     """Get list of all Qiskit addon modules and tutorials."""
-    return await get_list_of_addons()
+    return get_list_of_addons()
 
 
 @mcp.resource("qiskit-docs://guides", mime_type="application/json")
-async def get_guides_list() -> dict[str, Any]:
+async def guides_resource() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices."""
-    return await get_list_of_guides()
-
-
-## Main function runs the MCP server
-def main():
-    mcp.run(transport="stdio", show_banner=False)
+    return get_list_of_guides()

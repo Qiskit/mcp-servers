@@ -10,7 +10,6 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-import asyncio
 import difflib
 import logging
 import os
@@ -132,27 +131,29 @@ async def fetch_text(url: str) -> str | None:
         logger.error(f"Unexpected error fetching {url}: {e}")
         return None
 
-async def fetch_text_json(url: str) -> list[dict]:
+
+async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     """
-    Fetch text content from a URL using httpx.
+    Fetch JSON content from a URL using httpx.
 
     Args:
         url: The URL to fetch
 
     Returns:
-        The text content of the page, or None if fetch fails
+        The JSON content as a list of dicts, or None if fetch fails
     """
     try:
-        async with httpx.Client(timeout=HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             response = await client.get(url, follow_redirects=True)
             response.raise_for_status()
-            return response.json()
+            return response.json()  # type: ignore[no-any-return]
     except httpx.HTTPError as e:
         logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
         return None
     except Exception as e:
         logger.error(f"Unexpected error fetching {url}: {e}")
         return None
+
 
 async def get_component_docs(component: str) -> dict[str, Any]:
     """
@@ -179,7 +180,7 @@ async def get_component_docs(component: str) -> dict[str, Any]:
     url = f"{QISKIT_SDK_DOCS}{path}"
     logger.info(f"Fetching component docs for {component} from {url}")
     html = await fetch_text(url)
-    docs = await asyncio.to_thread(convert_html_to_markdown, html) if html else None
+    docs = convert_html_to_markdown(html) if html else None
 
     return {
         "status": "success",
@@ -228,7 +229,7 @@ async def get_guide_docs(guide: str) -> dict[str, Any]:
     url = f"{QISKIT_DOCS_BASE}{path}"
     logger.info(f"Fetching style docs for {guide} from {url}")
     html = await fetch_text(url)
-    docs = await asyncio.to_thread(convert_html_to_markdown, html) if html else None
+    docs = convert_html_to_markdown(html) if html else None
 
     return {
         "status": "success",
@@ -258,7 +259,7 @@ async def search_qiskit_docs(query: str, module: str = "documentation") -> dict[
     url = f"{BASE_URL}{SEARCH_PATH}?query={query}&module={module}"
     logger.info(f"Querying from {query} which gives {url} from {module}")
 
-    results =  await fetch_text_json(url)
+    results = await fetch_text_json(url)
 
     return {
         "status": "success",
@@ -272,6 +273,7 @@ async def search_qiskit_docs(query: str, module: str = "documentation") -> dict[
             "content_type": "json",
         },
     }
+
 
 def get_list_of_modules() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules."""

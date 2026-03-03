@@ -14,12 +14,10 @@
 LangChain Agent Example with Qiskit Docs MCP Server
 
 This example demonstrates how to create an AI agent using LangChain that
-Connects to the qiskit-docs-mcp-server via the Model Context Protocol (MCP).
+connects to the qiskit-docs-mcp-server via the Model Context Protocol (MCP).
 
-The agent uses the documentation MCP server to:
-- Retrieve SDK module lists and documentation pages
-- Answer factual questions by quoting and citing Qiskit docs (RAG mode)
-- Provide concise excerpts, example snippets, and resource URIs
+The agent can query Qiskit documentation through the MCP server, which
+provides tools for searching docs, getting module documentation, and accessing guides.
 
 Supported LLM Providers:
     - OpenAI (default): pip install langchain-openai
@@ -44,8 +42,14 @@ Usage:
     # With Ollama (local, no API key needed)
     python langchain_agent.py --provider ollama --model llama3.3
 
-    # Single query mode
-    python langchain_agent.py --single
+    # With Google
+    export GOOGLE_API_KEY="your-api-key"
+    python langchain_agent.py --provider google
+
+    # With Watsonx
+    export WATSONX_APIKEY="your-watsonx-api-key"
+    export WATSONX_PROJECT_ID="your-project-id"
+    python langchain_agent.py --provider watsonx
 """
 
 import argparse
@@ -62,116 +66,71 @@ from langchain_mcp_adapters.tools import load_mcp_tools
 # Load environment variables
 load_dotenv()
 
-SYSTEM_PROMPT = """You are a knowledgeable Qiskit documentation assistant with access to the
-qiskit-docs-mcp-server through the MCP server.
+SYSTEM_PROMPT = """You are a helpful quantum computing documentation assistant with access to Qiskit documentation
+through the Qiskit Docs MCP server.
 
 You can help users:
-- Retrieve SDK module lists and documentation pages (list_sdk_modules, get_module_docs)
-- Answer factual questions by quoting and citing Qiskit documentation
-- Provide concise excerpts, example snippets, and resource URIs for follow-up
+- Search Qiskit documentation (search_docs)
+- Get SDK module documentation for circuit, primitives, transpiler, quantum_info, result, visualization (get_sdk_module_docs)
+- Get guide documentation for optimization, quantum-circuits, error-mitigation, dynamic-circuits, parametric-compilation, performance-tuning (get_guide)
+- List available modules, addons, and guides (via resources)
 
-When answering:
-- Prefer exact quotes or short excerpts from documentation and include the resource URI
-- If multiple sources apply, summarize and list the sources used
-- For code examples, indicate the documented origin and recommend how to run them
-- If a topic is not found, explain the search steps and suggest related documentation pages
-"""
+Always provide clear explanations about quantum computing concepts when relevant.
+When showing documentation, highlight key points and provide context.
+If a search returns no results, suggest alternative search terms or related modules."""
 
 
-def get_llm(provider: str, model: str | None = None) -> BaseChatModel:
+def get_llm(provider: str = "openai", model: str | None = None) -> BaseChatModel:
     """
-    Get an LLM instance for the specified provider.
+    Get the appropriate LLM based on the provider.
 
     Args:
-        provider: The LLM provider ('openai', 'anthropic', 'ollama', 'google', 'watsonx').
-        model: Optional model name override.
+        provider: LLM provider name
+        model: Optional model name override
 
     Returns:
-        Configured LLM instance.
-
-    Raises:
-        ValueError: If provider is not supported or required package is missing.
+        Configured LLM instance
     """
     if provider == "openai":
-        try:
-            from langchain_openai import ChatOpenAI
-        except ImportError:
-            raise ValueError("Install langchain-openai: pip install langchain-openai")
-        return ChatOpenAI(model=model or "gpt-5.2", temperature=0)
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(model=model or "gpt-4o", temperature=0)
 
     elif provider == "anthropic":
-        try:
-            from langchain_anthropic import ChatAnthropic
-        except ImportError:
-            raise ValueError("Install langchain-anthropic: pip install langchain-anthropic")
+        from langchain_anthropic import ChatAnthropic
+
         return ChatAnthropic(model=model or "claude-sonnet-4-5-20250929", temperature=0)
 
     elif provider == "ollama":
-        try:
-            from langchain_ollama import ChatOllama
-        except ImportError:
-            raise ValueError("Install langchain-ollama: pip install langchain-ollama")
+        from langchain_ollama import ChatOllama
+
         return ChatOllama(model=model or "llama3.3", temperature=0)
 
     elif provider == "google":
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-        except ImportError:
-            raise ValueError("Install langchain-google-genai: pip install langchain-google-genai")
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
         return ChatGoogleGenerativeAI(model=model or "gemini-3-pro-preview", temperature=0)
 
     elif provider == "watsonx":
-        try:
-            from langchain_ibm import ChatWatsonx
-        except ImportError:
-            raise ValueError("Install langchain-ibm: pip install langchain-ibm")
+        from langchain_ibm import ChatWatsonx
+
         return ChatWatsonx(
             model_id=model or "ibm/granite-4-h-small",
             url=os.getenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com"),
             project_id=os.getenv("WATSONX_PROJECT_ID"),
-            params={
-                "temperature": 0,
-                "max_tokens": 4096,
-            },
+            temperature=0,
         )
 
     else:
-        raise ValueError(
-            f"Unknown provider: {provider}. Supported: openai, anthropic, ollama, google, watsonx"
-        )
-
-
-def check_api_key(provider: str) -> bool:
-    """Check if required API key/config is set for the provider."""
-    key_map = {
-        "openai": ["OPENAI_API_KEY"],
-        "anthropic": ["ANTHROPIC_API_KEY"],
-        "google": ["GOOGLE_API_KEY"],
-        "ollama": [],  # No API key needed for local Ollama
-        "watsonx": ["WATSONX_APIKEY", "WATSONX_PROJECT_ID"],
-    }
-
-    required_keys = [*key_map.get(provider, [])]
-    missing_keys = [key for key in required_keys if not os.getenv(key)]
-
-    if not missing_keys:
-        return True
-
-    print(f"Error: Missing required environment variables for {provider}:")
-    for key in missing_keys:
-        print(f"  - {key}")
-    print("\nSet them with:")
-    for key in missing_keys:
-        print(f"  export {key}='your-value'")
-    return False
+        raise ValueError(f"Unknown provider: {provider}")
 
 
 def get_mcp_client() -> MultiServerMCPClient:
     """
-    Create and return an MCP client configured for the Qiskit Docs server.
+    Create and configure the MCP client for qiskit-docs-mcp-server.
 
     Returns:
-        Configured MultiServerMCPClient instance.
+        Configured MultiServerMCPClient instance
     """
     return MultiServerMCPClient(
         {
@@ -179,81 +138,64 @@ def get_mcp_client() -> MultiServerMCPClient:
                 "transport": "stdio",
                 "command": "qiskit-docs-mcp-server",
                 "args": [],
-                "env": {},
             }
         }
     )
 
 
-async def create_quantum_agent_with_session(
+async def create_docs_agent_with_session(
     session, provider: str = "openai", model: str | None = None
 ):
     """
-    Create a LangChain agent using an existing MCP session.
-
-    This uses a persistent session to avoid spawning a new server process
-    for each tool call, significantly improving performance.
+    Create a LangChain agent with MCP tools using an existing session.
 
     Args:
-        session: An active MCP ClientSession from MultiServerMCPClient.session()
-        provider: The LLM provider.
-        model: Optional model name override.
+        session: Active MCP session
+        provider: LLM provider name
+        model: Optional model name override
 
     Returns:
-        Configured LangChain agent.
+        Configured agent
     """
-    # Load tools from the existing session (reuses the same server process)
+    # Load MCP tools from the session
     tools = await load_mcp_tools(session)
 
-    # Get the LLM for the specified provider
+    # Get LLM
     llm = get_llm(provider, model)
 
-    # Create an agent using LangChain's create_agent
+    # Create agent
     agent = create_agent(llm, tools, system_prompt=SYSTEM_PROMPT)
 
     return agent
 
 
-async def run_agent_query(agent, query: str, history: list | None = None) -> tuple[str, list]:
+async def run_agent_query(agent, query: str) -> str:
     """
-    Run a query through the agent with conversation history.
+    Run a query through the agent.
 
     Args:
-        agent: The configured LangChain agent.
-        query: The user's query.
-        history: Optional list of previous messages for context.
+        agent: Configured agent
+        query: User query
 
     Returns:
-        Tuple of (response_text, updated_history).
+        Agent response
     """
-    from langchain_core.messages import HumanMessage
-
-    # Build messages with history
-    messages = list(history) if history else []
-    messages.append(HumanMessage(content=query))
-
-    result = await agent.ainvoke({"messages": messages})
-    result_messages = result.get("messages", [])
-
-    if result_messages:
-        response = result_messages[-1].content
-        # Return the full conversation history from the agent
-        return response, result_messages
-
-    return "No response generated.", messages
+    response = await agent.ainvoke({"messages": [("user", query)]})
+    return response["messages"][-1].content
 
 
-async def interactive_session(provider: str, model: str | None):
-    """Run an interactive session with the documentation assistant agent."""
-    if not check_api_key(provider):
-        return
+async def interactive_mode(provider: str = "openai", model: str | None = None):
+    """
+    Run the agent in interactive mode.
 
-    print("Qiskit Docs Assistant Agent with LangChain + MCP")
-    print("=" * 50)
-    print(f"Provider: {provider}" + (f" (model: {model})" if model else ""))
-    print("This agent connects to the qiskit-docs-mcp-server")
-    print("to help you find and understand Qiskit documentation.")
-    print("Type 'quit' to exit, 'clear' to reset conversation history.\n")
+    Args:
+        provider: LLM provider name
+        model: Optional model name override
+    """
+    print(f"\n🤖 Qiskit Docs Agent (Provider: {provider}, Model: {model or 'default'})")
+    print("=" * 60)
+    print("Ask questions about Qiskit documentation!")
+    print("Type 'quit' or 'exit' to end the session.")
 
     # Example queries to demonstrate capabilities
     example_queries = [
@@ -264,91 +206,70 @@ async def interactive_session(provider: str, model: str | None):
         "Explain the Qiskit transpiler",
     ]
 
-    print("Example queries you can try:")
+    print("\nExample queries you can try:")
     for i, query in enumerate(example_queries, 1):
         print(f"  {i}. {query}")
-    print()
 
-    print("Connecting to MCP server...")
+    print("=" * 60)
 
-    # Use persistent session to avoid spawning new server for each tool call
     mcp_client = get_mcp_client()
-    async with mcp_client.session("qiskit-docs") as session:
-        agent = await create_quantum_agent_with_session(session, provider, model)
-        print("Connected! Ready to help with Qiskit documentation.\n")
 
-        # Maintain conversation history for context
-        history: list = []
+    # Use persistent session for efficient tool calls
+    async with mcp_client.session("qiskit-docs") as session:
+        agent = await create_docs_agent_with_session(session, provider, model)
 
         while True:
             try:
-                user_input = input("You: ").strip()
-                if not user_input:
-                    continue
-                if user_input.lower() in ["quit", "exit", "q"]:
-                    print("Goodbye!")
+                query = input("\n💬 You: ").strip()
+
+                if query.lower() in ["quit", "exit", "q"]:
+                    print("\n👋 Goodbye!")
                     break
-                if user_input.lower() == "clear":
-                    history = []
-                    print("Conversation history cleared.\n")
+
+                if not query:
                     continue
 
-                response, history = await run_agent_query(agent, user_input, history)
-                print(f"\nAssistant: {response}\n")
+                print("\n🤔 Agent: ", end="", flush=True)
+                response = await run_agent_query(agent, query)
+                print(response)
 
             except KeyboardInterrupt:
-                print("\nGoodbye!")
+                print("\n\n👋 Goodbye!")
                 break
             except Exception as e:
-                print(f"Error: {e}\n")
+                print(f"\n❌ Error: {e}")
 
 
-async def single_query_example(provider: str, model: str | None):
-    """Example of running a single query programmatically."""
-    if not check_api_key(provider):
-        return
+async def single_query_mode(
+    query: str, provider: str = "openai", model: str | None = None
+):
+    """
+    Run a single query and exit.
 
-    print("Running single query example...")
-    print(f"Provider: {provider}" + (f" (model: {model})" if model else ""))
-    print("-" * 40)
+    Args:
+        query: User query
+        provider: LLM provider name
+        model: Optional model name override
+    """
+    print(f"\n🤖 Qiskit Docs Agent (Provider: {provider}, Model: {model or 'default'})")
+    print("=" * 60)
 
-    # Use persistent session for the query
     mcp_client = get_mcp_client()
-    async with mcp_client.session("qiskit-docs") as session:
-        agent = await create_quantum_agent_with_session(session, provider, model)
 
-        # Run a sample query
-        response, _ = await run_agent_query(
-            agent, "What are the main modules available in Qiskit?"
-        )
-        print(f"\nResponse:\n{response}")
+    # Use persistent session for efficient tool calls
+    async with mcp_client.session("qiskit-docs") as session:
+        agent = await create_docs_agent_with_session(session, provider, model)
+
+        print(f"\n💬 Query: {query}")
+        print("\n🤔 Agent: ", end="", flush=True)
+        response = await run_agent_query(agent, query)
+        print(response)
 
 
 def main():
-    """Entry point for the example."""
+    """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="LangChain Agent for Qiskit Docs via MCP",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # OpenAI (default)
-  python langchain_agent.py
-
-  # Anthropic Claude
-  python langchain_agent.py --provider anthropic
-
-  # Local Ollama
-  python langchain_agent.py --provider ollama --model llama3.3
-
-  # Google Gemini
-  python langchain_agent.py --provider google
-
-  # IBM Watsonx
-  python langchain_agent.py --provider watsonx
-
-  # Single query mode
-  python langchain_agent.py --single
-        """,
+        description="LangChain Agent with Qiskit Docs MCP Server"
     )
     parser.add_argument(
         "--provider",
@@ -357,24 +278,32 @@ Examples:
         help="LLM provider to use (default: openai)",
     )
     parser.add_argument(
-        "--model",
-        type=str,
-        default=None,
-        help="Model name override (uses provider default if not specified)",
+        "--model", type=str, help="Model name (overrides provider default)"
     )
     parser.add_argument(
         "--single",
         action="store_true",
-        help="Run a single example query instead of interactive mode",
+        help="Run a single query and exit (interactive mode by default)",
     )
+    parser.add_argument("--query", type=str, help="Query to run in single mode")
 
     args = parser.parse_args()
 
     if args.single:
-        asyncio.run(single_query_example(args.provider, args.model))
+        if not args.query:
+            query = input("Enter your query: ").strip()
+            if not query:
+                print("No query provided. Exiting.")
+                return
+        else:
+            query = args.query
+
+        asyncio.run(single_query_mode(query, args.provider, args.model))
     else:
-        asyncio.run(interactive_session(args.provider, args.model))
+        asyncio.run(interactive_mode(args.provider, args.model))
 
 
 if __name__ == "__main__":
     main()
+
+# Made with Bob

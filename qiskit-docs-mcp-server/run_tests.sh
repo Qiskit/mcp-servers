@@ -28,10 +28,10 @@ echo "🔍 Running code linting..."
 uv run ruff check src tests
 uv run ruff format --check src tests
 
-# # Run type checking
-# echo ""
-# echo "🔬 Running type checking..."
-# uv run mypy src
+# Run type checking
+echo ""
+echo "🔬 Running type checking..."
+uv run mypy src
 
 # Run unit tests
 echo ""
