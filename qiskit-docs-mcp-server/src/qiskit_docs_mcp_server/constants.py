@@ -38,13 +38,22 @@ def _get_env_float(name: str, default: float) -> float:
         return default
 
 
-# Qiskit documentation bases (configurable via environment variables)
+# Qiskit documentation base URL (configurable via environment variable)
 QISKIT_DOCS_BASE = os.getenv("QISKIT_DOCS_BASE", "https://quantum.cloud.ibm.com/docs/")
-QISKIT_SDK_DOCS = os.getenv("QISKIT_SDK_DOCS", "https://quantum.cloud.ibm.com/docs/")
 BASE_URL = os.getenv("QISKIT_SEARCH_BASE_URL", "https://quantum.cloud.ibm.com/")
 
-# Error code registry path
-ERROR_CODES_PATH = "errors"
+# Error code registry
+ERROR_CODE_CATEGORIES = {
+    "1XXX": "Validation, transpilation, backend availability, authorization, and job management",
+    "2XXX": "Backend configuration, booking, and data retrieval",
+    "3XXX": "Job handling, authentication, and analytics",
+    "4XXX": "Session management and job limits",
+    "5XXX": "Job timeout and cancellation",
+    "6XXX": "Shot limits, compiler input, and control system",
+    "7XXX": "Instruction and basis gate compatibility",
+    "8XXX": "Pulse and channel configuration",
+    "9XXX": "Hardware loading and internal errors",
+}
 
 # HTTP timeout configuration (in seconds)
 HTTP_TIMEOUT = _get_env_float("QISKIT_HTTP_TIMEOUT", 10.0)

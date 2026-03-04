@@ -27,6 +27,7 @@ from qiskit_docs_mcp_server.data_fetcher import (
     get_component_docs,
     get_guide_docs,
     get_list_of_addons,
+    get_list_of_error_code_categories,
     get_list_of_guides,
     get_list_of_modules,
     lookup_error_code,
@@ -143,3 +144,9 @@ def addons_resource() -> dict[str, Any]:
 def guides_resource() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices."""
     return get_list_of_guides()
+
+
+@mcp.resource("qiskit-docs://error-codes", mime_type="application/json")
+def error_codes_resource() -> dict[str, Any]:
+    """Get list of IBM Quantum error code categories and registry URL."""
+    return get_list_of_error_code_categories()

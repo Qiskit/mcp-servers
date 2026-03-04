@@ -24,10 +24,9 @@ from qiskit_docs_mcp_server.constants import (
     AVAILABLE_GUIDES,
     AVAILABLE_MODULES,
     BASE_URL,
-    ERROR_CODES_PATH,
+    ERROR_CODE_CATEGORIES,
     HTTP_TIMEOUT,
     QISKIT_DOCS_BASE,
-    QISKIT_SDK_DOCS,
     SEARCH_PATH,
 )
 
@@ -138,7 +137,7 @@ async def get_component_docs(component: str) -> dict[str, Any]:
             error_response["suggestions"] = suggestions
         return error_response
 
-    url = f"{QISKIT_SDK_DOCS}api/qiskit/{component}"
+    url = f"{QISKIT_DOCS_BASE}api/qiskit/{component}"
     logger.info(f"Fetching component docs for {component} from {url}")
     html = await fetch_text(url)
     docs = convert_html_to_markdown(html) if html else None
@@ -242,7 +241,7 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
             "message": f"Invalid error code format: '{code}'. Expected a 4-digit code (e.g., '1002').",
         }
 
-    url = f"{QISKIT_DOCS_BASE}{ERROR_CODES_PATH}"
+    url = f"{QISKIT_DOCS_BASE}errors"
     logger.info(f"Fetching error code {code} from {url}")
     html = await fetch_text(url)
 
@@ -315,7 +314,7 @@ async def get_addon_docs(addon: str) -> dict[str, Any]:
             error_response["suggestions"] = suggestions
         return error_response
 
-    url = f"{QISKIT_SDK_DOCS}api/qiskit-addon-{addon}"
+    url = f"{QISKIT_DOCS_BASE}api/qiskit-addon-{addon}"
     logger.info(f"Fetching addon docs for {addon} from {url}")
     html = await fetch_text(url)
     docs = convert_html_to_markdown(html) if html else None
@@ -341,3 +340,12 @@ def get_list_of_addons() -> dict[str, Any]:
 def get_list_of_guides() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices."""
     return {"status": "success", "guides": AVAILABLE_GUIDES}
+
+
+def get_list_of_error_code_categories() -> dict[str, Any]:
+    """Get list of IBM Quantum error code categories."""
+    return {
+        "status": "success",
+        "categories": ERROR_CODE_CATEGORIES,
+        "registry_url": f"{QISKIT_DOCS_BASE}errors",
+    }
