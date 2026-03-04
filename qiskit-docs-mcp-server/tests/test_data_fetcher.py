@@ -15,16 +15,20 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-from qiskit_docs_mcp_server.data_fetcher import (
+from qiskit_docs_mcp_server.constants import (
+    AVAILABLE_ADDONS,
+    AVAILABLE_MODULES,
     HTTP_TIMEOUT,
-    QISKIT_ADDON_MODULES,
-    QISKIT_MODULES,
-    _find_similar,
     _get_env_float,
+)
+from qiskit_docs_mcp_server.data_fetcher import (
+    _find_similar,
     fetch_text,
     fetch_text_json,
+    get_addon_docs,
     get_component_docs,
     get_guide_docs,
+    lookup_error_code,
     search_qiskit_docs,
 )
 
@@ -163,7 +167,7 @@ class TestGetComponentDocs:
         """Test getting docs for all valid modules."""
         mock_fetch.return_value = "Documentation"
 
-        for module in QISKIT_MODULES:
+        for module in AVAILABLE_MODULES:
             result = await get_component_docs(module)
             assert result["status"] == "success"
             assert result["module"] == module
@@ -183,12 +187,12 @@ class TestGetGuideDocs:
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
     async def test_get_guide_docs_valid_guide(self, mock_fetch):
         """Test getting docs for a valid guide."""
-        mock_fetch.return_value = "Optimization guide"
-        result = await get_guide_docs("optimization")
+        mock_fetch.return_value = "Quick start guide"
+        result = await get_guide_docs("quick-start")
 
         assert result["status"] == "success"
-        assert result["guide"] == "optimization"
-        assert "Optimization guide" in result["documentation"]
+        assert result["guide"] == "quick-start"
+        assert "Quick start guide" in result["documentation"]
         assert "metadata" in result
         mock_fetch.assert_called_once()
 
@@ -204,12 +208,14 @@ class TestGetGuideDocs:
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
     async def test_get_guide_docs_invalid_with_suggestions(self, mock_fetch):
         """Test getting docs with similar guide suggestions."""
-        result = await get_guide_docs("optimization-guide")  # Similar to 'optimization'
+        result = await get_guide_docs(
+            "transpile-with-pass-manager"
+        )  # Similar to 'transpile-with-pass-managers'
         assert result["status"] == "error"
         assert "available_guides" in result
         # May or may not have suggestions depending on similarity cutoff
         if "suggestions" in result:
-            assert "optimization" in result["suggestions"]
+            assert "transpile-with-pass-managers" in result["suggestions"]
         mock_fetch.assert_not_called()
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
@@ -217,12 +223,12 @@ class TestGetGuideDocs:
         """Test getting docs for all valid guides."""
         mock_fetch.return_value = "Guide documentation"
         valid_guides = [
-            "optimization",
-            "quantum-circuits",
-            "error-mitigation",
+            "quick-start",
+            "construct-circuits",
+            "transpile",
             "dynamic-circuits",
-            "parametric-compilation",
-            "performance-tuning",
+            "primitives",
+            "configure-error-mitigation",
         ]
 
         for guide in valid_guides:
@@ -234,7 +240,7 @@ class TestGetGuideDocs:
     async def test_get_guide_docs_fetch_fails(self, mock_fetch):
         """Test get_guide_docs when fetch fails."""
         mock_fetch.return_value = None
-        result = await get_guide_docs("optimization")
+        result = await get_guide_docs("quick-start")
         assert result["status"] == "success"
         assert result["documentation"] is None
 
@@ -242,9 +248,9 @@ class TestGetGuideDocs:
     async def test_get_guide_docs_error_mitigation(self, mock_fetch):
         """Test getting error-mitigation guide."""
         mock_fetch.return_value = "Error mitigation techniques"
-        result = await get_guide_docs("error-mitigation")
+        result = await get_guide_docs("configure-error-mitigation")
         assert result["status"] == "success"
-        assert result["guide"] == "error-mitigation"
+        assert result["guide"] == "configure-error-mitigation"
         assert "Error mitigation techniques" in result["documentation"]
 
 
@@ -366,7 +372,7 @@ class TestMetadataHandling:
     async def test_guide_docs_has_metadata(self, mock_fetch):
         """Test that guide docs response includes metadata."""
         mock_fetch.return_value = "Guide content"
-        result = await get_guide_docs("optimization")
+        result = await get_guide_docs("quick-start")
 
         assert "metadata" in result
         metadata = result["metadata"]
@@ -469,39 +475,150 @@ class TestDocFetcherConstants:
     """Test data_fetcher constants."""
 
     def test_qiskit_modules_not_empty(self):
-        """Test that QISKIT_MODULES is not empty."""
-        assert len(QISKIT_MODULES) > 0
+        """Test that AVAILABLE_MODULES is not empty."""
+        assert len(AVAILABLE_MODULES) > 0
 
     def test_qiskit_modules_has_circuit(self):
-        """Test that QISKIT_MODULES contains circuit."""
-        assert "circuit" in QISKIT_MODULES
+        """Test that AVAILABLE_MODULES contains circuit."""
+        assert "circuit" in AVAILABLE_MODULES
 
     def test_qiskit_modules_has_primitives(self):
-        """Test that QISKIT_MODULES contains primitives."""
-        assert "primitives" in QISKIT_MODULES
+        """Test that AVAILABLE_MODULES contains primitives."""
+        assert "primitives" in AVAILABLE_MODULES
 
     def test_qiskit_modules_has_transpiler(self):
-        """Test that QISKIT_MODULES contains transpiler."""
-        assert "transpiler" in QISKIT_MODULES
+        """Test that AVAILABLE_MODULES contains transpiler."""
+        assert "transpiler" in AVAILABLE_MODULES
 
     def test_qiskit_addon_modules_not_empty(self):
-        """Test that QISKIT_ADDON_MODULES is not empty."""
-        assert len(QISKIT_ADDON_MODULES) > 0
+        """Test that AVAILABLE_ADDONS is not empty."""
+        assert len(AVAILABLE_ADDONS) > 0
 
-    def test_qiskit_addon_modules_has_vqe(self):
-        """Test that QISKIT_ADDON_MODULES contains VQE."""
-        assert "addon-vqe" in QISKIT_ADDON_MODULES
+    def test_qiskit_addon_modules_has_sqd(self):
+        """Test that AVAILABLE_ADDONS contains SQD."""
+        assert "sqd" in AVAILABLE_ADDONS
 
-    def test_qiskit_addon_modules_has_opt_mapper(self):
-        """Test that QISKIT_ADDON_MODULES contains opt-mapper."""
-        assert "addon-opt-mapper" in QISKIT_ADDON_MODULES
+    def test_qiskit_addon_modules_has_cutting(self):
+        """Test that AVAILABLE_ADDONS contains cutting."""
+        assert "cutting" in AVAILABLE_ADDONS
 
-    def test_qiskit_modules_values_are_strings(self):
-        """Test that QISKIT_MODULES values are strings."""
-        for value in QISKIT_MODULES.values():
+    def test_qiskit_modules_entries_are_strings(self):
+        """Test that AVAILABLE_MODULES entries are strings."""
+        for value in AVAILABLE_MODULES:
             assert isinstance(value, str)
 
-    def test_qiskit_addon_modules_values_are_strings(self):
-        """Test that QISKIT_ADDON_MODULES values are strings."""
-        for value in QISKIT_ADDON_MODULES.values():
+    def test_qiskit_addon_modules_entries_are_strings(self):
+        """Test that AVAILABLE_ADDONS entries are strings."""
+        for value in AVAILABLE_ADDONS:
             assert isinstance(value, str)
+
+
+class TestLookupErrorCode:
+    """Test lookup_error_code function."""
+
+    async def test_invalid_code_format_letters(self):
+        """Test that non-numeric codes return an error."""
+        result = await lookup_error_code("abcd")
+        assert result["status"] == "error"
+        assert "Invalid error code format" in result["message"]
+
+    async def test_invalid_code_format_short(self):
+        """Test that codes with wrong length return an error."""
+        result = await lookup_error_code("12")
+        assert result["status"] == "error"
+        assert "Invalid error code format" in result["message"]
+
+    async def test_invalid_code_format_long(self):
+        """Test that 5-digit codes return an error."""
+        result = await lookup_error_code("12345")
+        assert result["status"] == "error"
+        assert "Invalid error code format" in result["message"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_fetch_failure(self, mock_fetch):
+        """Test lookup when fetch fails."""
+        mock_fetch.return_value = None
+        result = await lookup_error_code("1002")
+        assert result["status"] == "error"
+        assert "Failed to fetch" in result["message"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found(self, mock_fetch):
+        """Test successful error code lookup."""
+        mock_fetch.return_value = (
+            "<table><tr><td>1002</td>"
+            "<td>Error in the validation process.</td>"
+            "<td>Check the job.</td></tr></table>"
+        )
+        result = await lookup_error_code("1002")
+        assert result["status"] == "success"
+        assert result["code"] == "1002"
+        assert "details" in result
+        assert "1002" in result["details"]
+        assert "metadata" in result
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_not_found(self, mock_fetch):
+        """Test lookup for a code that does not exist in the page."""
+        mock_fetch.return_value = "<table><tr><td>1002</td><td>Some error</td></tr></table>"
+        result = await lookup_error_code("9999")
+        assert result["status"] == "error"
+        assert "not found" in result["message"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_metadata_url_includes_range(self, mock_fetch):
+        """Test that metadata URL points to the correct error range anchor."""
+        mock_fetch.return_value = "<table><tr><td>7001</td><td>Error</td><td>Fix</td></tr></table>"
+        result = await lookup_error_code("7001")
+        assert result["status"] == "success"
+        assert "7xxx" in result["metadata"]["url"]
+
+
+class TestGetAddonDocs:
+    """Test get_addon_docs function."""
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_addon_docs_valid(self, mock_fetch):
+        """Test getting docs for a valid addon."""
+        mock_fetch.return_value = "SQD documentation"
+        result = await get_addon_docs("sqd")
+        assert result["status"] == "success"
+        assert result["addon"] == "sqd"
+        assert "SQD documentation" in result["documentation"]
+        assert "metadata" in result
+        assert "qiskit-addon-sqd" in result["metadata"]["url"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_addon_docs_invalid(self, mock_fetch):
+        """Test getting docs for an invalid addon."""
+        result = await get_addon_docs("nonexistent")
+        assert result["status"] == "error"
+        assert "not found" in result["message"]
+        assert "available_addons" in result
+        mock_fetch.assert_not_called()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_addon_docs_with_suggestions(self, mock_fetch):
+        """Test getting docs with fuzzy match suggestions."""
+        result = await get_addon_docs("cut")
+        assert result["status"] == "error"
+        if "suggestions" in result:
+            assert "cutting" in result["suggestions"]
+        mock_fetch.assert_not_called()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_addon_docs_fetch_fails(self, mock_fetch):
+        """Test get_addon_docs when fetch fails."""
+        mock_fetch.return_value = None
+        result = await get_addon_docs("cutting")
+        assert result["status"] == "success"
+        assert result["documentation"] is None
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_addon_docs_all_valid(self, mock_fetch):
+        """Test getting docs for all valid addons."""
+        mock_fetch.return_value = "Addon docs"
+        for addon in AVAILABLE_ADDONS:
+            result = await get_addon_docs(addon)
+            assert result["status"] == "success"
+            assert result["addon"] == addon

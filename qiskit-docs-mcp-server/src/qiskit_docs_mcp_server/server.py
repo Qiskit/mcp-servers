@@ -23,11 +23,13 @@ from typing import Any
 from fastmcp import FastMCP
 
 from qiskit_docs_mcp_server.data_fetcher import (
+    get_addon_docs,
     get_component_docs,
     get_guide_docs,
     get_list_of_addons,
     get_list_of_guides,
     get_list_of_modules,
+    lookup_error_code,
     search_qiskit_docs,
 )
 
@@ -63,12 +65,26 @@ async def get_sdk_module_docs_tool(module: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+async def get_addon_docs_tool(addon: str) -> dict[str, Any]:
+    """
+    Get documentation for a Qiskit addon module.
+
+    Args:
+        addon: Addon name (e.g., 'sqd', 'cutting', 'mpf', 'obp', 'aqc-tensor')
+
+    Returns:
+        Addon API documentation including classes, methods, and usage examples.
+    """
+    return await get_addon_docs(addon)
+
+
+@mcp.tool()
 async def get_guide_tool(guide: str) -> dict[str, Any]:
     """
     Get a Qiskit guide or best practice documentation.
 
     Args:
-        guide: Guide name (e.g., 'optimization', 'error-mitigation', 'dynamic-circuits', 'performance-tuning')
+        guide: Guide name (e.g., 'quick-start', 'transpile', 'configure-error-mitigation', 'dynamic-circuits')
 
     Returns:
         Complete guide documentation with best practices and implementation patterns.
@@ -91,6 +107,20 @@ async def search_docs_tool(query: str, module: str = "documentation") -> dict[st
     return await search_qiskit_docs(query, module)
 
 
+@mcp.tool()
+async def lookup_error_code_tool(code: str) -> dict[str, Any]:
+    """
+    Look up a Qiskit/IBM Quantum error code to get its message and solution.
+
+    Args:
+        code: 4-digit error code (e.g., '1002', '7001', '8004')
+
+    Returns:
+        Error code details including message and suggested solution.
+    """
+    return await lookup_error_code(code)
+
+
 ##################################################
 ## MCP Resources
 ## - https://modelcontextprotocol.io/docs/concepts/resources
@@ -105,7 +135,7 @@ def modules_resource() -> dict[str, Any]:
 
 @mcp.resource("qiskit-docs://addons", mime_type="application/json")
 def addons_resource() -> dict[str, Any]:
-    """Get list of all Qiskit addon modules and tutorials."""
+    """Get list of all Qiskit addon modules."""
     return get_list_of_addons()
 
 
