@@ -142,6 +142,12 @@ async def get_component_docs(component: str) -> dict[str, Any]:
     html = await fetch_text(url)
     docs = convert_html_to_markdown(html) if html else None
 
+    if docs is None:
+        return {
+            "status": "error",
+            "message": f"Failed to fetch documentation for component '{component}'.",
+        }
+    
     return {
         "status": "success",
         "module": component,
@@ -180,6 +186,12 @@ async def get_guide_docs(guide: str) -> dict[str, Any]:
     logger.info(f"Fetching style docs for {guide} from {url}")
     html = await fetch_text(url)
     docs = convert_html_to_markdown(html) if html else None
+    
+    if docs is None:
+        return {
+            "status": "error",
+            "message": f"Failed to fetch documentation for guide '{guide}'.",
+        }
 
     return {
         "status": "success",
@@ -318,6 +330,12 @@ async def get_addon_docs(addon: str) -> dict[str, Any]:
     logger.info(f"Fetching addon docs for {addon} from {url}")
     html = await fetch_text(url)
     docs = convert_html_to_markdown(html) if html else None
+
+    if docs is None:
+        return {
+            "status": "error",
+            "message": f"Failed to fetch documentation for addon '{addon}'.",
+        }
 
     return {
         "status": "success",
