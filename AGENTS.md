@@ -211,8 +211,8 @@ Each MCP server follows this standard structure:
 | `qiskit-docs://guides` | List of Qiskit guides and best practices |
 
 **Environment Variables**:
-- `QISKIT_DOCS_BASE`: Base URL for Qiskit documentation (default: https://docs.quantum.ibm.com/)
-- `QISKIT_SDK_DOCS`: SDK documentation URL (default: https://docs.quantum.ibm.com/)
+- `QISKIT_DOCS_BASE`: Base URL for Qiskit documentation (default: https://quantum.cloud.ibm.com/docs/)
+- `QISKIT_SDK_DOCS`: SDK documentation URL (default: https://quantum.cloud.ibm.com/docs/)
 - `QISKIT_HTTP_TIMEOUT`: HTTP request timeout in seconds (default: 10.0)
 - `QISKIT_SEARCH_BASE_URL`: Search API base URL (default: https://quantum.cloud.ibm.com/)
 
