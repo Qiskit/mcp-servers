@@ -90,7 +90,6 @@ The server can be configured using environment variables:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `QISKIT_DOCS_BASE` | Base URL for Qiskit documentation | `https://quantum.cloud.ibm.com/docs/` |
-| `QISKIT_SDK_DOCS` | SDK documentation URL | `https://quantum.cloud.ibm.com/docs/` |
 | `QISKIT_HTTP_TIMEOUT` | HTTP request timeout in seconds | `10.0` |
 | `QISKIT_SEARCH_BASE_URL` | Search API base URL | `https://quantum.cloud.ibm.com/` |
 
