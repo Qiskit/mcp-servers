@@ -45,7 +45,7 @@ The server provides three resources for listing available documentation:
 
 - Python 3.10 or higher
 - [uv](https://astral.sh/uv) package manager (recommended)
-- Internet connection to access docs.quantum.ibm.com
+- Internet connection to access [IBM Quantum Documentation](https://quantum.cloud.ibm.com/docs/)
 
 ## Installation
 
@@ -89,8 +89,8 @@ The server can be configured using environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `QISKIT_DOCS_BASE` | Base URL for Qiskit documentation | `https://docs.quantum.ibm.com/` |
-| `QISKIT_SDK_DOCS` | SDK documentation URL | `https://docs.quantum.ibm.com/` |
+| `QISKIT_DOCS_BASE` | Base URL for Qiskit documentation | `https://quantum.cloud.ibm.com/docs/` |
+| `QISKIT_SDK_DOCS` | SDK documentation URL | `https://quantum.cloud.ibm.com/docs/` |
 | `QISKIT_HTTP_TIMEOUT` | HTTP request timeout in seconds | `10.0` |
 | `QISKIT_SEARCH_BASE_URL` | Search API base URL | `https://quantum.cloud.ibm.com/` |
 
@@ -100,7 +100,7 @@ Create a `.env` file in the project directory:
 
 ```env
 # Optional: Customize documentation URLs
-QISKIT_DOCS_BASE=https://docs.quantum.ibm.com/
+QISKIT_DOCS_BASE=https://quantum.cloud.ibm.com/docs/
 QISKIT_HTTP_TIMEOUT=15.0
 ```
 
@@ -269,7 +269,7 @@ All responses include rich metadata:
     "module": "circuit",
     "documentation": "...",
     "metadata": {
-        "url": "https://docs.quantum.ibm.com/api/qiskit/circuit",
+        "url": "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit",
         "timestamp": "2026-03-03T03:00:00Z",
         "content_type": "markdown",
         "content_length": 15420
@@ -322,7 +322,7 @@ See the [`examples/`](examples/) directory for complete working examples:
 ### Connection Issues
 
 **Problem**: "Failed to fetch documentation"
-**Solution**: Check your internet connection and verify access to docs.quantum.ibm.com
+**Solution**: Check your internet connection and verify access to https://quantum.cloud.ibm.com/docs/
 
 ### Timeout Errors
 
@@ -347,7 +347,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Links
 
-- [Qiskit Documentation](https://docs.quantum.ibm.com/)
+- [Qiskit Documentation](https://quantum.cloud.ibm.com/docs/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [MCP Registry](https://registry.modelcontextprotocol.io/)
 - [GitHub Repository](https://github.com/Qiskit/mcp-servers)
