@@ -24,7 +24,7 @@
         {
           "name": "QISKIT_DOCS_BASE",
           "description": "Base URL for Qiskit documentation",
-          "default": "https://docs.quantum.ibm.com/"
+          "default": "https://quantum.cloud.ibm.com/docs/"
         },
         {
           "name": "QISKIT_HTTP_TIMEOUT",
