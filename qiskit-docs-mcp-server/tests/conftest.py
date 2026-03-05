@@ -20,7 +20,7 @@ import pytest
 @pytest.fixture
 def mock_fetch_text():
     """Mock fetch_text function."""
-    with patch("data_fetcher.fetch_text") as mock:
+    with patch("qiskit_docs_mcp_server.data_fetcher.fetch_text") as mock:
         mock.return_value = "Mock documentation content"
         yield mock
 
@@ -28,7 +28,7 @@ def mock_fetch_text():
 @pytest.fixture
 def mock_fetch_text_json():
     """Mock fetch_text_json function."""
-    with patch("data_fetcher.fetch_text_json") as mock:
+    with patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json") as mock:
         mock.return_value = [
             {"type": "module", "name": "circuit", "url": "https://example.com/circuit"}
         ]
@@ -38,7 +38,7 @@ def mock_fetch_text_json():
 @pytest.fixture
 def mock_get_component_docs():
     """Mock get_component_docs function."""
-    with patch("data_fetcher.get_component_docs") as mock:
+    with patch("qiskit_docs_mcp_server.data_fetcher.get_component_docs") as mock:
         mock.return_value = "Component documentation"
         yield mock
 
@@ -46,7 +46,7 @@ def mock_get_component_docs():
 @pytest.fixture
 def mock_get_pattern_docs():
     """Mock get_pattern_docs function."""
-    with patch("data_fetcher.get_pattern_docs") as mock:
+    with patch("qiskit_docs_mcp_server.data_fetcher.get_pattern_docs") as mock:
         mock.return_value = "Pattern documentation"
         yield mock
 
@@ -54,7 +54,7 @@ def mock_get_pattern_docs():
 @pytest.fixture
 def mock_get_style_docs():
     """Mock get_style_docs function."""
-    with patch("data_fetcher.get_style_docs") as mock:
+    with patch("qiskit_docs_mcp_server.data_fetcher.get_style_docs") as mock:
         mock.return_value = "Style documentation"
         yield mock
 
@@ -62,7 +62,7 @@ def mock_get_style_docs():
 @pytest.fixture
 def mock_search_qiskit_docs():
     """Mock search_qiskit_docs function."""
-    with patch("data_fetcher.search_qiskit_docs") as mock:
+    with patch("qiskit_docs_mcp_server.data_fetcher.search_qiskit_docs") as mock:
         mock.return_value = [
             {
                 "type": "module",
