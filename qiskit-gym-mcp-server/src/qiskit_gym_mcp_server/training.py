@@ -222,6 +222,10 @@ def _apply_curriculum_overrides(
     def _set_if_present(obj: Any, name: str, value: int) -> None:
         if obj is not None and hasattr(obj, name):
             setattr(obj, name, value)
+        elif obj is not None:
+            logger.warning(
+                f"Skipping curriculum override: {type(obj).__name__} has no attribute {name}"
+            )
 
     def _set_in_config(obj: Any, name: str, value: int) -> None:
         cfg = getattr(obj, "config", None)
