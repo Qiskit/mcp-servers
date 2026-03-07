@@ -12,6 +12,8 @@
 
 """Tests for training.py."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from qiskit_gym_mcp_server.gym_core import create_permutation_environment
@@ -150,6 +152,12 @@ class TestStartTraining:
         mock_basic_policy_config,
     ):
         """Test that depth_slope/max_depth overrides are applied before RLSynthesis is instantiated."""
+        mock_instance = mock_permutation_gym.from_coupling_map.return_value
+        mock_instance.config = {}
+        mock_raw_env = MagicMock()
+        mock_raw_env.config = {}
+        mock_instance._raw_env = mock_raw_env
+
         env_result = await create_permutation_environment(preset="linear_5")
         env_id = env_result["env_id"]
 
@@ -168,26 +176,15 @@ class TestStartTraining:
         mock_rls_synthesis.assert_called_once()
         (passed_env, *_), _ = mock_rls_synthesis.call_args
 
-        if hasattr(passed_env, "depth_slope"):
-            assert passed_env.depth_slope == 3
-        if hasattr(passed_env, "max_depth"):
-            assert passed_env.max_depth == 64
+        assert passed_env.depth_slope == 3
+        assert passed_env.max_depth == 64
+        assert passed_env.config["depth_slope"] == 3
+        assert passed_env.config["max_depth"] == 64
 
-        cfg = getattr(passed_env, "config", None)
-        if isinstance(cfg, dict):
-            assert cfg.get("depth_slope") == 3
-            assert cfg.get("max_depth") == 64
-
-        raw_env = getattr(passed_env, "_raw_env", None)
-        if raw_env is not None:
-            if hasattr(raw_env, "depth_slope"):
-                assert raw_env.depth_slope == 3
-            if hasattr(raw_env, "max_depth"):
-                assert raw_env.max_depth == 64
-            raw_cfg = getattr(raw_env, "config", None)
-            if isinstance(raw_cfg, dict):
-                assert raw_cfg.get("depth_slope") == 3
-                assert raw_cfg.get("max_depth") == 64
+        assert passed_env._raw_env.depth_slope == 3
+        assert passed_env._raw_env.max_depth == 64
+        assert passed_env._raw_env.config["depth_slope"] == 3
+        assert passed_env._raw_env.config["max_depth"] == 64
 
     @pytest.mark.asyncio
     async def test_start_training_invalid_depth_slope(self, mock_permutation_gym):
