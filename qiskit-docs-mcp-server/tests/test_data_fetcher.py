@@ -177,7 +177,7 @@ class TestGetComponentDocs:
         """Test get_component_docs when fetch fails."""
         mock_fetch.return_value = None
         result = await get_component_docs("circuit")
-        assert result["status"] == "success"
+        assert result["status"] == "error"
         assert result["documentation"] is None
 
 
@@ -241,7 +241,7 @@ class TestGetGuideDocs:
         """Test get_guide_docs when fetch fails."""
         mock_fetch.return_value = None
         result = await get_guide_docs("quick-start")
-        assert result["status"] == "success"
+        assert result["status"] == "error"
         assert result["documentation"] is None
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
@@ -611,7 +611,7 @@ class TestGetAddonDocs:
         """Test get_addon_docs when fetch fails."""
         mock_fetch.return_value = None
         result = await get_addon_docs("cutting")
-        assert result["status"] == "success"
+        assert result["status"] == "error"
         assert result["documentation"] is None
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
