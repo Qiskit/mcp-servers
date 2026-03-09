@@ -44,22 +44,6 @@ def mock_get_component_docs():
 
 
 @pytest.fixture
-def mock_get_pattern_docs():
-    """Mock get_pattern_docs function."""
-    with patch("qiskit_docs_mcp_server.data_fetcher.get_pattern_docs") as mock:
-        mock.return_value = "Pattern documentation"
-        yield mock
-
-
-@pytest.fixture
-def mock_get_style_docs():
-    """Mock get_style_docs function."""
-    with patch("qiskit_docs_mcp_server.data_fetcher.get_style_docs") as mock:
-        mock.return_value = "Style documentation"
-        yield mock
-
-
-@pytest.fixture
 def mock_search_qiskit_docs():
     """Mock search_qiskit_docs function."""
     with patch("qiskit_docs_mcp_server.data_fetcher.search_qiskit_docs") as mock:
@@ -67,7 +51,7 @@ def mock_search_qiskit_docs():
             {
                 "type": "module",
                 "name": "circuit",
-                "url": "https://docs.quantum.ibm.com/api/qiskit/circuit",
+                "url": "https://quantum.cloud.ibm.com/docs/en/api/qiskit/circuit",
             }
         ]
         yield mock
@@ -79,7 +63,7 @@ def sample_module_docs():
     return {
         "name": "circuit",
         "description": "Quantum circuit module",
-        "url": "https://docs.quantum.ibm.com/api/qiskit/circuit",
+        "url": "https://quantum.cloud.ibm.com/docs/en/api/qiskit/circuit",
         "content": "Detailed circuit documentation...",
     }
 
@@ -88,10 +72,10 @@ def sample_module_docs():
 def sample_addon_docs():
     """Sample addon documentation."""
     return {
-        "name": "addon-vqe",
-        "description": "Variational Quantum Eigensolver addon",
-        "url": "https://docs.quantum.ibm.com/guides/vqe",
-        "content": "VQE implementation details...",
+        "name": "sqd",
+        "description": "Sample-based Quantum Diagonalization addon",
+        "url": "https://qiskit.github.io/qiskit-addon-sqd",
+        "content": "SQD implementation details...",
     }
 
 
@@ -99,10 +83,10 @@ def sample_addon_docs():
 def sample_guide_docs():
     """Sample guide documentation."""
     return {
-        "name": "optimization",
-        "description": "Quantum optimization guide",
-        "url": "https://docs.quantum.ibm.com/guides/optimization",
-        "content": "Optimization techniques and best practices...",
+        "name": "quick-start",
+        "description": "Qiskit quick start guide",
+        "url": "https://quantum.cloud.ibm.com/docs/en/guides/quick-start",
+        "content": "Getting started with Qiskit...",
     }
 
 
@@ -113,16 +97,16 @@ def sample_search_results():
         {
             "type": "sdk_module",
             "name": "circuit",
-            "url": "https://docs.quantum.ibm.com/api/qiskit/circuit",
+            "url": "https://quantum.cloud.ibm.com/docs/en/api/qiskit/circuit",
         },
         {
             "type": "addon",
-            "name": "addon-opt-mapper",
-            "url": "https://docs.quantum.ibm.com/guides/qaoa-mapper",
+            "name": "sqd",
+            "url": "https://qiskit.github.io/qiskit-addon-sqd",
         },
         {
             "type": "guide",
-            "name": "optimization",
-            "url": "https://docs.quantum.ibm.com/guides/optimization",
+            "name": "quick-start",
+            "url": "https://docs.quantum.ibm.com/guides/quick-start",
         },
     ]
