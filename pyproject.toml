@@ -1,6 +1,6 @@
 [project]
 name = "qiskit-mcp-servers"
-version = "0.7.0"
+version = "0.8.0"
 description = "Model Context Protocol servers for IBM Quantum services and Qiskit"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
@@ -27,6 +27,7 @@ classifiers = [
 dependencies = [
     "qiskit-mcp-server>=0.1.2",
     "qiskit-code-assistant-mcp-server>=0.3.0",
+    "qiskit-docs-mcp-server>=0.1.0",
     "qiskit-ibm-runtime-mcp-server>=0.5.0",
     "qiskit-ibm-transpiler-mcp-server>=0.3.1",
 ]
@@ -97,7 +98,7 @@ extend = "ruff.toml"
 # Note: mypy doesn't support extend in pyproject.toml, see mypy.ini
 
 [tool.pytest.ini_options]
-testpaths = ["qiskit-mcp-server/tests", "qiskit-code-assistant-mcp-server/tests", "qiskit-ibm-runtime-mcp-server/tests", "qiskit-ibm-transpiler-mcp-server/tests", "qiskit-gym-mcp-server/tests"]
+testpaths = ["qiskit-mcp-server/tests", "qiskit-code-assistant-mcp-server/tests", "qiskit-docs-mcp-server/tests", "qiskit-ibm-runtime-mcp-server/tests", "qiskit-ibm-transpiler-mcp-server/tests", "qiskit-gym-mcp-server/tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
@@ -121,6 +122,7 @@ markers = [
 source = [
     "qiskit-mcp-server/src",
     "qiskit-code-assistant-mcp-server/src",
+    "qiskit-docs-mcp-server/src",
     "qiskit-ibm-runtime-mcp-server/src",
     "qiskit-ibm-transpiler-mcp-server/src",
     "qiskit-gym-mcp-server/src",
