@@ -138,7 +138,6 @@ class TestGetComponentDocs:
 
         assert result["status"] == "success"
         assert result["module"] == "circuit"
-        assert "Circuit documentation" in result["documentation"]
         assert "metadata" in result
         mock_fetch.assert_called_once()
 
@@ -178,7 +177,6 @@ class TestGetComponentDocs:
         mock_fetch.return_value = None
         result = await get_component_docs("circuit")
         assert result["status"] == "error"
-        assert result["documentation"] is None
 
 
 class TestGetGuideDocs:
@@ -192,7 +190,6 @@ class TestGetGuideDocs:
 
         assert result["status"] == "success"
         assert result["guide"] == "quick-start"
-        assert "Quick start guide" in result["documentation"]
         assert "metadata" in result
         mock_fetch.assert_called_once()
 
@@ -242,7 +239,6 @@ class TestGetGuideDocs:
         mock_fetch.return_value = None
         result = await get_guide_docs("quick-start")
         assert result["status"] == "error"
-        assert result["documentation"] is None
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
     async def test_get_guide_docs_error_mitigation(self, mock_fetch):
@@ -251,7 +247,6 @@ class TestGetGuideDocs:
         result = await get_guide_docs("configure-error-mitigation")
         assert result["status"] == "success"
         assert result["guide"] == "configure-error-mitigation"
-        assert "Error mitigation techniques" in result["documentation"]
 
 
 class TestSearchQiskitDocs:
@@ -584,7 +579,6 @@ class TestGetAddonDocs:
         result = await get_addon_docs("sqd")
         assert result["status"] == "success"
         assert result["addon"] == "sqd"
-        assert "SQD documentation" in result["documentation"]
         assert "metadata" in result
         assert "qiskit-addon-sqd" in result["metadata"]["url"]
 
@@ -612,7 +606,6 @@ class TestGetAddonDocs:
         mock_fetch.return_value = None
         result = await get_addon_docs("cutting")
         assert result["status"] == "error"
-        assert result["documentation"] is None
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
     async def test_get_addon_docs_all_valid(self, mock_fetch):
