@@ -431,9 +431,7 @@ QasmVersion = Literal["auto", "2.0", "3.0"]
 ExportQasmVersion = Literal["2.0", "3.0"]
 
 
-def load_circuit_from_qasm(
-    qasm_string: str, qasm_version: QasmVersion = "auto"
-) -> dict[str, Any]:
+def load_circuit_from_qasm(qasm_string: str, qasm_version: QasmVersion = "auto") -> dict[str, Any]:
     """Load a quantum circuit from an OpenQASM string with version selection and metadata.
 
     Args:
