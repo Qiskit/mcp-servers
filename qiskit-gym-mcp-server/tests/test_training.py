@@ -12,6 +12,8 @@
 
 """Tests for training.py."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from qiskit_gym_mcp_server.gym_core import create_permutation_environment
@@ -140,6 +142,81 @@ class TestStartTraining:
         )
         assert result["status"] == "error"
         assert result["message"] == "initial_difficulty must be at least 1"
+
+    @pytest.mark.asyncio
+    async def test_start_training_applies_curriculum_overrides(
+        self,
+        mock_permutation_gym,
+        mock_rls_synthesis,
+        mock_ppo_config,
+        mock_basic_policy_config,
+    ):
+        """Test that depth_slope/max_depth overrides are applied before RLSynthesis is instantiated."""
+        mock_instance = mock_permutation_gym.from_coupling_map.return_value
+        mock_instance.config = {}
+        mock_raw_env = MagicMock()
+        mock_raw_env.config = {}
+        mock_instance._raw_env = mock_raw_env
+
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        result = await start_training(
+            env_id=env_id,
+            algorithm="ppo",
+            policy="basic",
+            num_iterations=10,
+            depth_slope=3,
+            max_depth=64,
+            background=False,
+        )
+
+        assert result["status"] == "success"
+
+        mock_rls_synthesis.assert_called_once()
+        (passed_env, *_), _ = mock_rls_synthesis.call_args
+
+        assert passed_env.depth_slope == 3
+        assert passed_env.max_depth == 64
+        assert passed_env.config["depth_slope"] == 3
+        assert passed_env.config["max_depth"] == 64
+
+        assert passed_env._raw_env.depth_slope == 3
+        assert passed_env._raw_env.max_depth == 64
+        assert passed_env._raw_env.config["depth_slope"] == 3
+        assert passed_env._raw_env.config["max_depth"] == 64
+
+    @pytest.mark.asyncio
+    async def test_start_training_invalid_depth_slope(self, mock_permutation_gym):
+        """Test error when depth_slope is less than 1."""
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        result = await start_training(
+            env_id=env_id,
+            num_iterations=10,
+            depth_slope=0,
+            max_depth=128,
+        )
+
+        assert result["status"] == "error"
+        assert result["message"] == "depth_slope must be at least 1"
+
+    @pytest.mark.asyncio
+    async def test_start_training_invalid_max_depth(self, mock_permutation_gym):
+        """Test error when max_depth is less than 1."""
+        env_result = await create_permutation_environment(preset="linear_5")
+        env_id = env_result["env_id"]
+
+        result = await start_training(
+            env_id=env_id,
+            num_iterations=10,
+            depth_slope=2,
+            max_depth=0,
+        )
+
+        assert result["status"] == "error"
+        assert result["message"] == "max_depth must be at least 1"
 
 
 class TestTrainingStatus:

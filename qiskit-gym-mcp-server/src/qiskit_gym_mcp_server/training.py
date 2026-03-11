@@ -195,6 +195,90 @@ def _run_training_in_background(
         GymStateProvider().set_training_status(session_id, "error", str(e))
 
 
+def _apply_curriculum_overrides(
+    gym_instance: Any,
+    *,
+    depth_slope: int,
+    max_depth: int,
+) -> Any:
+    """Apply curriculum overrides to a qiskit-gym synthesis environment instance.
+
+    Args:
+        gym_instance: The qiskit-gym environment instance.
+        depth_slope: How fast difficulty increases (default: 2). Must be >= 1.
+        max_depth: Maximum circuit depth for training (default: 128). Must be >= 1.
+
+    Returns:
+        The same `gym_instance` passed in, after applying the overrides.
+
+    Raises:
+        ValueError: If `depth_slope` or `max_depth` are less than 1.
+    """
+    if depth_slope < 1:
+        raise ValueError("depth_slope must be at least 1")
+    if max_depth < 1:
+        raise ValueError("max_depth must be at least 1")
+
+    def _set_if_present(obj: Any, name: str, value: int) -> None:
+        if obj is not None and hasattr(obj, name):
+            setattr(obj, name, value)
+        elif obj is not None:
+            logger.warning(
+                f"Skipping curriculum override: {type(obj).__name__} has no attribute {name}"
+            )
+
+    def _set_in_config(obj: Any, name: str, value: int) -> None:
+        cfg = getattr(obj, "config", None)
+        if isinstance(cfg, dict):
+            cfg[name] = value
+
+    # Update wrapper env
+    _set_if_present(gym_instance, "depth_slope", depth_slope)
+    _set_if_present(gym_instance, "max_depth", max_depth)
+    _set_in_config(gym_instance, "depth_slope", depth_slope)
+    _set_in_config(gym_instance, "max_depth", max_depth)
+
+    # Update underlying backend env if present
+    raw_env = getattr(gym_instance, "_raw_env", None)
+    _set_if_present(raw_env, "depth_slope", depth_slope)
+    _set_if_present(raw_env, "max_depth", max_depth)
+    _set_in_config(raw_env, "depth_slope", depth_slope)
+    _set_in_config(raw_env, "max_depth", max_depth)
+
+    return gym_instance
+
+
+def _validate_training_params(
+    num_iterations: int,
+    initial_difficulty: int,
+    depth_slope: int,
+    max_depth: int,
+) -> dict[str, Any] | None:
+    """Validate training-related parameters for a training session."""
+
+    # Validate iteration count (only if limit is explicitly set)
+    if QISKIT_GYM_MAX_ITERATIONS > 0 and num_iterations > QISKIT_GYM_MAX_ITERATIONS:
+        return {
+            "status": "error",
+            "message": f"num_iterations ({num_iterations}) exceeds maximum ({QISKIT_GYM_MAX_ITERATIONS}). "
+            "Set QISKIT_GYM_MAX_ITERATIONS=0 to remove limit.",
+        }
+
+    if num_iterations < 1:
+        return {"status": "error", "message": "num_iterations must be at least 1"}
+
+    if initial_difficulty < 1:
+        return {"status": "error", "message": "initial_difficulty must be at least 1"}
+
+    if depth_slope < 1:
+        return {"status": "error", "message": "depth_slope must be at least 1"}
+
+    if max_depth < 1:
+        return {"status": "error", "message": "max_depth must be at least 1"}
+
+    return None
+
+
 @with_sync
 async def start_training(
     env_id: str,
@@ -202,6 +286,8 @@ async def start_training(
     policy: Literal["basic", "conv1d"] = "basic",
     num_iterations: int = 100,
     initial_difficulty: int = 1,
+    depth_slope: int = 2,
+    max_depth: int = 128,
     tensorboard_experiment: str | None = None,
     background: bool = False,
 ) -> dict[str, Any]:
@@ -219,6 +305,8 @@ async def start_training(
             - "conv1d": 1D convolutional network (better for larger problems)
         num_iterations: Number of training iterations (default: 100)
         initial_difficulty: Starting difficulty level (default: 1)
+        depth_slope: How fast difficulty increases (default: 2)
+        max_depth: Maximum circuit depth for training (default: 128)
         tensorboard_experiment: Name for TensorBoard experiment logging (optional)
         background: If True, run training in background and return immediately.
             Use get_training_status to poll for completion, or wait_for_training
@@ -228,30 +316,13 @@ async def start_training(
         Dict with session_id. If background=False, also includes final status
         and training metrics. If background=True, returns immediately with
         session_id for polling.
-
-    TODO: Add training curriculum parameters (currently using qiskit-gym defaults):
-        - depth_slope: How fast difficulty increases (default: 2)
-        - max_depth: Maximum circuit depth (default: 128)
     """
     try:
-        # Validate iteration count (only if limit is explicitly set)
-        if QISKIT_GYM_MAX_ITERATIONS > 0 and num_iterations > QISKIT_GYM_MAX_ITERATIONS:
-            return {
-                "status": "error",
-                "message": f"num_iterations ({num_iterations}) exceeds maximum ({QISKIT_GYM_MAX_ITERATIONS}). "
-                "Set QISKIT_GYM_MAX_ITERATIONS=0 to remove limit.",
-            }
-
-        if num_iterations < 1:
-            return {
-                "status": "error",
-                "message": "num_iterations must be at least 1",
-            }
-        if initial_difficulty < 1:
-            return {
-                "status": "error",
-                "message": "initial_difficulty must be at least 1",
-            }
+        error = _validate_training_params(
+            num_iterations, initial_difficulty, depth_slope, max_depth
+        )
+        if error:
+            return error
 
         # Get environment
         state = GymStateProvider()
@@ -261,6 +332,13 @@ async def start_training(
                 "status": "error",
                 "message": f"Environment '{env_id}' not found. Use list_environments to see available.",
             }
+
+        # Apply curriculum overrides (depth_slope and max_depth)
+        _apply_curriculum_overrides(
+            env.gym_instance,
+            depth_slope=depth_slope,
+            max_depth=max_depth,
+        )
 
         # Create training session first to get session_id
         session_id = state.create_training_session(
