@@ -195,13 +195,16 @@ Each MCP server follows this standard structure:
 **Core Files**:
 - `server.py`: FastMCP server with tool/resource definitions
 - `data_fetcher.py`: Documentation fetching and search functions (async)
+- `constants.py`: Module/guide/addon lists, error code categories, URL configuration
 
 **Tools Provided**:
 | Tool | Description |
 |------|-------------|
-| `get_sdk_module_docs_tool` | Get documentation for Qiskit SDK modules (circuit, primitives, transpiler, quantum_info, result, visualization) |
+| `get_sdk_module_docs_tool` | Get documentation for Qiskit SDK modules (circuit, quantum_info, transpiler, synthesis, primitives, result, visualization, and more) |
+| `get_addon_docs_tool` | Get documentation for Qiskit addon packages (sqd, cutting, mpf, obp, aqc-tensor, utils) |
 | `get_guide_tool` | Get Qiskit guides and best practices (optimization, error-mitigation, dynamic-circuits, etc.) |
 | `search_docs_tool` | Search Qiskit documentation for relevant content |
+| `lookup_error_code_tool` | Look up a Qiskit/IBM Quantum error code (e.g., 1002, 7001, 8004) |
 
 **Resources Provided**:
 | Resource URI | Description |
@@ -209,27 +212,42 @@ Each MCP server follows this standard structure:
 | `qiskit-docs://modules` | List of all Qiskit SDK modules |
 | `qiskit-docs://addons` | List of all Qiskit addon modules and tutorials |
 | `qiskit-docs://guides` | List of Qiskit guides and best practices |
+| `qiskit-docs://error-codes` | List of Qiskit error code categories |
 
 **Environment Variables**:
 - `QISKIT_DOCS_BASE`: Base URL for Qiskit documentation (default: https://quantum.cloud.ibm.com/docs/)
 - `QISKIT_HTTP_TIMEOUT`: HTTP request timeout in seconds (default: 10.0)
 - `QISKIT_SEARCH_BASE_URL`: Search API base URL (default: https://quantum.cloud.ibm.com/)
 
-**Available Modules**:
+**Available Modules** (17 total, see `constants.py` for canonical list):
 - `circuit`: Quantum circuit construction and manipulation
-- `primitives`: Sampler and Estimator primitives
-- `transpiler`: Circuit transpilation and optimization
 - `quantum_info`: Quantum information theory utilities
+- `transpiler`: Circuit transpilation and optimization
+- `synthesis`: Circuit synthesis algorithms
+- `dagcircuit`: DAG representation of circuits
+- `passmanager`: Pass manager framework
+- `converters`: Circuit format converters
+- `compiler`: High-level compilation functions
+- `primitives`: Sampler and Estimator primitives
+- `providers`: Backend provider interfaces
 - `result`: Job result handling
 - `visualization`: Circuit and result visualization
+- `qasm2`: OpenQASM 2.0 import/export
+- `qasm3`: OpenQASM 3.0 import/export
+- `qpy`: Qiskit Python serialization format
+- `utils`: Utility functions
+- `exceptions`: Qiskit exception classes
 
-**Available Guides**:
-- `optimization`: Quantum optimization techniques
-- `quantum-circuits`: Circuit design patterns
-- `error-mitigation`: Error mitigation strategies
-- `dynamic-circuits`: Mid-circuit measurements and classical control
-- `parametric-compilation`: Parameterized circuit compilation
-- `performance-tuning`: Performance optimization tips
+**Available Guides** (~40 total, see `constants.py` for canonical list, key categories):
+- Getting started: `quick-start`
+- Circuit building: `construct-circuits`
+- Transpilation: `transpile`, `transpiler-stages`, `transpile-with-pass-managers`, `defaults-and-configuration-options`, `circuit-transpilation-settings`, `qiskit-transpiler-service`
+- Error handling: `error-mitigation-and-suppression-techniques`, `configure-error-mitigation`, `configure-error-suppression`
+- Execution: `primitives`, `execution-modes`, `runtime-options-overview`, `directed-execution-model`
+- Dynamic circuits: `dynamic-circuits`
+- Qiskit Functions: `functions`, `ibm-circuit-function`, `algorithmiq-tem`, `qedma-qesem`, `q-ctrl-performance-management`, and more
+- Application functions: `colibritd-pde`, `global-data-quantum-optimizer`, `qunova-chemistry`, `kipu-optimization`, and more
+- Security: `secure-data`, `support`
 
 **Features**:
 - Fuzzy matching for module/guide names (suggests corrections for typos)
@@ -471,6 +489,7 @@ AI Assistant → MCP Client → create_*_env_tool → start_training_tool
    uv run qiskit-code-assistant-mcp-server
    uv run qiskit-ibm-runtime-mcp-server
    uv run qiskit-ibm-transpiler-mcp-server
+   uv run qiskit-docs-mcp-server
    uv run qiskit-gym-mcp-server
    ```
 
@@ -741,6 +760,7 @@ When adding a new MCP server, you must update the following GitHub configuration
    | qiskit-code-assistant-mcp-server | `code-assistant*` |
    | qiskit-ibm-runtime-mcp-server | `runtime*` |
    | qiskit-ibm-transpiler-mcp-server | `transpiler*` |
+   | qiskit-docs-mcp-server | `docs*` |
    | qiskit-gym-mcp-server | `gym*` |
    | Meta-package | `meta*` |
 
@@ -885,7 +905,7 @@ Each server is also published to the [MCP Registry](https://registry.modelcontex
 
 **Automated publishing** (recommended):
 - Publishing happens automatically via GitHub Actions when a release is created
-- Uses the same release tags as PyPI (`qiskit-v*`, `code-assistant*`, `runtime*`, `transpiler*`, `gym*`)
+- Uses the same release tags as PyPI (`qiskit-v*`, `code-assistant*`, `runtime*`, `transpiler*`, `docs*`, `gym*`)
 - Uses GitHub OIDC authentication (no secrets required)
 
 **Manual publishing**:
@@ -926,6 +946,7 @@ Each server has a `server.json` file that defines its MCP Registry metadata:
 - `qiskit-code-assistant-mcp-server/README.md`: Code Assistant server docs
 - `qiskit-ibm-runtime-mcp-server/README.md`: IBM Runtime server docs
 - `qiskit-ibm-transpiler-mcp-server/README.md`: IBM Transpiler server docs
+- `qiskit-docs-mcp-server/README.md`: Documentation server docs
 - `qiskit-gym-mcp-server/README.md`: Qiskit Gym RL server docs
 
 ### GitHub Configuration
