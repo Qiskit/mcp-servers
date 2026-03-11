@@ -36,12 +36,13 @@ qiskit-mcp-servers is a collection of **Model Context Protocol (MCP)** servers t
 
 ### Repository Structure
 
-This is a **monorepo** using uv workspace containing five independent MCP servers:
+This is a **monorepo** using uv workspace containing six independent MCP servers:
 
 ```
 qiskit-mcp-servers/
 ├── qiskit-mcp-server/                       # Core Qiskit transpilation
 ├── qiskit-code-assistant-mcp-server/        # AI code completion
+├── qiskit-docs-mcp-server/                  # Documentation retrieval
 ├── qiskit-ibm-runtime-mcp-server/           # IBM Quantum cloud services
 ├── qiskit-ibm-transpiler-mcp-server/        # AI-powered transpilation
 ├── qiskit-gym-mcp-server/                   # RL-based circuit synthesis
@@ -72,6 +73,7 @@ The root `pyproject.toml` defines a uv workspace:
 members = [
     "qiskit-mcp-server",
     "qiskit-code-assistant-mcp-server",
+    "qiskit-docs-mcp-server",
     "qiskit-ibm-runtime-mcp-server",
     "qiskit-ibm-transpiler-mcp-server",
     "qiskit-gym-mcp-server",
@@ -80,7 +82,7 @@ members = [
 
 The root package is also a **meta-package** that installs all servers:
 ```bash
-pip install qiskit-mcp-servers  # Installs all four servers
+pip install qiskit-mcp-servers  # Installs all six servers
 ```
 
 ### Component Structure
@@ -184,7 +186,60 @@ Each MCP server follows this standard structure:
 
 ---
 
-### 3. Qiskit IBM Runtime MCP Server
+### 3. Qiskit Documentation MCP Server
+
+**Purpose**: Query and retrieve Qiskit documentation, guides, and API references
+
+**Directory**: [`qiskit-docs-mcp-server/`](qiskit-docs-mcp-server/)
+
+**Core Files**:
+- `server.py`: FastMCP server with tool/resource definitions
+- `data_fetcher.py`: Documentation fetching and search functions (async)
+
+**Tools Provided**:
+| Tool | Description |
+|------|-------------|
+| `get_sdk_module_docs_tool` | Get documentation for Qiskit SDK modules (circuit, primitives, transpiler, quantum_info, result, visualization) |
+| `get_guide_tool` | Get Qiskit guides and best practices (optimization, error-mitigation, dynamic-circuits, etc.) |
+| `search_docs_tool` | Search Qiskit documentation for relevant content |
+
+**Resources Provided**:
+| Resource URI | Description |
+|--------------|-------------|
+| `qiskit-docs://modules` | List of all Qiskit SDK modules |
+| `qiskit-docs://addons` | List of all Qiskit addon modules and tutorials |
+| `qiskit-docs://guides` | List of Qiskit guides and best practices |
+
+**Environment Variables**:
+- `QISKIT_DOCS_BASE`: Base URL for Qiskit documentation (default: https://quantum.cloud.ibm.com/docs/)
+- `QISKIT_HTTP_TIMEOUT`: HTTP request timeout in seconds (default: 10.0)
+- `QISKIT_SEARCH_BASE_URL`: Search API base URL (default: https://quantum.cloud.ibm.com/)
+
+**Available Modules**:
+- `circuit`: Quantum circuit construction and manipulation
+- `primitives`: Sampler and Estimator primitives
+- `transpiler`: Circuit transpilation and optimization
+- `quantum_info`: Quantum information theory utilities
+- `result`: Job result handling
+- `visualization`: Circuit and result visualization
+
+**Available Guides**:
+- `optimization`: Quantum optimization techniques
+- `quantum-circuits`: Circuit design patterns
+- `error-mitigation`: Error mitigation strategies
+- `dynamic-circuits`: Mid-circuit measurements and classical control
+- `parametric-compilation`: Parameterized circuit compilation
+- `performance-tuning`: Performance optimization tips
+
+**Features**:
+- Fuzzy matching for module/guide names (suggests corrections for typos)
+- Converts HTML documentation to Markdown format
+- Includes metadata (URLs, timestamps, content length)
+- No authentication required (public documentation)
+
+---
+
+### 4. Qiskit IBM Runtime MCP Server
 
 **Purpose**: Complete access to IBM Quantum cloud services
 
@@ -221,7 +276,7 @@ Each MCP server follows this standard structure:
 
 ---
 
-### 4. Qiskit IBM Transpiler MCP Server
+### 5. Qiskit IBM Transpiler MCP Server
 
 **Purpose**: AI-powered circuit transpilation with routing and synthesis
 
@@ -252,7 +307,7 @@ Each MCP server follows this standard structure:
 
 ---
 
-### 5. Qiskit Gym MCP Server
+### 6. Qiskit Gym MCP Server
 
 **Purpose**: Reinforcement learning-based quantum circuit synthesis
 
@@ -330,6 +385,17 @@ AI Assistant → MCP Client → get_completion_tool
                     IBM Qiskit Code Assistant API
                                   ↓
                         Code completion response
+```
+
+### Qiskit Documentation Server
+```
+AI Assistant → MCP Client → get_sdk_module_docs_tool / search_docs_tool
+                                  ↓
+                       data_fetcher.py (async functions)
+                                  ↓
+                         Qiskit Documentation Website
+                                  ↓
+                    Markdown-formatted documentation
 ```
 
 ### IBM Runtime Server

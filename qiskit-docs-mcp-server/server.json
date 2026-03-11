@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Qiskit/qiskit-docs-mcp-server",
+  "title": "Qiskit Documentation MCP Server",
+  "description": "MCP server for querying and retrieving Qiskit documentation, guides, and API references",
+  "version": "0.1.0",
+  "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-docs-mcp-server",
+  "repository": {
+    "url": "https://github.com/Qiskit/mcp-servers",
+    "source": "github",
+    "id": "1051018539",
+    "subfolder": "qiskit-docs-mcp-server"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "qiskit-docs-mcp-server",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "QISKIT_DOCS_BASE",
+          "description": "Base URL for Qiskit documentation",
+          "default": "https://quantum.cloud.ibm.com/docs/"
+        },
+        {
+          "name": "QISKIT_HTTP_TIMEOUT",
+          "description": "HTTP request timeout in seconds",
+          "default": "10.0"
+        }
+      ]
+    }
+  ]
+}
