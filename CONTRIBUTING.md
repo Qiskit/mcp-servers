@@ -35,6 +35,8 @@ Before you begin, ensure you have the following installed:
    # OR
    cd qiskit-ibm-transpiler-mcp-server
    # OR
+   cd qiskit-docs-mcp-server
+   # OR
    cd qiskit-gym-mcp-server
    ```
 
@@ -43,9 +45,9 @@ Before you begin, ensure you have the following installed:
    uv sync --group dev --group test
    ```
 
-4. **Configure environment variables**:
+4. **Configure environment variables** (if the server requires authentication):
    ```bash
-   cp .env.example .env
+   cp .env.example .env  # where available
    # Edit .env and add your IBM Quantum API token
    ```
 
@@ -58,6 +60,8 @@ Before you begin, ensure you have the following installed:
    uv run qiskit-ibm-runtime-mcp-server
    # OR
    uv run qiskit-ibm-transpiler-mcp-server
+   # OR
+   uv run qiskit-docs-mcp-server
    # OR
    uv run qiskit-gym-mcp-server
    ```
@@ -146,7 +150,7 @@ git commit -m "fix: description of bug that was fixed"
 ### Python Standards
 
 - **Python version**: 3.10+ features allowed
-- **Async/await**: Primary implementation for all MCP operations, with sync wrappers in `sync.py`
+- **Async/await**: Primary implementation for all MCP operations
 - **Type hints**: Required (mypy strict mode)
 - **Naming**: `snake_case` for functions/variables, `PascalCase` for classes
 - **Docstrings**: Google style for public functions
@@ -157,7 +161,7 @@ git commit -m "fix: description of bug that was fixed"
 - Tools are defined with `@mcp.tool()` decorator
 - Resources are defined with `@mcp.resource()` decorator
 - Async functions for all MCP handlers
-- Synchronous wrappers go in `sync.py` for DSPy/Jupyter compatibility
+- Use `nest_asyncio` when synchronous wrappers are needed for DSPy/Jupyter compatibility
 
 ### Error Handling
 
@@ -184,6 +188,7 @@ qiskit-mcp-servers/
 ├── qiskit-code-assistant-mcp-server/    # AI code completion server
 ├── qiskit-ibm-runtime-mcp-server/       # IBM Quantum cloud services
 ├── qiskit-ibm-transpiler-mcp-server/    # AI-powered transpilation
+├── qiskit-docs-mcp-server/              # Documentation retrieval
 ├── qiskit-gym-mcp-server/               # RL-based circuit synthesis (community)
 ├── README.md                            # Main documentation
 ├── CONTRIBUTING.md                      # This file
@@ -199,7 +204,6 @@ Each server follows this structure:
 │   ├── __init__.py          # Main entry point
 │   ├── server.py            # FastMCP server definition
 │   ├── <core>.py            # Core async functionality
-│   ├── sync.py              # Synchronous wrappers
 │   └── utils.py             # Utilities (optional)
 ├── tests/
 │   ├── conftest.py          # Test fixtures
@@ -230,22 +234,6 @@ async def my_new_tool(param: str) -> dict:
 async def my_resource() -> str:
     """Resource description."""
     return "resource content"
-```
-
-### Adding Synchronous Wrappers
-
-```python
-# In sync.py
-import nest_asyncio
-import asyncio
-from .core_module import async_function
-
-nest_asyncio.apply()
-
-def function_name_sync(*args, **kwargs):
-    """Synchronous wrapper for DSPy/Jupyter."""
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(async_function(*args, **kwargs))
 ```
 
 ## Getting Help

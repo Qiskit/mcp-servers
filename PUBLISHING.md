@@ -10,8 +10,9 @@ This repository contains multiple PyPI packages:
 2. **qiskit-code-assistant-mcp-server** - MCP server for Qiskit Code Assistant
 3. **qiskit-ibm-runtime-mcp-server** - MCP server for IBM Quantum Runtime
 4. **qiskit-ibm-transpiler-mcp-server** - MCP server for transpilation using the AI-powered transpiler passes.
-5. **qiskit-gym-mcp-server** - MCP server for qiskit-gym reinforcement learning circuit synthesis
-6. **qiskit-mcp-servers** - Meta-package that installs all MCP servers
+5. **qiskit-docs-mcp-server** - MCP server for Qiskit documentation retrieval and search
+6. **qiskit-gym-mcp-server** - MCP server for qiskit-gym reinforcement learning circuit synthesis
+7. **qiskit-mcp-servers** - Meta-package that installs all MCP servers
 
 ### Meta-Package
 
@@ -26,6 +27,7 @@ pip install qiskit-mcp-servers[qiskit]           # Only Qiskit
 pip install qiskit-mcp-servers[code-assistant]   # Only Code Assistant
 pip install qiskit-mcp-servers[runtime]          # Only Runtime
 pip install qiskit-mcp-servers[transpiler]       # Only Transpiler
+pip install qiskit-mcp-servers[docs]             # Only Docs
 pip install qiskit-mcp-servers[gym]              # Only Gym (community)
 ```
 
@@ -62,11 +64,12 @@ Alternatively, you can create releases manually through the GitHub web interface
    - For `qiskit-code-assistant-mcp-server`: https://pypi.org/manage/project/qiskit-code-assistant-mcp-server/settings/publishing/
    - For `qiskit-ibm-runtime-mcp-server`: https://pypi.org/manage/project/qiskit-ibm-runtime-mcp-server/settings/publishing/
    - For `qiskit-ibm-transpiler-mcp-server`: https://pypi.org/manage/project/qiskit-ibm-transpiler-mcp-server/settings/publishing/
+   - For `qiskit-docs-mcp-server`: https://pypi.org/manage/project/qiskit-docs-mcp-server/settings/publishing/
    - For `qiskit-gym-mcp-server`: https://pypi.org/manage/project/qiskit-gym-mcp-server/settings/publishing/
    - For `qiskit-mcp-servers`: https://pypi.org/manage/project/qiskit-mcp-servers/settings/publishing/
 
 2. Add a "trusted publisher" with these settings:
-   - **PyPI Project Name**: `qiskit-mcp-server` (or `qiskit-code-assistant-mcp-server`, `qiskit-ibm-runtime-mcp-server`, `qiskit-ibm-transpiler-mcp-server`, `qiskit-gym-mcp-server`, or `qiskit-mcp-servers`)
+   - **PyPI Project Name**: `qiskit-mcp-server` (or `qiskit-code-assistant-mcp-server`, `qiskit-ibm-runtime-mcp-server`, `qiskit-ibm-transpiler-mcp-server`, `qiskit-docs-mcp-server`, `qiskit-gym-mcp-server`, or `qiskit-mcp-servers`)
    - **Owner**: `Qiskit`
    - **Repository**: `mcp-servers`
    - **Workflow name**: `publish-pypi.yml`
@@ -84,6 +87,7 @@ The workflow automatically publishes when you create a GitHub release. The tag n
 | `code-assistant-v*` | qiskit-code-assistant-mcp-server |
 | `runtime-v*` | qiskit-ibm-runtime-mcp-server |
 | `transpiler-v*` | qiskit-ibm-transpiler-mcp-server |
+| `docs-v*` | qiskit-docs-mcp-server |
 | `gym-v*` | qiskit-gym-mcp-server |
 | `meta-v*` | qiskit-mcp-servers (meta-package) |
 
@@ -98,6 +102,7 @@ Edit the version in the appropriate `pyproject.toml`:
 - **Code Assistant**: `qiskit-code-assistant-mcp-server/pyproject.toml`
 - **Runtime**: `qiskit-ibm-runtime-mcp-server/pyproject.toml`
 - **Transpiler**: `qiskit-ibm-transpiler-mcp-server/pyproject.toml`
+- **Docs**: `qiskit-docs-mcp-server/pyproject.toml`
 - **Gym**: `qiskit-gym-mcp-server/pyproject.toml`
 - **Meta-package**: `pyproject.toml` (root)
 
@@ -167,6 +172,14 @@ git tag -a transpiler-v0.1.0 -m "Release v0.1.0" && git push origin transpiler-v
 gh release create transpiler-v0.1.0 --title "qiskit-ibm-transpiler-mcp-server v0.1.0" --generate-notes
 ```
 
+**Docs Server:**
+```bash
+# After updating version in qiskit-docs-mcp-server/pyproject.toml
+git add -A && git commit -m "Bump docs to v0.1.0" && git push origin main
+git tag -a docs-v0.1.0 -m "Release v0.1.0" && git push origin docs-v0.1.0
+gh release create docs-v0.1.0 --title "qiskit-docs-mcp-server v0.1.0" --generate-notes
+```
+
 **Gym Server:**
 ```bash
 # After updating version in qiskit-gym-mcp-server/pyproject.toml
@@ -203,6 +216,9 @@ gh workflow run "Publish to PyPI" -f package=runtime
 # Publish only transpiler
 gh workflow run "Publish to PyPI" -f package=transpiler
 
+# Publish only docs
+gh workflow run "Publish to PyPI" -f package=docs
+
 # Publish only gym
 gh workflow run "Publish to PyPI" -f package=gym
 
@@ -214,7 +230,7 @@ Alternatively, you can trigger via the GitHub web interface:
 
 1. Go to **Actions** → **Publish to PyPI**
 2. Click **Run workflow**
-3. Select which package to publish: `all`, `meta-package`, `qiskit`, `code-assistant`, `runtime`, `transpiler`, or `gym`
+3. Select which package to publish: `all`, `meta-package`, `qiskit`, `code-assistant`, `runtime`, `transpiler`, `docs`, or `gym`
 
 ## Manual Publishing
 
@@ -241,6 +257,7 @@ Edit the version in `pyproject.toml`:
 - **Code Assistant**: `qiskit-code-assistant-mcp-server/pyproject.toml`
 - **Runtime**: `qiskit-ibm-runtime-mcp-server/pyproject.toml`
 - **Transpiler**: `qiskit-ibm-transpiler-mcp-server/pyproject.toml`
+- **Docs**: `qiskit-docs-mcp-server/pyproject.toml`
 - **Gym**: `qiskit-gym-mcp-server/pyproject.toml`
 - **Meta-package**: `pyproject.toml` (root)
 
@@ -282,6 +299,17 @@ python -m build
 **For Transpiler:**
 ```bash
 cd qiskit-ibm-transpiler-mcp-server
+
+# Build with uv (recommended)
+uv build
+
+# Or with build
+python -m build
+```
+
+**For Docs:**
+```bash
+cd qiskit-docs-mcp-server
 
 # Build with uv (recommended)
 uv build
@@ -339,6 +367,8 @@ pip install --index-url https://test.pypi.org/simple/ qiskit-ibm-runtime-mcp-ser
 # or
 pip install --index-url https://test.pypi.org/simple/ qiskit-ibm-transpiler-mcp-server
 # or
+pip install --index-url https://test.pypi.org/simple/ qiskit-docs-mcp-server
+# or
 pip install --index-url https://test.pypi.org/simple/ qiskit-gym-mcp-server
 ```
 
@@ -368,6 +398,9 @@ pip install qiskit-ibm-runtime-mcp-server
 # For Transpiler
 pip install qiskit-ibm-transpiler-mcp-server
 
+# For Docs
+pip install qiskit-docs-mcp-server
+
 # For Gym
 pip install qiskit-gym-mcp-server
 
@@ -379,7 +412,7 @@ pip install qiskit-mcp-servers
 
 ### Versioning Strategy
 
-Both packages use **semantic versioning**: `MAJOR.MINOR.PATCH`
+All packages use **semantic versioning**: `MAJOR.MINOR.PATCH`
 
 - **MAJOR**: Breaking changes to the API
 - **MINOR**: New features, backward compatible
@@ -393,6 +426,7 @@ The current version for each package is defined in their respective `pyproject.t
 - **qiskit-code-assistant-mcp-server**: See [qiskit-code-assistant-mcp-server/pyproject.toml](qiskit-code-assistant-mcp-server/pyproject.toml) (search for `version =`)
 - **qiskit-ibm-runtime-mcp-server**: See [qiskit-ibm-runtime-mcp-server/pyproject.toml](qiskit-ibm-runtime-mcp-server/pyproject.toml) (search for `version =`)
 - **qiskit-ibm-transpiler-mcp-server**: See [qiskit-ibm-transpiler-mcp-server/pyproject.toml](qiskit-ibm-transpiler-mcp-server/pyproject.toml) (search for `version =`)
+- **qiskit-docs-mcp-server**: See [qiskit-docs-mcp-server/pyproject.toml](qiskit-docs-mcp-server/pyproject.toml) (search for `version =`)
 - **qiskit-gym-mcp-server**: See [qiskit-gym-mcp-server/pyproject.toml](qiskit-gym-mcp-server/pyproject.toml) (search for `version =`)
 - **qiskit-mcp-servers**: See [pyproject.toml](pyproject.toml) (search for `version =`)
 
@@ -436,7 +470,7 @@ password = pypi-YOUR-API-TOKEN-HERE
 
 Make sure you're running build commands from the package directory:
 ```bash
-cd qiskit-mcp-server  # or qiskit-code-assistant-mcp-server, qiskit-ibm-runtime-mcp-server, qiskit-gym-mcp-server, etc.
+cd qiskit-mcp-server  # or qiskit-code-assistant-mcp-server, qiskit-docs-mcp-server, qiskit-gym-mcp-server, etc.
 uv build
 ```
 
@@ -467,6 +501,7 @@ gh workflow run "Publish to MCP Registry" -f package=qiskit
 gh workflow run "Publish to MCP Registry" -f package=code-assistant
 gh workflow run "Publish to MCP Registry" -f package=runtime
 gh workflow run "Publish to MCP Registry" -f package=transpiler
+gh workflow run "Publish to MCP Registry" -f package=docs
 gh workflow run "Publish to MCP Registry" -f package=gym
 ```
 

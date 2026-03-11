@@ -94,7 +94,7 @@ From the repository root, install all example dependencies (including the MCP se
 uv sync --group examples
 ```
 
-This installs `deepagents`, `langchain`, `langchain-mcp-adapters`, `langchain-anthropic`, `scipy`, and all Qiskit MCP servers.
+This installs `deepagents`, `langchain`, `langchain-mcp-adapters`, `langchain-anthropic`, and all Qiskit MCP servers. For the full QV protocol (`--num-circuits`), also install `scipy`: `pip install scipy`.
 
 ### Environment Variables
 
@@ -251,4 +251,6 @@ Each MCP server has simpler examples in its own directory:
 - [`qiskit-mcp-server/examples/`](../qiskit-mcp-server/examples/) - Local transpilation
 - [`qiskit-ibm-runtime-mcp-server/examples/`](../qiskit-ibm-runtime-mcp-server/examples/) - IBM Quantum Runtime
 - [`qiskit-ibm-transpiler-mcp-server/examples/`](../qiskit-ibm-transpiler-mcp-server/examples/) - AI transpilation
+- [`qiskit-docs-mcp-server/examples/`](../qiskit-docs-mcp-server/examples/) - Documentation retrieval
 - [`qiskit-code-assistant-mcp-server/examples/`](../qiskit-code-assistant-mcp-server/examples/) - Code generation
+- [`qiskit-gym-mcp-server/examples/`](../qiskit-gym-mcp-server/examples/) - RL-based circuit synthesis (community)
