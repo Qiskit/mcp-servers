@@ -476,7 +476,7 @@ def load_circuit_from_qasm(qasm_string: str, qasm_version: QasmVersion = "auto")
                 "status": "error",
                 "message": f"QASM 3.0 parsing failed: {e}",
             }
-    elif qasm_version == "2.0":
+    else:  # qasm_version == "2.0"
         try:
             circuit = qasm2_loads(qasm_string)
             version_detected = "2.0"
@@ -485,11 +485,6 @@ def load_circuit_from_qasm(qasm_string: str, qasm_version: QasmVersion = "auto")
                 "status": "error",
                 "message": f"QASM 2.0 parsing failed: {e}",
             }
-    else:
-        return {
-            "status": "error",
-            "message": f"Invalid qasm_version: {qasm_version}. Must be 'auto', '2.0', or '3.0'.",
-        }
 
     try:
         circuit_qpy = dump_qpy_circuit(circuit)
@@ -532,13 +527,8 @@ def export_circuit_to_qasm(
     try:
         if qasm_version == "3.0":
             qasm_string = qasm3_dumps(circuit)
-        elif qasm_version == "2.0":
+        else:  # qasm_version == "2.0"
             qasm_string = qasm2_dumps(circuit)
-        else:
-            return {
-                "status": "error",
-                "message": f"Invalid qasm_version: {qasm_version}. Must be '2.0' or '3.0'.",
-            }
     except Exception as e:
         return {
             "status": "error",
