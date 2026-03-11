@@ -29,6 +29,7 @@ from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_mcp_server.circuit_serialization import (
     CircuitFormat,
     dump_circuit,
+    get_circuit_metadata,
     load_circuit,
 )
 from qiskit_mcp_server.utils import with_sync
@@ -131,26 +132,10 @@ def _circuit_to_dict(circuit: QuantumCircuit) -> dict[str, Any]:
     Returns:
         Dictionary with circuit information including QPY serialization
     """
-    # Get operation counts
-    op_counts: dict[str, int] = {}
-    for instruction in circuit.data:
-        op_name = instruction.operation.name
-        op_counts[op_name] = op_counts.get(op_name, 0) + 1
-
-    # Calculate depth
-    depth = circuit.depth()
-
-    # Serialize circuit in QPY format (source of truth)
+    metadata = get_circuit_metadata(circuit)
     qpy_str = dump_circuit(circuit, circuit_format="qpy")
-
     return {
-        "num_qubits": circuit.num_qubits,
-        "num_clbits": circuit.num_clbits,
-        "depth": depth,
-        "size": circuit.size(),
-        "width": circuit.width(),
-        "operation_counts": op_counts,
-        "total_operations": sum(op_counts.values()),
+        **metadata,
         "circuit_qpy": qpy_str,  # QPY format (use for chaining tools/servers)
     }
 
