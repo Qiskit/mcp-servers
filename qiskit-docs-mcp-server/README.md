@@ -23,23 +23,26 @@ The Qiskit Documentation MCP Server provides AI assistants and agents with seaml
 
 ### Tools
 
-The server implements three tools for documentation access:
+The server implements five tools for documentation access:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `get_sdk_module_docs_tool` | Get documentation for Qiskit SDK modules | `module`: Module name (circuit, primitives, transpiler, quantum_info, result, visualization) |
+| `get_addon_docs_tool` | Get documentation for Qiskit addon packages | `addon`: Addon name (e.g., sqd, cutting, mpf, obp, aqc-tensor) |
 | `get_guide_tool` | Get Qiskit implementation guides and best practices | `guide`: Guide name (optimization, quantum-circuits, error-mitigation, dynamic-circuits, parametric-compilation, performance-tuning) |
 | `search_docs_tool` | Search Qiskit documentation for relevant content | `query`: Search query string<br>`module`: Search scope (default: "documentation") |
+| `lookup_error_code_tool` | Look up a Qiskit/IBM Quantum error code | `code`: 4-digit error code (e.g., 1002, 7001, 8004) |
 
 ### Resources
 
-The server provides three resources for listing available documentation:
+The server provides four resources for listing available documentation:
 
 | Resource URI | Description |
 |--------------|-------------|
 | `qiskit-docs://modules` | List of all Qiskit SDK modules with descriptions |
 | `qiskit-docs://addons` | List of Qiskit addon modules and tutorials |
 | `qiskit-docs://guides` | List of implementation guides and best practices |
+| `qiskit-docs://error-codes` | List of Qiskit error code categories |
 
 ## Prerequisites
 

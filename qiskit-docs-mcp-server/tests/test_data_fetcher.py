@@ -23,11 +23,16 @@ from qiskit_docs_mcp_server.constants import (
 )
 from qiskit_docs_mcp_server.data_fetcher import (
     _find_similar,
+    convert_html_to_markdown,
     fetch_text,
     fetch_text_json,
     get_addon_docs,
     get_component_docs,
     get_guide_docs,
+    get_list_of_addons,
+    get_list_of_error_code_categories,
+    get_list_of_guides,
+    get_list_of_modules,
     lookup_error_code,
     search_qiskit_docs,
 )
@@ -290,12 +295,28 @@ class TestSearchQiskitDocs:
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
     async def test_search_qiskit_docs_fetch_fails(self, mock_fetch):
-        """Test search when fetch fails."""
+        """Test search when fetch fails returns error status."""
         mock_fetch.return_value = None
         result = await search_qiskit_docs("circuit")
+        assert result["status"] == "error"
+        assert "Failed to search" in result["message"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_qiskit_docs_empty_results(self, mock_fetch):
+        """Test search with empty results list."""
+        mock_fetch.return_value = []
+        result = await search_qiskit_docs("nonexistent")
         assert result["status"] == "success"
         assert result["results"] == []
         assert result["total_results"] == 0
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_qiskit_docs_url_encodes_query(self, mock_fetch):
+        """Test that search query is URL-encoded."""
+        mock_fetch.return_value = []
+        await search_qiskit_docs("error mitigation")
+        call_url = mock_fetch.call_args[0][0]
+        assert "error%20mitigation" in call_url
 
 
 class TestFuzzyMatching:
@@ -615,3 +636,86 @@ class TestGetAddonDocs:
             result = await get_addon_docs(addon)
             assert result["status"] == "success"
             assert result["addon"] == addon
+
+
+class TestConvertHtmlToMarkdown:
+    """Test convert_html_to_markdown function."""
+
+    def test_basic_html(self):
+        """Test conversion of basic HTML tags."""
+        html = "<h1>Title</h1><p>Paragraph text.</p>"
+        result = convert_html_to_markdown(html)
+        assert "Title" in result
+        assert "Paragraph text." in result
+
+    def test_links_preserved(self):
+        """Test that links are preserved in markdown output."""
+        html = '<a href="https://example.com">Click here</a>'
+        result = convert_html_to_markdown(html)
+        assert "https://example.com" in result
+        assert "Click here" in result
+
+    def test_empty_html(self):
+        """Test conversion of empty HTML."""
+        result = convert_html_to_markdown("")
+        assert result.strip() == ""
+
+    def test_nested_html(self):
+        """Test conversion of nested HTML structures."""
+        html = "<div><ul><li>Item 1</li><li>Item 2</li></ul></div>"
+        result = convert_html_to_markdown(html)
+        assert "Item 1" in result
+        assert "Item 2" in result
+
+    def test_code_blocks(self):
+        """Test conversion of code blocks."""
+        html = "<pre><code>print('hello')</code></pre>"
+        result = convert_html_to_markdown(html)
+        assert "print('hello')" in result
+
+    def test_table_html(self):
+        """Test conversion of HTML tables."""
+        html = "<table><tr><td>1002</td><td>Error message</td></tr></table>"
+        result = convert_html_to_markdown(html)
+        assert "1002" in result
+        assert "Error message" in result
+
+
+class TestListHelpers:
+    """Test list helper functions."""
+
+    def test_get_list_of_modules(self):
+        """Test get_list_of_modules returns correct structure."""
+        result = get_list_of_modules()
+        assert result["status"] == "success"
+        assert "modules" in result
+        assert isinstance(result["modules"], list)
+        assert len(result["modules"]) > 0
+        assert "circuit" in result["modules"]
+
+    def test_get_list_of_addons(self):
+        """Test get_list_of_addons returns correct structure."""
+        result = get_list_of_addons()
+        assert result["status"] == "success"
+        assert "addons" in result
+        assert isinstance(result["addons"], list)
+        assert len(result["addons"]) > 0
+        assert "sqd" in result["addons"]
+
+    def test_get_list_of_guides(self):
+        """Test get_list_of_guides returns correct structure."""
+        result = get_list_of_guides()
+        assert result["status"] == "success"
+        assert "guides" in result
+        assert isinstance(result["guides"], list)
+        assert len(result["guides"]) > 0
+        assert "quick-start" in result["guides"]
+
+    def test_get_list_of_error_code_categories(self):
+        """Test get_list_of_error_code_categories returns correct structure."""
+        result = get_list_of_error_code_categories()
+        assert result["status"] == "success"
+        assert "categories" in result
+        assert isinstance(result["categories"], dict)
+        assert "registry_url" in result
+        assert "errors" in result["registry_url"]
