@@ -15,6 +15,7 @@ import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote
 
 import html2text
 import httpx
@@ -147,7 +148,7 @@ async def get_component_docs(component: str) -> dict[str, Any]:
             "status": "error",
             "message": f"Failed to fetch documentation for component '{component}'.",
         }
-    
+
     return {
         "status": "success",
         "module": component,
@@ -186,7 +187,7 @@ async def get_guide_docs(guide: str) -> dict[str, Any]:
     logger.info(f"Fetching style docs for {guide} from {url}")
     html = await fetch_text(url)
     docs = convert_html_to_markdown(html) if html else None
-    
+
     if docs is None:
         return {
             "status": "error",
@@ -217,18 +218,27 @@ async def search_qiskit_docs(query: str, module: str = "documentation") -> dict[
     Returns:
         Search results with matching entries, total count, and metadata
     """
-
-    url = f"{BASE_URL}{SEARCH_PATH}?query={query}&module={module}"
-    logger.info(f"Querying from {query} which gives {url} from {module}")
+    url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(module)}"
+    logger.info(f"Searching docs for '{query}' in module '{module}'")
 
     results = await fetch_text_json(url)
+
+    if results is None:
+        return {
+            "status": "error",
+            "message": f"Failed to search documentation for query '{query}'.",
+            "metadata": {
+                "url": url,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        }
 
     return {
         "status": "success",
         "query": query,
         "module": module,
-        "results": results if results else [],
-        "total_results": len(results) if results else 0,
+        "results": results,
+        "total_results": len(results),
         "metadata": {
             "url": url,
             "timestamp": datetime.now(timezone.utc).isoformat(),

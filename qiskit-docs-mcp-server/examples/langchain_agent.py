@@ -240,9 +240,7 @@ async def interactive_mode(provider: str = "openai", model: str | None = None):
                 print(f"\n❌ Error: {e}")
 
 
-async def single_query_mode(
-    query: str, provider: str = "openai", model: str | None = None
-):
+async def single_query_mode(query: str, provider: str = "openai", model: str | None = None):
     """
     Run a single query and exit.
 
@@ -268,18 +266,14 @@ async def single_query_mode(
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="LangChain Agent with Qiskit Docs MCP Server"
-    )
+    parser = argparse.ArgumentParser(description="LangChain Agent with Qiskit Docs MCP Server")
     parser.add_argument(
         "--provider",
         choices=["openai", "anthropic", "ollama", "google", "watsonx"],
         default="openai",
         help="LLM provider to use (default: openai)",
     )
-    parser.add_argument(
-        "--model", type=str, help="Model name (overrides provider default)"
-    )
+    parser.add_argument("--model", type=str, help="Model name (overrides provider default)")
     parser.add_argument(
         "--single",
         action="store_true",
