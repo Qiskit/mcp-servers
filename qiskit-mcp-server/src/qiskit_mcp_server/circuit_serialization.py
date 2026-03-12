@@ -56,8 +56,10 @@ import logging
 from typing import Any, Literal
 
 from qiskit import QuantumCircuit, qpy
-from qiskit.qasm2 import dumps as qasm2_dumps, loads as qasm2_loads
-from qiskit.qasm3 import dumps as qasm3_dumps, loads as qasm3_loads
+from qiskit.qasm2 import dumps as qasm2_dumps
+from qiskit.qasm2 import loads as qasm2_loads
+from qiskit.qasm3 import dumps as qasm3_dumps
+from qiskit.qasm3 import loads as qasm3_loads
 
 
 logger = logging.getLogger(__name__)
