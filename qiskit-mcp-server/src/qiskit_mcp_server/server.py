@@ -29,7 +29,15 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from qiskit_mcp_server.circuit_serialization import CircuitFormat, qasm3_to_qpy, qpy_to_qasm3
+from qiskit_mcp_server.circuit_serialization import (
+    CircuitFormat,
+    ExportQasmVersion,
+    QasmVersion,
+    export_circuit_to_qasm,
+    load_circuit_from_qasm,
+    qasm3_to_qpy,
+    qpy_to_qasm3,
+)
 from qiskit_mcp_server.transpiler import (
     analyze_circuit,
     compare_optimization_levels,
@@ -184,6 +192,54 @@ async def convert_qasm3_to_qpy_tool(
         Dict with 'status' and 'circuit_qpy' (base64-encoded QPY string).
     """
     return qasm3_to_qpy(circuit_qasm)
+
+
+@mcp.tool()
+async def load_circuit_from_qasm_tool(
+    qasm_string: str,
+    qasm_version: QasmVersion = "auto",
+) -> dict[str, Any]:
+    """Load a quantum circuit from an OpenQASM 2.0 or 3.0 string.
+
+    Parses the QASM input, returns the circuit as base64-encoded QPY along with
+    metadata (qubit count, gate counts, depth) so you can reason about the circuit
+    before deciding what to do next.
+
+    Args:
+        qasm_string: The OpenQASM source code (2.0 or 3.0)
+        qasm_version: Which parser to use:
+            - "auto" (default): Try QASM 3.0 first, fall back to QASM 2.0
+            - "3.0": Only use the QASM 3.0 parser
+            - "2.0": Only use the QASM 2.0 parser
+
+    Returns:
+        Dict with 'status', 'circuit_qpy' (base64-encoded QPY), 'qasm_version_detected',
+        'num_qubits', 'num_clbits', 'depth', 'size', 'width', 'operation_counts', and 'total_operations'.
+    """
+    return load_circuit_from_qasm(qasm_string, qasm_version=qasm_version)
+
+
+@mcp.tool()
+async def export_circuit_to_qasm_tool(
+    circuit_qpy: str,
+    qasm_version: ExportQasmVersion = "3.0",
+) -> dict[str, Any]:
+    """Export a Qiskit circuit to OpenQASM format.
+
+    Converts a base64-encoded QPY circuit to human-readable OpenQASM text.
+    Supports both QASM 3.0 and QASM 2.0 output. Note that some circuits with
+    non-standard gates may not be expressible in QASM 2.0.
+
+    Args:
+        circuit_qpy: Base64-encoded QPY circuit string (from other tool outputs)
+        qasm_version: Target QASM version:
+            - "3.0" (default): Export as OpenQASM 3.0
+            - "2.0": Export as OpenQASM 2.0
+
+    Returns:
+        Dict with 'status', 'qasm_string', 'qasm_version', 'num_qubits', and 'depth'.
+    """
+    return export_circuit_to_qasm(circuit_qpy, qasm_version=qasm_version)
 
 
 # Resources - Static metadata accessible without tool calls

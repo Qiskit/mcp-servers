@@ -55,7 +55,9 @@ import io
 import logging
 from typing import Any, Literal
 
-from qiskit import QuantumCircuit, qasm2, qpy
+from qiskit import QuantumCircuit, qpy
+from qiskit.qasm2 import dumps as qasm2_dumps
+from qiskit.qasm2 import loads as qasm2_loads
 from qiskit.qasm3 import dumps as qasm3_dumps
 from qiskit.qasm3 import loads as qasm3_loads
 
@@ -155,7 +157,7 @@ def load_qasm_circuit(qasm_string: str) -> dict[str, Any]:
 
     # Fall back to QASM2
     try:
-        circuit = qasm2.loads(qasm_string)
+        circuit = qasm2_loads(qasm_string)
         return {"status": "success", "circuit": circuit}
     except Exception as qasm2_error:
         qasm2_error_msg = str(qasm2_error)
@@ -397,3 +399,146 @@ def qasm3_to_qpy(qasm_string: str) -> dict[str, Any]:
             "status": "error",
             "message": f"Failed to convert circuit to QPY: {e}",
         }
+
+
+def get_circuit_metadata(circuit: QuantumCircuit) -> dict[str, Any]:
+    """Extract metadata from a quantum circuit.
+
+    Args:
+        circuit: The quantum circuit to analyze.
+
+    Returns:
+        Dictionary with num_qubits, num_clbits, depth, size, width,
+        operation_counts, and total_operations.
+    """
+    op_counts: dict[str, int] = {}
+    for instruction in circuit.data:
+        name = instruction.operation.name
+        op_counts[name] = op_counts.get(name, 0) + 1
+
+    return {
+        "num_qubits": circuit.num_qubits,
+        "num_clbits": circuit.num_clbits,
+        "depth": circuit.depth(),
+        "size": circuit.size(),
+        "width": circuit.width(),
+        "operation_counts": op_counts,
+        "total_operations": sum(op_counts.values()),
+    }
+
+
+QasmVersion = Literal["auto", "2.0", "3.0"]
+ExportQasmVersion = Literal["2.0", "3.0"]
+
+
+def load_circuit_from_qasm(qasm_string: str, qasm_version: QasmVersion = "auto") -> dict[str, Any]:
+    """Load a quantum circuit from an OpenQASM string with version selection and metadata.
+
+    Args:
+        qasm_string: The OpenQASM source code (2.0 or 3.0).
+        qasm_version: Which parser to use:
+            - "auto" (default): Try QASM 3.0 first, fall back to QASM 2.0
+            - "3.0": Only try QASM 3.0 parser
+            - "2.0": Only try QASM 2.0 parser
+
+    Returns:
+        Dictionary with status, circuit_qpy, qasm_version_detected,
+        num_qubits, num_clbits, depth, size, width, operation_counts, total_operations.
+    """
+    circuit = None
+    version_detected = None
+
+    if qasm_version == "auto":
+        # Try QASM 3.0 first, fall back to QASM 2.0
+        try:
+            circuit = qasm3_loads(qasm_string)
+            version_detected = "3.0"
+        except Exception as qasm3_error:
+            logger.debug(f"QASM3 parsing failed: {qasm3_error}, trying QASM2")
+            try:
+                circuit = qasm2_loads(qasm_string)
+                version_detected = "2.0"
+            except Exception as qasm2_error:
+                return {
+                    "status": "error",
+                    "message": (
+                        f"QASM string not valid. "
+                        f"QASM3 error: {qasm3_error}; "
+                        f"QASM2 error: {qasm2_error}"
+                    ),
+                }
+    elif qasm_version == "3.0":
+        try:
+            circuit = qasm3_loads(qasm_string)
+            version_detected = "3.0"
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"QASM 3.0 parsing failed: {e}",
+            }
+    else:  # qasm_version == "2.0"
+        try:
+            circuit = qasm2_loads(qasm_string)
+            version_detected = "2.0"
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"QASM 2.0 parsing failed: {e}",
+            }
+
+    try:
+        circuit_qpy = dump_qpy_circuit(circuit)
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to serialize circuit to QPY: {e}",
+        }
+
+    metadata = get_circuit_metadata(circuit)
+    return {
+        "status": "success",
+        "circuit_qpy": circuit_qpy,
+        "qasm_version_detected": version_detected,
+        **metadata,
+    }
+
+
+def export_circuit_to_qasm(
+    circuit_qpy: str, qasm_version: ExportQasmVersion = "3.0"
+) -> dict[str, Any]:
+    """Export a Qiskit circuit to OpenQASM format.
+
+    Args:
+        circuit_qpy: Base64-encoded QPY circuit.
+        qasm_version: Target QASM version ("2.0" or "3.0"). Default "3.0".
+
+    Returns:
+        Dictionary with status, qasm_string, qasm_version, num_qubits, depth.
+    """
+    load_result = load_qpy_circuit(circuit_qpy)
+    if load_result["status"] == "error":
+        return {
+            "status": "error",
+            "message": load_result["message"],
+        }
+
+    circuit = load_result["circuit"]
+
+    try:
+        if qasm_version == "3.0":
+            qasm_string = qasm3_dumps(circuit)
+        else:  # qasm_version == "2.0"
+            qasm_string = qasm2_dumps(circuit)
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to export circuit to QASM {qasm_version}: {e}",
+        }
+
+    return {
+        "status": "success",
+        "qasm_string": qasm_string,
+        "qasm_version": qasm_version,
+        "num_qubits": circuit.num_qubits,
+        "depth": circuit.depth(),
+    }

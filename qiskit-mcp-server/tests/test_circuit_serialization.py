@@ -18,7 +18,9 @@ from qiskit_mcp_server.circuit_serialization import (
     dump_circuit,
     dump_qasm_circuit,
     dump_qpy_circuit,
+    export_circuit_to_qasm,
     load_circuit,
+    load_circuit_from_qasm,
     load_qasm_circuit,
     load_qpy_circuit,
     qpy_to_qasm3,
@@ -42,6 +44,18 @@ include "stdgates.inc";
 qubit[2] q;
 h q[0];
 cx q[0], q[1];
+"""
+
+
+@pytest.fixture
+def valid_qasm2():
+    """Valid QASM 2.0 string."""
+    return """OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[2];
+creg c[2];
+h q[0];
+cx q[0],q[1];
 """
 
 
@@ -477,3 +491,198 @@ class TestAutoDetectionLoadCircuit:
         loaded = result["circuit"]
         assert loaded.num_qubits == simple_circuit.num_qubits
         assert loaded.depth() == simple_circuit.depth()
+
+
+class TestLoadCircuitFromQasm:
+    """Tests for load_circuit_from_qasm function."""
+
+    def test_auto_detect_qasm3(self, valid_qasm3):
+        """Test auto-detection with QASM 3.0 input."""
+        result = load_circuit_from_qasm(valid_qasm3)
+
+        assert result["status"] == "success"
+        assert result["qasm_version_detected"] == "3.0"
+        assert result["num_qubits"] == 2
+        assert "circuit_qpy" in result
+        assert "operation_counts" in result
+        assert "total_operations" in result
+        assert "depth" in result
+
+    def test_auto_detect_qasm2(self, valid_qasm2):
+        """Test auto-detection with QASM 2.0 input."""
+        result = load_circuit_from_qasm(valid_qasm2)
+
+        assert result["status"] == "success"
+        # QASM 2.0 may be parsed by either parser depending on version
+        assert result["qasm_version_detected"] in ("2.0", "3.0")
+        assert result["num_qubits"] == 2
+
+    def test_explicit_qasm3(self, valid_qasm3):
+        """Test explicit QASM 3.0 parsing."""
+        result = load_circuit_from_qasm(valid_qasm3, qasm_version="3.0")
+
+        assert result["status"] == "success"
+        assert result["qasm_version_detected"] == "3.0"
+        assert result["num_qubits"] == 2
+
+    def test_explicit_qasm2(self, valid_qasm2):
+        """Test explicit QASM 2.0 parsing."""
+        result = load_circuit_from_qasm(valid_qasm2, qasm_version="2.0")
+
+        assert result["status"] == "success"
+        assert result["qasm_version_detected"] == "2.0"
+        assert result["num_qubits"] == 2
+
+    def test_invalid_qasm(self, invalid_qasm3):
+        """Test invalid QASM input returns error."""
+        result = load_circuit_from_qasm(invalid_qasm3)
+
+        assert result["status"] == "error"
+        assert "message" in result
+
+    def test_invalid_qasm_explicit_version(self, invalid_qasm3):
+        """Test invalid QASM with explicit version returns error."""
+        result = load_circuit_from_qasm(invalid_qasm3, qasm_version="3.0")
+
+        assert result["status"] == "error"
+        assert "QASM 3.0 parsing failed" in result["message"]
+
+    def test_metadata_fields(self, valid_qasm3):
+        """Test that all expected metadata fields are present."""
+        result = load_circuit_from_qasm(valid_qasm3)
+
+        assert result["status"] == "success"
+        assert "num_qubits" in result
+        assert "num_clbits" in result
+        assert "depth" in result
+        assert "operation_counts" in result
+        assert "total_operations" in result
+        assert isinstance(result["operation_counts"], dict)
+        assert result["total_operations"] > 0
+
+    def test_circuit_qpy_is_loadable(self, valid_qasm3):
+        """Test that the returned circuit_qpy can be loaded back."""
+        result = load_circuit_from_qasm(valid_qasm3)
+
+        assert result["status"] == "success"
+        load_result = load_qpy_circuit(result["circuit_qpy"])
+        assert load_result["status"] == "success"
+        assert load_result["circuit"].num_qubits == result["num_qubits"]
+
+    def test_operation_counts_accuracy(self):
+        """Test that operation counts are accurate."""
+        qasm = """OPENQASM 3.0;
+include "stdgates.inc";
+qubit[3] q;
+h q[0];
+h q[1];
+cx q[0], q[1];
+cx q[1], q[2];
+"""
+        result = load_circuit_from_qasm(qasm)
+
+        assert result["status"] == "success"
+        assert result["operation_counts"]["h"] == 2
+        assert result["operation_counts"]["cx"] == 2
+        assert result["total_operations"] == 4
+
+
+class TestExportCircuitToQasm:
+    """Tests for export_circuit_to_qasm function."""
+
+    def test_export_qasm3_default(self, simple_circuit):
+        """Test default export to QASM 3.0."""
+        qpy_str = dump_qpy_circuit(simple_circuit)
+        result = export_circuit_to_qasm(qpy_str)
+
+        assert result["status"] == "success"
+        assert "OPENQASM" in result["qasm_string"]
+        assert result["qasm_version"] == "3.0"
+        assert result["num_qubits"] == 2
+        assert "depth" in result
+
+    def test_export_qasm3_explicit(self, simple_circuit):
+        """Test explicit QASM 3.0 export."""
+        qpy_str = dump_qpy_circuit(simple_circuit)
+        result = export_circuit_to_qasm(qpy_str, qasm_version="3.0")
+
+        assert result["status"] == "success"
+        assert result["qasm_version"] == "3.0"
+        assert "OPENQASM" in result["qasm_string"]
+
+    def test_export_qasm2(self, simple_circuit):
+        """Test export to QASM 2.0."""
+        qpy_str = dump_qpy_circuit(simple_circuit)
+        result = export_circuit_to_qasm(qpy_str, qasm_version="2.0")
+
+        assert result["status"] == "success"
+        assert result["qasm_version"] == "2.0"
+        assert "OPENQASM" in result["qasm_string"]
+        assert result["num_qubits"] == 2
+
+    def test_invalid_qpy(self):
+        """Test export with invalid QPY input."""
+        result = export_circuit_to_qasm("not-valid-base64!")
+
+        assert result["status"] == "error"
+        assert "message" in result
+
+    def test_export_qasm2_unsupported_circuit(self):
+        """Test that exporting a circuit with QASM3-only features to QASM 2.0 returns an error."""
+        # Circuit with if_test (classical bit condition) — not expressible in QASM 2.0
+        qc = QuantumCircuit(2, 1)
+        qc.h(0)
+        qc.measure(0, 0)
+        with qc.if_test((qc.clbits[0], True)):
+            qc.x(1)
+        qpy_str = dump_qpy_circuit(qc)
+
+        result = export_circuit_to_qasm(qpy_str, qasm_version="2.0")
+
+        assert result["status"] == "error"
+        assert "Failed to export circuit to QASM 2.0" in result["message"]
+
+    def test_export_qasm3_contains_valid_qasm(self, simple_circuit):
+        """Test that exported QASM 3.0 can be parsed back."""
+        qpy_str = dump_qpy_circuit(simple_circuit)
+        result = export_circuit_to_qasm(qpy_str, qasm_version="3.0")
+
+        assert result["status"] == "success"
+        # Verify the QASM can be loaded back
+        load_result = load_qasm_circuit(result["qasm_string"])
+        assert load_result["status"] == "success"
+        assert load_result["circuit"].num_qubits == simple_circuit.num_qubits
+
+    def test_export_qasm2_contains_valid_qasm(self, simple_circuit):
+        """Test that exported QASM 2.0 can be parsed back."""
+        qpy_str = dump_qpy_circuit(simple_circuit)
+        result = export_circuit_to_qasm(qpy_str, qasm_version="2.0")
+
+        assert result["status"] == "success"
+        # Verify the QASM can be loaded back
+        load_result = load_qasm_circuit(result["qasm_string"])
+        assert load_result["status"] == "success"
+        assert load_result["circuit"].num_qubits == simple_circuit.num_qubits
+
+    def test_round_trip_qasm3(self, valid_qasm3):
+        """Test full round-trip: QASM3 → QPY → QASM3."""
+        # Load QASM to QPY
+        load_result = load_circuit_from_qasm(valid_qasm3)
+        assert load_result["status"] == "success"
+
+        # Export back to QASM3
+        export_result = export_circuit_to_qasm(load_result["circuit_qpy"], qasm_version="3.0")
+        assert export_result["status"] == "success"
+        assert "OPENQASM" in export_result["qasm_string"]
+        assert export_result["num_qubits"] == load_result["num_qubits"]
+
+    def test_round_trip_qasm2(self, valid_qasm2):
+        """Test full round-trip: QASM2 → QPY → QASM2."""
+        # Load QASM to QPY
+        load_result = load_circuit_from_qasm(valid_qasm2, qasm_version="2.0")
+        assert load_result["status"] == "success"
+
+        # Export back to QASM2
+        export_result = export_circuit_to_qasm(load_result["circuit_qpy"], qasm_version="2.0")
+        assert export_result["status"] == "success"
+        assert "OPENQASM" in export_result["qasm_string"]
