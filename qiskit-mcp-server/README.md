@@ -220,6 +220,10 @@ For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed example
 | `transpile_circuit_tool` | Transpile a circuit with configurable optimization |
 | `analyze_circuit_tool` | Analyze circuit structure without transpiling |
 | `compare_optimization_levels_tool` | Compare all optimization levels (0-3) |
+| `load_circuit_from_qasm_tool` | Load a circuit from OpenQASM 2.0 or 3.0 string, returning QPY and metadata |
+| `export_circuit_to_qasm_tool` | Export a QPY circuit to OpenQASM 2.0 or 3.0 format |
+| `convert_qpy_to_qasm3_tool` | Convert a base64-encoded QPY circuit to QASM3 |
+| `convert_qasm3_to_qpy_tool` | Convert a QASM3 (or QASM2) circuit to base64-encoded QPY |
 
 ### Resources
 
