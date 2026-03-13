@@ -3,7 +3,7 @@
   "name": "io.github.Qiskit/qiskit-docs-mcp-server",
   "title": "Qiskit Documentation MCP Server",
   "description": "MCP server for querying and retrieving Qiskit documentation, guides, and API references",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://github.com/Qiskit/mcp-servers/tree/main/qiskit-docs-mcp-server",
   "repository": {
     "url": "https://github.com/Qiskit/mcp-servers",
@@ -15,7 +15,7 @@
     {
       "registryType": "pypi",
       "identifier": "qiskit-docs-mcp-server",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
