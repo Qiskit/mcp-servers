@@ -31,6 +31,7 @@ class TestServerRegistration:
             "get_guide_tool",
             "search_docs_tool",
             "lookup_error_code_tool",
+            "cache_status_tool",
         }
         assert expected_tools.issubset(tool_names), f"Missing tools: {expected_tools - tool_names}"
 
@@ -49,7 +50,7 @@ class TestServerRegistration:
 
     def test_tool_count(self):
         """Test the expected number of tools."""
-        assert len(mcp._tool_manager._tools) == 5
+        assert len(mcp._tool_manager._tools) == 6
 
     def test_resource_count(self):
         """Test the expected number of resources."""

@@ -11,3 +11,14 @@
 # that they have been altered from the originals.
 
 """Pytest configuration and shared fixtures."""
+
+import pytest
+from qiskit_docs_mcp_server.data_fetcher import clear_cache
+
+
+@pytest.fixture(autouse=True)
+def _clear_caches() -> None:  # type: ignore[misc]
+    """Clear caches before each test for isolation."""
+    clear_cache()
+    yield  # type: ignore[misc]
+    clear_cache()

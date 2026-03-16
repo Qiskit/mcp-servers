@@ -14,25 +14,73 @@ import difflib
 import logging
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 import html2text
 import httpx
 
+from qiskit_docs_mcp_server.cache import DiskCache, LayeredCache, TTLCache
 from qiskit_docs_mcp_server.constants import (
     AVAILABLE_ADDONS,
     AVAILABLE_GUIDES,
     AVAILABLE_MODULES,
     BASE_URL,
+    CACHE_DIR,
+    CACHE_MAXSIZE,
+    CACHE_TTL,
     ERROR_CODE_CATEGORIES,
     HTTP_TIMEOUT,
+    OFFLINE_MODE,
     QISKIT_DOCS_BASE,
     SEARCH_PATH,
 )
 
 
 logger = logging.getLogger(__name__)
+
+
+# --- Shared HTTP client ---
+
+_client: httpx.AsyncClient | None = None
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    """Get or create the shared HTTP client."""
+    global _client  # noqa: PLW0603
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True)
+    return _client
+
+
+async def _close_http_client() -> None:
+    """Close the shared HTTP client."""
+    global _client  # noqa: PLW0603
+    if _client is not None and not _client.is_closed:
+        await _client.aclose()
+        _client = None
+
+
+# --- Cache setup ---
+
+_memory_cache = TTLCache(maxsize=CACHE_MAXSIZE, ttl=CACHE_TTL)
+_disk_cache = DiskCache(Path(CACHE_DIR), ttl=CACHE_TTL) if CACHE_DIR else None
+_layered_cache = LayeredCache(_memory_cache, _disk_cache)
+
+
+def clear_cache() -> None:
+    """Clear in-memory and disk documentation caches."""
+    _layered_cache.clear()
+    logger.info("Documentation cache cleared.")
+
+
+def get_cache_info() -> dict[str, Any]:
+    """Return cache statistics."""
+    return _layered_cache.info()
+
+
+# --- Helpers ---
 
 
 def _find_similar(query: str, available: list[str], cutoff: float = 0.6) -> list[str]:
@@ -71,9 +119,12 @@ def convert_html_to_markdown(html: str) -> str:
     return h.handle(html)
 
 
+# --- Fetch functions with caching ---
+
+
 async def fetch_text(url: str) -> str | None:
     """
-    Fetch text content from a URL using httpx.
+    Fetch text content from a URL, with layered caching and offline support.
 
     Args:
         url: The URL to fetch
@@ -81,22 +132,50 @@ async def fetch_text(url: str) -> str | None:
     Returns:
         The text content of the page, or None if fetch fails
     """
+    # Check cache
+    cached_value, is_stale = _layered_cache.get(url)
+    if cached_value is not None and not is_stale:
+        logger.debug(f"Cache hit for {url}")
+        return cached_value  # type: ignore[return-value]
+
+    if is_stale:
+        logger.debug(f"Stale cache entry for {url}, attempting refresh")
+
+    # Offline mode: skip network
+    if OFFLINE_MODE:
+        if cached_value is not None:
+            logger.warning(f"Serving stale cached content for {url} (offline mode).")
+            return cached_value  # type: ignore[return-value]
+        logger.error(
+            f"Content not available in cache for {url}. "
+            "Run 'qiskit-docs-mcp-server --sync' to download documentation."
+        )
+        return None
+
+    # Fetch from network
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
-            return response.text
+        client = _get_http_client()
+        response = await client.get(url)
+        response.raise_for_status()
+        text = response.text
+        _layered_cache.put(url, text, content_type="text")
+        return text
     except httpx.HTTPError as e:
         logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
-        return None
     except Exception as e:
         logger.error(f"Unexpected error fetching {url}: {e}")
-        return None
+
+    # Fallback to stale cache on network failure
+    stale = _layered_cache.get_stale_fallback(url)
+    if stale is not None:
+        logger.warning(f"Using stale cached content for {url} due to network failure.")
+        return stale  # type: ignore[return-value]
+    return None
 
 
 async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     """
-    Fetch JSON content from a URL using httpx.
+    Fetch JSON content from a URL, with layered caching and offline support.
 
     Args:
         url: The URL to fetch
@@ -104,17 +183,48 @@ async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     Returns:
         The JSON content as a list of dicts, or None if fetch fails
     """
+    # Check cache
+    cached_value, is_stale = _layered_cache.get(url)
+    if cached_value is not None and not is_stale:
+        logger.debug(f"Cache hit for {url}")
+        return cached_value  # type: ignore[return-value]
+
+    if is_stale:
+        logger.debug(f"Stale cache entry for {url}, attempting refresh")
+
+    # Offline mode: skip network
+    if OFFLINE_MODE:
+        if cached_value is not None:
+            logger.warning(f"Serving stale cached content for {url} (offline mode).")
+            return cached_value  # type: ignore[return-value]
+        logger.error(
+            f"Content not available in cache for {url}. "
+            "Search requires network access and cannot be pre-cached."
+        )
+        return None
+
+    # Fetch from network
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
-            return response.json()  # type: ignore[no-any-return]
+        client = _get_http_client()
+        response = await client.get(url)
+        response.raise_for_status()
+        data: list[dict[str, Any]] = response.json()
+        _layered_cache.put(url, data, content_type="json")
+        return data
     except httpx.HTTPError as e:
         logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
-        return None
     except Exception as e:
         logger.error(f"Unexpected error fetching {url}: {e}")
-        return None
+
+    # Fallback to stale cache on network failure
+    stale = _layered_cache.get_stale_fallback(url)
+    if stale is not None:
+        logger.warning(f"Using stale cached content for {url} due to network failure.")
+        return stale  # type: ignore[return-value]
+    return None
+
+
+# --- Documentation retrieval functions ---
 
 
 async def get_component_docs(component: str) -> dict[str, Any]:

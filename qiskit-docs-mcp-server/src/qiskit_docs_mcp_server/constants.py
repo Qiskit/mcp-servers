@@ -58,6 +58,12 @@ ERROR_CODE_CATEGORIES = {
 # HTTP timeout configuration (in seconds)
 HTTP_TIMEOUT = _get_env_float("QISKIT_HTTP_TIMEOUT", 10.0)
 
+# Cache configuration
+CACHE_TTL = _get_env_float("QISKIT_DOCS_CACHE_TTL", 3600.0)  # 1 hour default
+CACHE_MAXSIZE = int(_get_env_float("QISKIT_DOCS_CACHE_MAXSIZE", 128.0))
+CACHE_DIR = os.getenv("QISKIT_DOCS_CACHE_DIR", "")  # empty = disk cache disabled
+OFFLINE_MODE = os.getenv("QISKIT_DOCS_OFFLINE", "").lower() in ("1", "true", "yes")
+
 # Qiskit modules and their documentation paths
 AVAILABLE_MODULES = [
     # Circuit construction

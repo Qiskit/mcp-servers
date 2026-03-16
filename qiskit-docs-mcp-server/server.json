@@ -30,6 +30,26 @@
           "name": "QISKIT_HTTP_TIMEOUT",
           "description": "HTTP request timeout in seconds",
           "default": "10.0"
+        },
+        {
+          "name": "QISKIT_DOCS_CACHE_TTL",
+          "description": "Cache entry time-to-live in seconds",
+          "default": "3600.0"
+        },
+        {
+          "name": "QISKIT_DOCS_CACHE_MAXSIZE",
+          "description": "Maximum number of in-memory cache entries",
+          "default": "128"
+        },
+        {
+          "name": "QISKIT_DOCS_CACHE_DIR",
+          "description": "Directory for persistent cache files (empty = memory-only)",
+          "default": ""
+        },
+        {
+          "name": "QISKIT_DOCS_OFFLINE",
+          "description": "Disable network requests; serve only from cache (1/true/yes to enable)",
+          "default": ""
         }
       ]
     }

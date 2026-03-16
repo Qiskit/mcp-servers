@@ -24,6 +24,7 @@ from fastmcp import FastMCP
 
 from qiskit_docs_mcp_server.data_fetcher import (
     get_addon_docs,
+    get_cache_info,
     get_component_docs,
     get_guide_docs,
     get_list_of_addons,
@@ -120,6 +121,17 @@ async def lookup_error_code_tool(code: str) -> dict[str, Any]:
         Error code details including message and suggested solution.
     """
     return await lookup_error_code(code)
+
+
+@mcp.tool()
+async def cache_status_tool() -> dict[str, Any]:
+    """
+    Get documentation cache status and statistics.
+
+    Returns:
+        Cache statistics including hit/miss counts, size, and disk usage.
+    """
+    return {"status": "success", **get_cache_info()}
 
 
 ##################################################
