@@ -10,12 +10,11 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-import difflib
 import logging
 import re
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import html2text
 import httpx
@@ -34,29 +33,24 @@ from qiskit_docs_mcp_server.constants import (
 
 logger = logging.getLogger(__name__)
 
+# Allowed hostname for URL validation
+_ALLOWED_HOST = "quantum.cloud.ibm.com"
 
-def _find_similar(query: str, available: list[str], cutoff: float = 0.6) -> list[str]:
-    """
-    Find similar strings using difflib.get_close_matches.
+
+def _strip_html_tags(text: str) -> str:
+    """Strip HTML tags from a string.
 
     Args:
-        query: The query string to match
-        available: List of available options to search
-        cutoff: Similarity threshold (0.0-1.0), default 0.6
+        text: String potentially containing HTML tags
 
     Returns:
-        List of similar strings, sorted by similarity (highest first)
+        String with all HTML tags removed
     """
-    if not query or not available:
-        return []
-
-    matches = difflib.get_close_matches(query, available, n=3, cutoff=cutoff)
-    return matches
+    return re.sub(r"<[^>]+>", "", text)
 
 
 def convert_html_to_markdown(html: str) -> str:
-    """
-    Convert HTML content to Markdown format.
+    """Convert HTML content to Markdown format.
 
     Args:
         html: HTML content string
@@ -71,9 +65,39 @@ def convert_html_to_markdown(html: str) -> str:
     return h.handle(html)
 
 
-async def fetch_text(url: str) -> str | None:
+def _resolve_url(url: str) -> str:
+    """Resolve a URL or relative path to a full documentation URL.
+
+    Args:
+        url: Full URL or path relative to docs base
+            (e.g., 'guides/transpile' or 'api/qiskit/circuit')
+
+    Returns:
+        Full resolved URL
+
+    Raises:
+        ValueError: If the URL is outside the allowed documentation domain
     """
-    Fetch text content from a URL using httpx.
+    # If it's already a full URL, validate the domain
+    parsed = urlparse(url)
+    if parsed.scheme and parsed.netloc:
+        if parsed.netloc != _ALLOWED_HOST:
+            msg = (
+                f"URL domain '{parsed.netloc}' is not allowed. "
+                f"Only URLs from '{_ALLOWED_HOST}' are supported."
+            )
+            raise ValueError(msg)
+        return url
+
+    # Relative path — resolve against the docs base
+    # Strip leading slash if present
+    path = url.lstrip("/")
+    base = QISKIT_DOCS_BASE.rstrip("/")
+    return f"{base}/{path}"
+
+
+async def fetch_text(url: str) -> str | None:
+    """Fetch text content from a URL using httpx.
 
     Args:
         url: The URL to fetch
@@ -95,8 +119,7 @@ async def fetch_text(url: str) -> str | None:
 
 
 async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
-    """
-    Fetch JSON content from a URL using httpx.
+    """Fetch JSON content from a URL using httpx.
 
     Args:
         url: The URL to fetch
@@ -117,109 +140,71 @@ async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
         return None
 
 
-async def get_component_docs(component: str) -> dict[str, Any]:
-    """
-    Fetch documentation for a Qiskit SDK module and convert to Markdown.
+async def get_page_docs(url: str) -> dict[str, Any]:
+    """Fetch any Qiskit documentation page and return as markdown.
+
+    Accepts full URLs or relative paths. Validates that the URL is within
+    the allowed documentation domain.
 
     Args:
-        component: Module name (e.g., 'circuit', 'primitives', 'transpiler')
+        url: Full URL or relative path (e.g., 'guides/transpile',
+            'api/qiskit/circuit', 'api/qiskit/qiskit.circuit.QuantumCircuit')
 
     Returns:
-        The documentation content in Markdown format or error status
+        Documentation content in markdown with metadata, or error status
     """
-    if component not in AVAILABLE_MODULES:
-        suggestions = _find_similar(component, AVAILABLE_MODULES)
-        error_response = {
-            "status": "error",
-            "message": f"Module '{component}' not found.",
-            "available_modules": AVAILABLE_MODULES,
-        }
-        if suggestions:
-            error_response["suggestions"] = suggestions
-        return error_response
-
-    url = f"{QISKIT_DOCS_BASE}api/qiskit/{component}"
-    logger.info(f"Fetching component docs for {component} from {url}")
-    html = await fetch_text(url)
-    docs = convert_html_to_markdown(html) if html else None
-
-    if docs is None:
+    try:
+        resolved_url = _resolve_url(url)
+    except ValueError as e:
         return {
             "status": "error",
-            "message": f"Failed to fetch documentation for component '{component}'.",
+            "message": str(e),
         }
+
+    logger.info(f"Fetching page docs from {resolved_url}")
+    html = await fetch_text(resolved_url)
+
+    if html is None:
+        return {
+            "status": "error",
+            "message": (
+                f"Failed to fetch '{url}'. The page may not exist. "
+                "Try using search_docs_tool to find the correct URL."
+            ),
+            "metadata": {
+                "url": resolved_url,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+
+    docs = convert_html_to_markdown(html)
 
     return {
         "status": "success",
-        "module": component,
+        "url": resolved_url,
         "documentation": docs,
         "metadata": {
-            "url": url,
+            "url": resolved_url,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "content_type": "markdown",
-            "content_length": len(docs) if docs else 0,
+            "content_length": len(docs),
         },
     }
 
 
-async def get_guide_docs(guide: str) -> dict[str, Any]:
-    """
-    Fetch documentation for a Qiskit guide or best practice and convert to Markdown.
+async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
+    """Search Qiskit documentation for relevant results.
 
     Args:
-        guide: Guide name (e.g., 'quick-start', 'transpile', 'configure-error-mitigation')
-
-    Returns:
-        The documentation content in Markdown format or error status
-    """
-    if guide not in AVAILABLE_GUIDES:
-        suggestions = _find_similar(guide, AVAILABLE_GUIDES)
-        error_response = {
-            "status": "error",
-            "message": f"Guide '{guide}' not found.",
-            "available_guides": AVAILABLE_GUIDES,
-        }
-        if suggestions:
-            error_response["suggestions"] = suggestions
-        return error_response
-
-    url = f"{QISKIT_DOCS_BASE}guides/{guide}"
-    logger.info(f"Fetching style docs for {guide} from {url}")
-    html = await fetch_text(url)
-    docs = convert_html_to_markdown(html) if html else None
-
-    if docs is None:
-        return {
-            "status": "error",
-            "message": f"Failed to fetch documentation for guide '{guide}'.",
-        }
-
-    return {
-        "status": "success",
-        "guide": guide,
-        "documentation": docs,
-        "metadata": {
-            "url": url,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "content_type": "markdown",
-            "content_length": len(docs) if docs else 0,
-        },
-    }
-
-
-async def search_qiskit_docs(query: str, module: str = "documentation") -> dict[str, Any]:
-    """
-    Search Qiskit documentation for relevant results.
-
-    Args:
-        query: Search query string (e.g., 'circuit', 'error mitigation')
-        module: Search scope (e.g., 'documentation', 'API')
+        query: Search query string
+        scope: Search scope filter. Valid values (case-sensitive):
+            'all', 'documentation', 'api', 'learning', 'tutorials'
 
     Returns:
         Search results with matching entries, total count, and metadata
     """
-    url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(module)}"
-    logger.info(f"Searching docs for '{query}' in module '{module}'")
+    url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(scope)}"
+    logger.info(f"Searching docs for '{query}' in scope '{scope}'")
 
     results = await fetch_text_json(url)
 
@@ -233,10 +218,17 @@ async def search_qiskit_docs(query: str, module: str = "documentation") -> dict[
             },
         }
 
+    # Strip HTML tags from search result fields
+    for result_item in results:
+        if "title" in result_item:
+            result_item["title"] = _strip_html_tags(result_item["title"])
+        if "text" in result_item:
+            result_item["text"] = _strip_html_tags(result_item["text"])
+
     return {
         "status": "success",
         "query": query,
-        "module": module,
+        "scope": scope,
         "results": results,
         "total_results": len(results),
         "metadata": {
@@ -248,8 +240,7 @@ async def search_qiskit_docs(query: str, module: str = "documentation") -> dict[
 
 
 async def lookup_error_code(code: str) -> dict[str, Any]:
-    """
-    Look up a Qiskit error code and return its message and solution.
+    """Look up a Qiskit error code and return its message and solution.
 
     Args:
         code: Error code string (e.g., '1002', '7001')
@@ -260,7 +251,9 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
     if not re.fullmatch(r"\d{4}", code):
         return {
             "status": "error",
-            "message": f"Invalid error code format: '{code}'. Expected a 4-digit code (e.g., '1002').",
+            "message": (
+                f"Invalid error code format: '{code}'. Expected a 4-digit code (e.g., '1002')."
+            ),
         }
 
     url = f"{QISKIT_DOCS_BASE}errors"
@@ -277,12 +270,10 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
     docs = convert_html_to_markdown(html)
 
     # Search for the error code in the markdown content
-    # Error codes appear as table rows: | code | message | solution |
     lines = docs.split("\n")
     matching_lines: list[str] = []
     for i, line in enumerate(lines):
         if re.search(rf"\b{code}\b", line):
-            # Grab surrounding context (table header + matching row)
             start = max(0, i - 2)
             end = min(len(lines), i + 3)
             matching_lines.extend(lines[start:end])
@@ -311,63 +302,29 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
 
 
 def get_list_of_modules() -> dict[str, Any]:
-    """Get list of all Qiskit SDK modules."""
-    return {"status": "success", "modules": AVAILABLE_MODULES}
-
-
-async def get_addon_docs(addon: str) -> dict[str, Any]:
-    """
-    Fetch documentation for a Qiskit addon module and convert to Markdown.
-
-    Args:
-        addon: Addon name (e.g., 'sqd', 'cutting', 'mpf')
-
-    Returns:
-        The documentation content in Markdown format or error status
-    """
-    if addon not in AVAILABLE_ADDONS:
-        suggestions = _find_similar(addon, AVAILABLE_ADDONS)
-        error_response = {
-            "status": "error",
-            "message": f"Addon '{addon}' not found.",
-            "available_addons": AVAILABLE_ADDONS,
-        }
-        if suggestions:
-            error_response["suggestions"] = suggestions
-        return error_response
-
-    url = f"{QISKIT_DOCS_BASE}api/qiskit-addon-{addon}"
-    logger.info(f"Fetching addon docs for {addon} from {url}")
-    html = await fetch_text(url)
-    docs = convert_html_to_markdown(html) if html else None
-
-    if docs is None:
-        return {
-            "status": "error",
-            "message": f"Failed to fetch documentation for addon '{addon}'.",
-        }
-
+    """Get list of all Qiskit SDK modules with URL paths."""
     return {
         "status": "success",
-        "addon": addon,
-        "documentation": docs,
-        "metadata": {
-            "url": url,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "content_type": "markdown",
-            "content_length": len(docs) if docs else 0,
-        },
+        "modules": [{"name": name, "url_path": f"api/qiskit/{name}"} for name in AVAILABLE_MODULES],
     }
 
 
 def get_list_of_addons() -> dict[str, Any]:
-    """Get list of all Qiskit addon modules."""
-    return {"status": "success", "addons": AVAILABLE_ADDONS}
+    """Get list of all Qiskit addon modules with URL paths."""
+    return {
+        "status": "success",
+        "addons": [
+            {"name": name, "url_path": f"api/qiskit-addon-{name}"} for name in AVAILABLE_ADDONS
+        ],
+    }
 
 
 def get_list_of_guides() -> dict[str, Any]:
-    """Get list of Qiskit guides and best practices."""
-    return {"status": "success", "guides": AVAILABLE_GUIDES}
+    """Get list of Qiskit guides and best practices with URL paths."""
+    return {
+        "status": "success",
+        "guides": [{"name": name, "url_path": f"guides/{name}"} for name in AVAILABLE_GUIDES],
+    }
 
 
 def get_list_of_error_code_categories() -> dict[str, Any]:
