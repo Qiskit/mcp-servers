@@ -53,71 +53,138 @@ logger.info("Qiskit Documentation MCP Server initialized")
 
 @mcp.tool()
 async def get_sdk_module_docs_tool(module: str) -> dict[str, Any]:
-    """
-    Get documentation for a Qiskit SDK module.
+    """Get the full API reference documentation for a Qiskit SDK module.
+
+    Returns the complete API reference in markdown format. Responses can be
+    very large (up to 100K+ chars for modules like 'circuit'). Consider using
+    search_docs_tool first to find specific topics, or read the
+    qiskit-docs://modules resource to see all available modules.
 
     Args:
-        module: Module name (e.g., 'circuit', 'primitives', 'transpiler', 'quantum_info')
+        module: Exact module name. Valid values:
+            Circuit construction: 'circuit'
+            Quantum information: 'quantum_info'
+            Transpilation: 'transpiler', 'synthesis', 'dagcircuit',
+                'passmanager', 'converters', 'compiler'
+            Primitives and providers: 'primitives', 'providers'
+            Results and visualization: 'result', 'visualization'
+            Serialization: 'qasm2', 'qasm3', 'qpy'
+            Utilities: 'utils', 'exceptions'
 
     Returns:
-        Module documentation including API reference and usage examples.
+        Module documentation in markdown format with metadata, or error
+        with fuzzy-match suggestions if the module name is invalid.
     """
     return await get_component_docs(module)
 
 
 @mcp.tool()
 async def get_addon_docs_tool(addon: str) -> dict[str, Any]:
-    """
-    Get documentation for a Qiskit addon module.
+    """Get API documentation for a Qiskit addon package.
+
+    Returns the full API reference for Qiskit addon modules. These are
+    separate packages that extend Qiskit with additional algorithms
+    and capabilities. Read the qiskit-docs://addons resource for the
+    full list with descriptions.
 
     Args:
-        addon: Addon name (e.g., 'sqd', 'cutting', 'mpf', 'obp', 'aqc-tensor')
+        addon: Exact addon name. Valid values:
+            'aqc-tensor' — Approximate Quantum Compiler with tensor networks
+            'cutting' — Circuit cutting for large circuits
+            'mpf' — Multi-product formulas for Hamiltonian simulation
+            'obp' — Operator backpropagation
+            'sqd' — Sample-based Quantum Diagonalization
+            'utils' — Shared utilities for addon packages
 
     Returns:
-        Addon API documentation including classes, methods, and usage examples.
+        Addon API documentation in markdown format with metadata, or error
+        with fuzzy-match suggestions if the addon name is invalid.
     """
     return await get_addon_docs(addon)
 
 
 @mcp.tool()
 async def get_guide_tool(guide: str) -> dict[str, Any]:
-    """
-    Get a Qiskit guide or best practice documentation.
+    """Get a Qiskit implementation guide or best practice document.
+
+    Returns a complete how-to guide in markdown format. Guides cover
+    practical topics like circuit construction, transpilation, error
+    mitigation, and execution. Read the qiskit-docs://guides resource
+    to see all available guides with descriptions.
 
     Args:
-        guide: Guide name (e.g., 'quick-start', 'transpile', 'configure-error-mitigation', 'dynamic-circuits')
+        guide: Exact guide slug name. Common guides:
+            Getting started: 'quick-start'
+            Circuits: 'construct-circuits', 'dynamic-circuits'
+            Transpilation: 'transpile', 'transpiler-stages',
+                'transpile-with-pass-managers',
+                'defaults-and-configuration-options'
+            Error handling: 'configure-error-mitigation',
+                'configure-error-suppression',
+                'error-mitigation-and-suppression-techniques'
+            Execution: 'primitives', 'execution-modes',
+                'runtime-options-overview'
+            Functions: 'functions', 'ibm-circuit-function'
 
     Returns:
-        Complete guide documentation with best practices and implementation patterns.
+        Guide documentation in markdown format with metadata, or error
+        with fuzzy-match suggestions if the guide name is invalid.
     """
     return await get_guide_docs(guide)
 
 
 @mcp.tool()
 async def search_docs_tool(query: str, module: str = "documentation") -> dict[str, Any]:
-    """
-    Search Qiskit documentation for relevant modules, addons, and guides.
+    """Search across the entire Qiskit documentation for relevant content.
+
+    Use this tool as a starting point when you're not sure which specific
+    module or guide to fetch. Returns ranked results with titles, URLs,
+    sections, and text snippets.
 
     Args:
-        query: Search query (e.g., 'optimization', 'circuit', 'error')
-        module: Search module (e.g. 'documentation', 'API' etc)
+        query: Search query string (e.g., 'error mitigation',
+            'QuantumCircuit', 'transpiler optimization'). More specific
+            queries yield better results.
+        module: Search scope filter (case-sensitive). Valid values:
+            'all' — Search everything
+            'documentation' — Guides and general docs (default)
+            'api' — API reference pages only
+            'learning' — Learning resources and tutorials
+            'tutorials' — Tutorial content only
 
     Returns:
-        List of matching documentation entries with URLs and types.
+        List of matching documentation entries with URLs, titles,
+        sections, and text snippets.
     """
     return await search_qiskit_docs(query, module)
 
 
 @mcp.tool()
 async def lookup_error_code_tool(code: str) -> dict[str, Any]:
-    """
-    Look up a Qiskit/IBM Quantum error code to get its message and solution.
+    """Look up a Qiskit or IBM Quantum error code to get its description and solution.
+
+    Use this when a user encounters a numeric error code from Qiskit or
+    IBM Quantum services. Returns the error message and suggested fix.
+    Read the qiskit-docs://error-codes resource for error code categories.
+
+    Error code ranges:
+        1XXX: Validation, transpilation, backend, authorization
+        2XXX: Backend configuration, booking, data retrieval
+        3XXX: Job handling, authentication, analytics
+        4XXX: Session management and job limits
+        5XXX: Job timeout and cancellation
+        6XXX: Shot limits, compiler input, control system
+        7XXX: Instruction and basis gate compatibility
+        8XXX: Pulse and channel configuration
+        9XXX: Hardware loading and internal errors
 
     Args:
-        code: 4-digit error code (e.g., '1002', '7001', '8004')
+        code: 4-digit numeric error code as a string (e.g., '1002',
+            '7001', '8004'). Must be exactly 4 digits.
 
     Returns:
-        Error code details including message and suggested solution.
+        Error code details including message, solution, and link to
+        the error registry. Returns error if code is invalid or not found.
     """
     return await lookup_error_code(code)
 
