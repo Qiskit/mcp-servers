@@ -390,6 +390,16 @@ class TestSearchQiskitDocs:
         call_url = mock_fetch.call_args[0][0]
         assert "error%20mitigation" in call_url
 
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_results_missing_title_text_keys(self, mock_fetch):
+        """Test that search results without title/text keys don't error."""
+        mock_fetch.return_value = [
+            {"url": "/docs/api/qiskit/circuit"},
+        ]
+        result = await search_qiskit_docs("circuit")
+        assert result["status"] == "success"
+        assert len(result["results"]) == 1
+
 
 class TestLookupErrorCode:
     """Test lookup_error_code function."""
