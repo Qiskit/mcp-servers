@@ -75,11 +75,19 @@ async def search_docs_tool(query: str, scope: str = "all") -> dict[str, Any]:
 
 
 @mcp.tool()
-async def get_page_tool(url: str) -> dict[str, Any]:
+async def get_page_tool(
+    url: str,
+    max_length: int = 20000,
+    offset: int = 0,
+) -> dict[str, Any]:
     """Fetch a Qiskit documentation page and return its content as markdown.
 
     Accepts any URL from the Qiskit documentation site. Use search_docs_tool
     first to find the right page, or use URLs from the resource lists.
+
+    Returns documentation in markdown format with pagination support.
+    Default max_length is 20000 chars. Set max_length=0 for unlimited.
+    Use offset to retrieve subsequent pages when has_more is true.
 
     This tool can fetch ANY page in the Qiskit documentation, including:
     - SDK module API references (e.g., 'api/qiskit/circuit')
@@ -92,12 +100,15 @@ async def get_page_tool(url: str) -> dict[str, Any]:
         url: Documentation page URL. Accepts:
             - Full URL: 'https://quantum.cloud.ibm.com/docs/guides/transpile'
             - Relative path: 'guides/transpile', 'api/qiskit/circuit'
+        max_length: Maximum characters to return (default: 20000, 0 for unlimited)
+        offset: Character offset for pagination (default: 0)
 
     Returns:
-        Page content in markdown format with metadata, or error with
-        suggestion to use search_docs_tool if the page is not found.
+        Page content in markdown format with pagination metadata
+        (has_more, next_offset, total_length), or error with suggestion
+        to use search_docs_tool if the page is not found.
     """
-    return await get_page_docs(url)
+    return await get_page_docs(url, max_length=max_length, offset=offset)
 
 
 @mcp.tool()

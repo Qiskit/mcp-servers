@@ -15,8 +15,10 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 from qiskit_docs_mcp_server.constants import (
     AVAILABLE_ADDONS,
+    AVAILABLE_GUIDES,
     AVAILABLE_MODULES,
     HTTP_TIMEOUT,
     _get_env_float,
@@ -24,6 +26,7 @@ from qiskit_docs_mcp_server.constants import (
 from qiskit_docs_mcp_server.data_fetcher import (
     _resolve_url,
     _strip_html_tags,
+    _truncate_content,
     convert_html_to_markdown,
     fetch_text,
     fetch_text_json,
@@ -161,8 +164,6 @@ class TestResolveUrl:
 
     def test_full_url_disallowed_domain(self):
         """Test that URLs with disallowed domains raise ValueError."""
-        import pytest
-
         with pytest.raises(ValueError, match="not allowed"):
             _resolve_url("https://evil.com/malicious")
 
@@ -170,6 +171,11 @@ class TestResolveUrl:
         """Test resolving an addon path."""
         url = _resolve_url("api/qiskit-addon-sqd")
         assert url == "https://quantum.cloud.ibm.com/docs/api/qiskit-addon-sqd"
+
+    def test_resolve_empty_string(self):
+        """Test resolving an empty string returns base URL."""
+        url = _resolve_url("")
+        assert url == "https://quantum.cloud.ibm.com/docs/"
 
 
 class TestGetPageDocs:
@@ -214,6 +220,86 @@ class TestGetPageDocs:
         assert "metadata" in result
         assert "url" in result["metadata"]
         assert "timestamp" in result["metadata"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_page_pagination_has_more(self, mock_fetch):
+        """Test that get_page_docs returns pagination fields."""
+        mock_fetch.return_value = "<p>" + "x" * 50000 + "</p>"
+        result = await get_page_docs("api/qiskit/circuit", max_length=1000)
+        assert result["status"] == "success"
+        assert result["has_more"] is True
+        assert result["next_offset"] is not None
+        assert result["total_length"] > 1000
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_page_pagination_with_offset(self, mock_fetch):
+        """Test pagination with offset retrieves subsequent content."""
+        mock_fetch.return_value = "<p>" + "A" * 100 + "</p>"
+        result = await get_page_docs("api/qiskit/circuit", max_length=50, offset=10)
+        assert result["status"] == "success"
+        assert "has_more" in result
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_page_unlimited_length(self, mock_fetch):
+        """Test max_length=0 returns all content without truncation."""
+        mock_fetch.return_value = "<p>" + "y" * 50000 + "</p>"
+        result = await get_page_docs("api/qiskit/circuit", max_length=0)
+        assert result["status"] == "success"
+        assert result["has_more"] is False
+
+
+class TestTruncateContent:
+    """Test _truncate_content function."""
+
+    def test_short_content_no_truncation(self):
+        """Test that short content is not truncated."""
+        result = _truncate_content("hello world", max_length=100)
+        assert result["content"] == "hello world"
+        assert result["has_more"] is False
+        assert result["next_offset"] is None
+
+    def test_long_content_truncated(self):
+        """Test that content exceeding max_length is truncated."""
+        content = "a" * 200
+        result = _truncate_content(content, max_length=100)
+        assert len(result["content"]) <= 100
+        assert result["has_more"] is True
+        assert result["next_offset"] is not None
+        assert result["total_length"] == 200
+
+    def test_offset_skips_content(self):
+        """Test that offset skips the beginning of content."""
+        content = "0123456789"
+        result = _truncate_content(content, max_length=100, offset=5)
+        assert result["content"] == "56789"
+        assert result["has_more"] is False
+
+    def test_unlimited_returns_all(self):
+        """Test max_length=0 returns all content."""
+        content = "a" * 50000
+        result = _truncate_content(content, max_length=0)
+        assert result["content"] == content
+        assert result["has_more"] is False
+
+    def test_negative_offset_clamped_to_zero(self):
+        """Test that negative offset is clamped to 0."""
+        result = _truncate_content("hello", max_length=100, offset=-5)
+        assert result["content"] == "hello"
+        assert result["offset"] == 0
+
+    def test_negative_max_length_treated_as_unlimited(self):
+        """Test that negative max_length is treated as unlimited (clamped to 0)."""
+        content = "a" * 500
+        result = _truncate_content(content, max_length=-10)
+        assert result["content"] == content
+        assert result["has_more"] is False
+
+    def test_truncation_snaps_to_line_boundary(self):
+        """Test that truncation snaps to a nearby newline boundary."""
+        lines = "\n".join(["line " + str(i) for i in range(50)])
+        result = _truncate_content(lines, max_length=100)
+        assert result["content"].endswith("\n")
+        assert result["has_more"] is True
 
 
 class TestStripHtmlTags:
@@ -385,9 +471,10 @@ class TestListHelpers:
         assert "modules" in result
         assert isinstance(result["modules"], list)
         assert len(result["modules"]) > 0
-        # Check structure includes url_path
+        # Check structure includes name, description, url_path
         first = result["modules"][0]
         assert "name" in first
+        assert "description" in first
         assert "url_path" in first
         assert first["url_path"].startswith("api/qiskit/")
 
@@ -399,6 +486,7 @@ class TestListHelpers:
         assert len(result["addons"]) > 0
         first = result["addons"][0]
         assert "name" in first
+        assert "description" in first
         assert "url_path" in first
         assert "qiskit-addon-" in first["url_path"]
 
@@ -410,6 +498,7 @@ class TestListHelpers:
         assert len(result["guides"]) > 0
         first = result["guides"][0]
         assert "name" in first
+        assert "description" in first
         assert "url_path" in first
         assert first["url_path"].startswith("guides/")
 
@@ -433,9 +522,37 @@ class TestDocFetcherConstants:
         """Test that AVAILABLE_MODULES contains circuit."""
         assert "circuit" in AVAILABLE_MODULES
 
+    def test_qiskit_modules_are_dict_with_descriptions(self):
+        """Test that AVAILABLE_MODULES values are description strings."""
+        assert isinstance(AVAILABLE_MODULES, dict)
+        for key, value in AVAILABLE_MODULES.items():
+            assert isinstance(key, str)
+            assert isinstance(value, str)
+            assert len(value) > 0
+
     def test_qiskit_addon_modules_not_empty(self):
         """Test that AVAILABLE_ADDONS is not empty."""
         assert len(AVAILABLE_ADDONS) > 0
+
+    def test_qiskit_addons_are_dict_with_descriptions(self):
+        """Test that AVAILABLE_ADDONS values are description strings."""
+        assert isinstance(AVAILABLE_ADDONS, dict)
+        for key, value in AVAILABLE_ADDONS.items():
+            assert isinstance(key, str)
+            assert isinstance(value, str)
+            assert len(value) > 0
+
+    def test_qiskit_guides_not_empty(self):
+        """Test that AVAILABLE_GUIDES is not empty."""
+        assert len(AVAILABLE_GUIDES) > 0
+
+    def test_qiskit_guides_are_dict_with_descriptions(self):
+        """Test that AVAILABLE_GUIDES values are description strings."""
+        assert isinstance(AVAILABLE_GUIDES, dict)
+        for key, value in AVAILABLE_GUIDES.items():
+            assert isinstance(key, str)
+            assert isinstance(value, str)
+            assert len(value) > 0
 
 
 class TestEnvironmentConfiguration:

@@ -33,8 +33,8 @@ from qiskit_docs_mcp_server.constants import (
 
 logger = logging.getLogger(__name__)
 
-# Allowed hostname for URL validation
-_ALLOWED_HOST = "quantum.cloud.ibm.com"
+# Allowed hostname for URL validation (derived from configurable QISKIT_DOCS_BASE)
+_ALLOWED_HOST = urlparse(QISKIT_DOCS_BASE).netloc
 
 
 def _strip_html_tags(text: str) -> str:
@@ -63,6 +63,61 @@ def convert_html_to_markdown(html: str) -> str:
     h.body_width = 0
     h.ignore_images = False
     return h.handle(html)
+
+
+def _truncate_content(content: str, max_length: int = 20000, offset: int = 0) -> dict[str, Any]:
+    """Truncate content with pagination metadata.
+
+    Args:
+        content: The full content string
+        max_length: Maximum number of characters to return (0 for unlimited)
+        offset: Character offset to start from (negative values clamped to 0)
+
+    Returns:
+        Dict with 'content', 'has_more', 'offset', 'next_offset', 'total_length'
+    """
+    # Clamp invalid inputs
+    offset = max(0, offset)
+    max_length = max(0, max_length)
+
+    total_length = len(content)
+
+    if max_length <= 0:
+        return {
+            "content": content[offset:] if offset > 0 else content,
+            "has_more": False,
+            "offset": offset,
+            "next_offset": None,
+            "total_length": total_length,
+        }
+
+    # Apply offset
+    sliced = content[offset:]
+
+    if len(sliced) <= max_length:
+        return {
+            "content": sliced,
+            "has_more": False,
+            "offset": offset,
+            "next_offset": None,
+            "total_length": total_length,
+        }
+
+    # Truncate at a line boundary if possible
+    truncated = sliced[:max_length]
+    last_newline = truncated.rfind("\n")
+    if last_newline > max_length * 0.8:  # Only snap to newline if reasonably close
+        truncated = truncated[: last_newline + 1]
+
+    next_offset = offset + len(truncated)
+
+    return {
+        "content": truncated,
+        "has_more": True,
+        "offset": offset,
+        "next_offset": next_offset,
+        "total_length": total_length,
+    }
 
 
 def _resolve_url(url: str) -> str:
@@ -140,15 +195,17 @@ async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
         return None
 
 
-async def get_page_docs(url: str) -> dict[str, Any]:
+async def get_page_docs(url: str, max_length: int = 20000, offset: int = 0) -> dict[str, Any]:
     """Fetch any Qiskit documentation page and return as markdown.
 
     Accepts full URLs or relative paths. Validates that the URL is within
-    the allowed documentation domain.
+    the allowed documentation domain. Supports pagination for large pages.
 
     Args:
         url: Full URL or relative path (e.g., 'guides/transpile',
             'api/qiskit/circuit', 'api/qiskit/qiskit.circuit.QuantumCircuit')
+        max_length: Maximum number of characters to return (0 for unlimited)
+        offset: Character offset to start from for pagination
 
     Returns:
         Documentation content in markdown with metadata, or error status
@@ -179,15 +236,21 @@ async def get_page_docs(url: str) -> dict[str, Any]:
 
     docs = convert_html_to_markdown(html)
 
+    # Apply pagination
+    paginated = _truncate_content(docs, max_length=max_length, offset=offset)
+
     return {
         "status": "success",
         "url": resolved_url,
-        "documentation": docs,
+        "documentation": paginated["content"],
+        "has_more": paginated["has_more"],
+        "next_offset": paginated["next_offset"],
+        "total_length": paginated["total_length"],
         "metadata": {
             "url": resolved_url,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "content_type": "markdown",
-            "content_length": len(docs),
+            "content_length": len(paginated["content"]),
         },
     }
 
@@ -218,19 +281,22 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
             },
         }
 
-    # Strip HTML tags from search result fields
-    for result_item in results:
-        if "title" in result_item:
-            result_item["title"] = _strip_html_tags(result_item["title"])
-        if "text" in result_item:
-            result_item["text"] = _strip_html_tags(result_item["text"])
+    # Strip HTML tags from search result fields (shallow copy to avoid mutating cached data)
+    cleaned = []
+    for item in results:
+        entry = dict(item)
+        if "title" in entry:
+            entry["title"] = _strip_html_tags(entry["title"])
+        if "text" in entry:
+            entry["text"] = _strip_html_tags(entry["text"])
+        cleaned.append(entry)
 
     return {
         "status": "success",
         "query": query,
         "scope": scope,
-        "results": results,
-        "total_results": len(results),
+        "results": cleaned,
+        "total_results": len(cleaned),
         "metadata": {
             "url": url,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -302,28 +368,35 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
 
 
 def get_list_of_modules() -> dict[str, Any]:
-    """Get list of all Qiskit SDK modules with URL paths."""
+    """Get list of all Qiskit SDK modules with descriptions and URL paths."""
     return {
         "status": "success",
-        "modules": [{"name": name, "url_path": f"api/qiskit/{name}"} for name in AVAILABLE_MODULES],
+        "modules": [
+            {"name": name, "description": desc, "url_path": f"api/qiskit/{name}"}
+            for name, desc in AVAILABLE_MODULES.items()
+        ],
     }
 
 
 def get_list_of_addons() -> dict[str, Any]:
-    """Get list of all Qiskit addon modules with URL paths."""
+    """Get list of all Qiskit addon modules with descriptions and URL paths."""
     return {
         "status": "success",
         "addons": [
-            {"name": name, "url_path": f"api/qiskit-addon-{name}"} for name in AVAILABLE_ADDONS
+            {"name": name, "description": desc, "url_path": f"api/qiskit-addon-{name}"}
+            for name, desc in AVAILABLE_ADDONS.items()
         ],
     }
 
 
 def get_list_of_guides() -> dict[str, Any]:
-    """Get list of Qiskit guides and best practices with URL paths."""
+    """Get list of Qiskit guides and best practices with descriptions and URL paths."""
     return {
         "status": "success",
-        "guides": [{"name": name, "url_path": f"guides/{name}"} for name in AVAILABLE_GUIDES],
+        "guides": [
+            {"name": name, "description": desc, "url_path": f"guides/{name}"}
+            for name, desc in AVAILABLE_GUIDES.items()
+        ],
     }
 
 
