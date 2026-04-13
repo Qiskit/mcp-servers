@@ -23,14 +23,12 @@ The Qiskit Documentation MCP Server provides AI assistants and agents with seaml
 
 ### Tools
 
-The server implements five tools for documentation access:
+The server implements three tools for documentation access:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `get_sdk_module_docs_tool` | Get documentation for Qiskit SDK modules | `module`: Module name (e.g., circuit, transpiler, quantum_info, primitives, synthesis, dagcircuit — see `qiskit-docs://modules` resource for full list) |
-| `get_addon_docs_tool` | Get documentation for Qiskit addon packages | `addon`: Addon name (e.g., sqd, cutting, mpf, obp, aqc-tensor) |
-| `get_guide_tool` | Get Qiskit implementation guides and best practices | `guide`: Guide name (e.g., quick-start, construct-circuits, transpile, configure-error-mitigation, dynamic-circuits — see `qiskit-docs://guides` resource for full list) |
-| `search_docs_tool` | Search Qiskit documentation for relevant content | `query`: Search query string<br>`module`: Search scope (default: "documentation") |
+| `search_docs_tool` | Search across the entire Qiskit documentation for relevant content | `query`: Search query string<br>`scope`: Search scope filter — `all` (default), `documentation`, `api`, `learning`, `tutorials` |
+| `get_page_tool` | Fetch any Qiskit documentation page and return as markdown | `url`: Full URL or relative path (e.g., `guides/transpile`, `api/qiskit/circuit`)<br>`max_length`: Max characters to return (default: 20000, 0 for unlimited)<br>`offset`: Character offset for pagination (default: 0) |
 | `lookup_error_code_tool` | Look up a Qiskit/IBM Quantum error code | `code`: 4-digit error code (e.g., 1002, 7001, 8004) |
 
 ### Resources
@@ -193,22 +191,6 @@ asyncio.run(main())
 
 ## Usage Examples
 
-### Get SDK Module Documentation
-
-```python
-# Query circuit module documentation
-result = await get_sdk_module_docs_tool("circuit")
-print(result["documentation"])
-```
-
-### Get Implementation Guide
-
-```python
-# Get error mitigation guide
-result = await get_guide_tool("configure-error-mitigation")
-print(result["documentation"])
-```
-
 ### Search Documentation
 
 ```python
@@ -216,7 +198,28 @@ print(result["documentation"])
 result = await search_docs_tool("transpiler optimization")
 print(f"Found {result['total_results']} results")
 for item in result["results"]:
-    print(f"- {item['name']}: {item['url']}")
+    print(f"- {item['title']}: {item['url']}")
+```
+
+### Fetch a Documentation Page
+
+```python
+# Fetch circuit module API reference
+result = await get_page_tool("api/qiskit/circuit")
+print(result["documentation"])
+
+# Fetch with pagination for large pages
+result = await get_page_tool("api/qiskit/circuit", max_length=5000)
+if result["has_more"]:
+    next_page = await get_page_tool("api/qiskit/circuit", offset=result["next_offset"])
+```
+
+### Look Up an Error Code
+
+```python
+# Look up error code 1002
+result = await lookup_error_code_tool("1002")
+print(result["details"])
 ```
 
 ## Available Documentation
@@ -262,14 +265,17 @@ for item in result["results"]:
 
 ## Features
 
-### Fuzzy Matching
+### Pagination Support
 
-The server includes intelligent fuzzy matching for module and guide names:
+Large documentation pages are automatically paginated. Use `max_length` and `offset` to control content retrieval:
 
 ```python
-# Typo in module name - server suggests correct spelling
-result = await get_sdk_module_docs_tool("circuitt")
-# Returns: {"status": "error", "suggestions": ["circuit"]}
+# Fetch first 5000 characters
+result = await get_page_tool("api/qiskit/circuit", max_length=5000)
+# result["has_more"] == True, result["next_offset"] == 5000
+
+# Fetch unlimited content
+result = await get_page_tool("api/qiskit/circuit", max_length=0)
 ```
 
 ### Metadata Inclusion
@@ -279,8 +285,10 @@ All responses include rich metadata:
 ```python
 {
     "status": "success",
-    "module": "circuit",
+    "url": "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit",
     "documentation": "...",
+    "has_more": False,
+    "total_length": 15420,
     "metadata": {
         "url": "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit",
         "timestamp": "2026-03-03T03:00:00Z",
@@ -345,10 +353,10 @@ See the [`examples/`](examples/) directory for complete working examples:
 export QISKIT_HTTP_TIMEOUT=30.0
 ```
 
-### Module Not Found
+### Page Not Found
 
-**Problem**: "Module 'xyz' not found"
-**Solution**: Check available modules using the `qiskit-docs://modules` resource or see the Available Documentation section above
+**Problem**: "Failed to fetch" error from `get_page_tool`
+**Solution**: Use `search_docs_tool` to find the correct URL, or check the `qiskit-docs://modules` and `qiskit-docs://guides` resources for valid paths
 
 ## Contributing
 
