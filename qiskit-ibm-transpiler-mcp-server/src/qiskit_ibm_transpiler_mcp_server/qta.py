@@ -413,7 +413,7 @@ async def hybrid_ai_transpile(
 
     Args:
         circuit: quantum circuit as QASM 3.0 string or base64-encoded QPY.
-        backend_name: Qiskit Runtime Service backend name (e.g., 'ibm_torino', 'ibm_fez')
+        backend_name: Qiskit Runtime Service backend name (e.g., 'ibm_boston', 'ibm_fez')
         ai_optimization_level: Optimization level (1-3) for AI components. Higher values
             yield better results but require more computational resources.
         optimization_level: Optimization level (1-3) for heuristic components in the PassManager.

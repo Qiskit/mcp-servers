@@ -72,7 +72,7 @@ async def ai_routing_tool(
 
     Args:
         circuit: Input quantum circuit as QASM 3.0 string or base64-encoded QPY
-        backend_name: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+        backend_name: Target IBM Quantum backend (e.g., 'ibm_boston', 'ibm_fez')
         optimization_level: 1 (fastest, least optimization) to 3 (slowest, most optimization)
         layout_mode: 'keep' (respect existing layout), 'improve' (refine initial guess), 'optimize' (best for general circuits)
         optimization_preferences: What to minimize - 'n_cnots', 'n_gates', 'cnot_layers', 'layers', or 'noise'. Can be a list.
@@ -114,7 +114,7 @@ async def ai_linear_function_synthesis_tool(
 
     Args:
         circuit: Input quantum circuit as QASM 3.0 string or base64-encoded QPY
-        backend_name: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+        backend_name: Target IBM Quantum backend (e.g., 'ibm_boston', 'ibm_fez')
         replace_only_if_better: If True, only replaces sub-circuits when synthesis improves CNOT count
         local_mode: True runs locally (recommended), False uses remote Qiskit Transpiler Service
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
@@ -148,7 +148,7 @@ async def ai_clifford_synthesis_tool(
 
     Args:
         circuit: Input quantum circuit as QASM 3.0 string or base64-encoded QPY
-        backend_name: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+        backend_name: Target IBM Quantum backend (e.g., 'ibm_boston', 'ibm_fez')
         replace_only_if_better: If True, only replaces sub-circuits when synthesis improves CNOT count
         local_mode: True runs locally (recommended), False uses remote Qiskit Transpiler Service
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
@@ -182,7 +182,7 @@ async def ai_permutation_synthesis_tool(
 
     Args:
         circuit: Input quantum circuit as QASM 3.0 string or base64-encoded QPY
-        backend_name: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+        backend_name: Target IBM Quantum backend (e.g., 'ibm_boston', 'ibm_fez')
         replace_only_if_better: If True, only replaces sub-circuits when synthesis improves CNOT count
         local_mode: True runs locally (recommended), False uses remote Qiskit Transpiler Service
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
@@ -216,7 +216,7 @@ async def ai_pauli_network_synthesis_tool(
 
     Args:
         circuit: Input quantum circuit as QASM 3.0 string or base64-encoded QPY
-        backend_name: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+        backend_name: Target IBM Quantum backend (e.g., 'ibm_boston', 'ibm_fez')
         replace_only_if_better: If True, only replaces sub-circuits when synthesis improves CNOT count
         local_mode: True runs locally (recommended), False uses remote Qiskit Transpiler Service
         circuit_format: Format of the input circuit - 'qasm3' (default) or 'qpy' (base64-encoded QPY for full circuit fidelity)
@@ -256,7 +256,7 @@ async def hybrid_ai_transpile_tool(
 
     Args:
         circuit: Input quantum circuit as QASM 3.0 string or base64-encoded QPY
-        backend_name: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+        backend_name: Target IBM Quantum backend (e.g., 'ibm_boston', 'ibm_fez')
         ai_optimization_level: Optimization level (1-3) for AI components. Higher = better results but slower.
         optimization_level: Optimization level (1-3) for heuristic components.
         ai_layout_mode: Layout selection strategy:
