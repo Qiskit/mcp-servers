@@ -20,13 +20,17 @@ from qiskit_docs_mcp_server.constants import (
     AVAILABLE_ADDONS,
     AVAILABLE_GUIDES,
     AVAILABLE_MODULES,
+    CACHE_TTL,
     HTTP_TIMEOUT,
     _get_env_float,
 )
 from qiskit_docs_mcp_server.data_fetcher import (
+    _json_cache,
     _resolve_url,
     _strip_html_tags,
+    _text_cache,
     _truncate_content,
+    _TTLCache,
     convert_html_to_markdown,
     fetch_text,
     fetch_text_json,
@@ -43,44 +47,50 @@ from qiskit_docs_mcp_server.data_fetcher import (
 class TestFetchText:
     """Test fetch_text function."""
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_success(self, mock_client_class):
+    def setup_method(self):
+        """Clear cache before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_success(self, mock_get_client):
         """Test successful text fetch."""
         mock_response = MagicMock()
         mock_response.text = "Sample documentation"
+        mock_response.raise_for_status = MagicMock()
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text("https://example.com")
         assert result == "Sample documentation"
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_http_error(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_http_error(self, mock_get_client):
         """Test fetch_text with HTTP error."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.HTTPError("Connection failed")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text("https://example.com")
         assert result is None
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_generic_exception(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_generic_exception(self, mock_get_client):
         """Test fetch_text with generic exception."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = Exception("Unexpected error")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text("https://example.com")
         assert result is None
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_timeout(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_timeout(self, mock_get_client):
         """Test fetch_text with timeout."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.TimeoutException("Request timed out")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text("https://example.com")
         assert result is None
@@ -89,46 +99,53 @@ class TestFetchText:
 class TestFetchTextJson:
     """Test fetch_text_json function."""
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_success(self, mock_client_class):
+    def setup_method(self):
+        """Clear cache before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_success(self, mock_get_client):
         """Test successful JSON fetch."""
         mock_response = MagicMock()
         mock_response.json.return_value = [{"key": "value"}]
+        mock_response.raise_for_status = MagicMock()
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text_json("https://example.com/api")
         assert result == [{"key": "value"}]
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_http_error(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_http_error(self, mock_get_client):
         """Test fetch_text_json with HTTP error."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.HTTPError("Connection failed")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text_json("https://example.com/api")
         assert result is None
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_generic_exception(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_generic_exception(self, mock_get_client):
         """Test fetch_text_json with generic exception."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = Exception("Unexpected error")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text_json("https://example.com/api")
         assert result is None
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_returns_list(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_returns_list(self, mock_get_client):
         """Test that fetch_text_json returns list."""
         mock_response = MagicMock()
         mock_response.json.return_value = [{"name": "test"}]
+        mock_response.raise_for_status = MagicMock()
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text_json("https://example.com")
         assert isinstance(result, list)
@@ -635,3 +652,111 @@ class TestEnvironmentConfiguration:
         """Test that HTTP_TIMEOUT has a reasonable default."""
         assert HTTP_TIMEOUT > 0
         assert HTTP_TIMEOUT <= 30.0
+
+    def test_cache_ttl_default(self):
+        """Test that CACHE_TTL has a reasonable default."""
+        assert CACHE_TTL > 0
+        assert CACHE_TTL <= 86400  # At most 24 hours
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
+    def test_fetch_text_uses_http_timeout(self, mock_client_class):
+        """Test that _get_http_client creates client with HTTP_TIMEOUT."""
+        import qiskit_docs_mcp_server.data_fetcher as df
+        from qiskit_docs_mcp_server.data_fetcher import _get_http_client
+
+        # Force creation of a new client
+        original_holder = df._client_holder.copy()
+        df._client_holder.clear()
+        try:
+            _get_http_client()
+            mock_client_class.assert_called_once()
+            call_kwargs = mock_client_class.call_args[1]
+            assert "timeout" in call_kwargs
+            assert call_kwargs["timeout"] == HTTP_TIMEOUT
+            assert call_kwargs["follow_redirects"] is True
+        finally:
+            df._client_holder.clear()
+            df._client_holder.update(original_holder)
+
+
+class TestCaching:
+    """Test in-memory caching functionality."""
+
+    def setup_method(self):
+        """Clear caches before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_caches_result(self, mock_get_client):
+        """Test that fetch_text caches successful results."""
+        mock_response = MagicMock()
+        mock_response.text = "Cached content"
+        mock_response.raise_for_status = MagicMock()
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_get_client.return_value = mock_client
+
+        # First call — should hit network
+        result1 = await fetch_text("https://example.com/page")
+        assert result1 == "Cached content"
+        assert mock_client.get.call_count == 1
+
+        # Second call — should use cache
+        result2 = await fetch_text("https://example.com/page")
+        assert result2 == "Cached content"
+        assert mock_client.get.call_count == 1  # No additional network call
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_caches_result(self, mock_get_client):
+        """Test that fetch_text_json caches successful results."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = [{"key": "value"}]
+        mock_response.raise_for_status = MagicMock()
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_get_client.return_value = mock_client
+
+        result1 = await fetch_text_json("https://example.com/api")
+        assert result1 == [{"key": "value"}]
+        assert mock_client.get.call_count == 1
+
+        result2 = await fetch_text_json("https://example.com/api")
+        assert result2 == [{"key": "value"}]
+        assert mock_client.get.call_count == 1
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_does_not_cache_errors(self, mock_get_client):
+        """Test that failed fetches are not cached."""
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.HTTPError("Connection failed")
+        mock_get_client.return_value = mock_client
+
+        result1 = await fetch_text("https://example.com/fail")
+        assert result1 is None
+
+        # Should try network again (not serve None from cache)
+        result2 = await fetch_text("https://example.com/fail")
+        assert result2 is None
+        assert mock_client.get.call_count == 2
+
+    def test_cache_clear(self):
+        """Test cache clear functionality."""
+        _text_cache.set("key", "value")
+        assert _text_cache.get("key") == "value"
+        _text_cache.clear()
+        assert _text_cache.get("key") is None
+
+    def test_cache_evicts_oldest_at_max_size(self):
+        """Test that cache evicts the oldest entry when at capacity."""
+        cache = _TTLCache(ttl=3600.0, max_size=2)
+        cache.set("a", 1)
+        cache.set("b", 2)
+        assert cache.get("a") == 1
+        assert cache.get("b") == 2
+
+        # Adding a third entry should evict the oldest ("a")
+        cache.set("c", 3)
+        assert cache.get("a") is None
+        assert cache.get("b") == 2
+        assert cache.get("c") == 3
