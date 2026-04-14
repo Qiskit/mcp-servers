@@ -301,6 +301,20 @@ class TestTruncateContent:
         assert result["content"].endswith("\n")
         assert result["has_more"] is True
 
+    def test_offset_beyond_content_returns_empty(self):
+        """Test that offset beyond content length is clamped and returns empty."""
+        result = _truncate_content("hello", max_length=100, offset=9999)
+        assert result["content"] == ""
+        assert result["has_more"] is False
+        assert result["offset"] == 5  # Clamped to total_length
+        assert result["total_length"] == 5
+
+    def test_offset_at_exact_length_returns_empty(self):
+        """Test that offset exactly at content length returns empty."""
+        result = _truncate_content("hello", max_length=100, offset=5)
+        assert result["content"] == ""
+        assert result["has_more"] is False
+
 
 class TestStripHtmlTags:
     """Test HTML tag stripping."""
@@ -399,6 +413,20 @@ class TestSearchQiskitDocs:
         result = await search_qiskit_docs("circuit")
         assert result["status"] == "success"
         assert len(result["results"]) == 1
+
+    async def test_search_invalid_scope_returns_error(self):
+        """Test that an invalid scope returns an error without calling the API."""
+        result = await search_qiskit_docs("test", scope="invalid")
+        assert result["status"] == "error"
+        assert "Invalid scope" in result["message"]
+        assert "invalid" in result["message"]
+
+    async def test_search_all_valid_scopes_accepted(self):
+        """Test that all documented scopes are accepted."""
+        from qiskit_docs_mcp_server.data_fetcher import _VALID_SCOPES
+
+        for scope in ["all", "documentation", "api", "learning", "tutorials"]:
+            assert scope in _VALID_SCOPES
 
 
 class TestLookupErrorCode:

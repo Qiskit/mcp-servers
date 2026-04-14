@@ -82,6 +82,9 @@ def _truncate_content(content: str, max_length: int = 20000, offset: int = 0) ->
 
     total_length = len(content)
 
+    # Clamp offset to content length
+    offset = min(offset, total_length)
+
     if max_length <= 0:
         return {
             "content": content[offset:] if offset > 0 else content,
@@ -255,6 +258,9 @@ async def get_page_docs(url: str, max_length: int = 20000, offset: int = 0) -> d
     }
 
 
+_VALID_SCOPES = {"all", "documentation", "api", "learning", "tutorials"}
+
+
 async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
     """Search Qiskit documentation for relevant results.
 
@@ -266,6 +272,14 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
     Returns:
         Search results with matching entries, total count, and metadata
     """
+    if scope not in _VALID_SCOPES:
+        return {
+            "status": "error",
+            "message": (
+                f"Invalid scope '{scope}'. Valid values: {', '.join(sorted(_VALID_SCOPES))}."
+            ),
+        }
+
     url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(scope)}"
     logger.info(f"Searching docs for '{query}' in scope '{scope}'")
 
