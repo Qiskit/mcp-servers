@@ -28,6 +28,7 @@ from qiskit_docs_mcp_server.data_fetcher import (
     _strip_html_tags,
     _truncate_content,
     convert_html_to_markdown,
+    extract_main_content,
     fetch_text,
     fetch_text_json,
     get_list_of_addons,
@@ -475,6 +476,114 @@ class TestLookupErrorCode:
         result = await lookup_error_code("9999")
         assert result["status"] == "error"
         assert "not found" in result["message"]
+
+
+class TestExtractMainContent:
+    """Test main content extraction from HTML."""
+
+    def test_extracts_main_tag(self):
+        """Test extraction of main tag content."""
+        html = "<html><body><nav>Nav</nav><main><h1>Title</h1><p>Content</p></main><footer>Footer</footer></body></html>"
+        result = extract_main_content(html)
+        assert "Title" in result
+        assert "Content" in result
+        assert "Nav" not in result
+        assert "Footer" not in result
+
+    def test_extracts_article_fallback(self):
+        """Test fallback to article tag."""
+        html = "<html><body><nav>Nav</nav><article><h1>Title</h1></article></body></html>"
+        result = extract_main_content(html)
+        assert "Title" in result
+        assert "Nav" not in result
+
+    def test_extracts_role_main_fallback(self):
+        """Test fallback to role=main."""
+        html = '<html><body><nav>Nav</nav><div role="main"><p>Content</p></div></body></html>'
+        result = extract_main_content(html)
+        assert "Content" in result
+        assert "Nav" not in result
+
+    def test_removes_nav_elements(self):
+        """Test that nav elements are removed."""
+        html = "<html><body><nav>Navigation</nav><main><p>Content</p></main></body></html>"
+        result = extract_main_content(html)
+        assert "Navigation" not in result
+
+    def test_removes_header_elements(self):
+        """Test that header elements are removed."""
+        html = "<html><body><header>Header</header><main><p>Content</p></main></body></html>"
+        result = extract_main_content(html)
+        assert "Header" not in result
+
+    def test_removes_footer_elements(self):
+        """Test that footer elements are removed."""
+        html = "<html><body><main><p>Content</p></main><footer>Footer</footer></body></html>"
+        result = extract_main_content(html)
+        assert "Footer" not in result
+
+    def test_removes_aside_elements(self):
+        """Test that aside elements are removed."""
+        html = "<html><body><aside>Sidebar</aside><main><p>Content</p></main></body></html>"
+        result = extract_main_content(html)
+        assert "Sidebar" not in result
+
+    def test_removes_navigation_role(self):
+        """Test that elements with role=navigation are removed."""
+        html = (
+            '<html><body><div role="navigation">Nav</div><main><p>Content</p></main></body></html>'
+        )
+        result = extract_main_content(html)
+        assert "Nav" not in result
+
+    def test_removes_skip_links(self):
+        """Test that skip-to-content links are removed."""
+        html = '<html><body><a class="skip-link">Skip to main content</a><main><p>Content</p></main></body></html>'
+        result = extract_main_content(html)
+        assert "Skip to main content" not in result
+
+    def test_body_fallback(self):
+        """Test fallback to body when no main/article found."""
+        html = "<html><body><nav>Nav</nav><div><p>Content</p></div></body></html>"
+        result = extract_main_content(html)
+        assert "Content" in result
+        assert "Nav" not in result
+
+    def test_empty_html(self):
+        """Test with empty HTML."""
+        result = extract_main_content("")
+        assert result is not None
+
+    def test_plain_content(self):
+        """Test with simple content without structure."""
+        html = "<p>Just a paragraph</p>"
+        result = extract_main_content(html)
+        assert "Just a paragraph" in result
+
+
+class TestConvertHtmlToMarkdownWithExtraction:
+    """Test that convert_html_to_markdown strips chrome before converting."""
+
+    def test_chrome_not_in_markdown(self):
+        """Test that navigation chrome is not in final markdown output."""
+        html = """
+        <html>
+        <body>
+            <nav><ul><li><a href="/">Home</a></li><li><a href="/docs">Docs</a></li></ul></nav>
+            <header><h1>IBM Quantum Platform</h1></header>
+            <main>
+                <h1>Circuit Module</h1>
+                <p>The circuit module provides QuantumCircuit class.</p>
+            </main>
+            <footer><p>Copyright IBM 2026</p></footer>
+        </body>
+        </html>
+        """
+        result = convert_html_to_markdown(html)
+        assert "Circuit Module" in result
+        assert "QuantumCircuit" in result
+        assert "IBM Quantum Platform" not in result
+        assert "Copyright IBM" not in result
 
 
 class TestConvertHtmlToMarkdown:
