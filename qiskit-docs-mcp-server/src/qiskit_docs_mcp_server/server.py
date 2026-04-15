@@ -142,6 +142,40 @@ async def lookup_error_code_tool(code: str) -> dict[str, Any]:
 
 
 ##################################################
+## MCP Prompts
+## - https://modelcontextprotocol.io/docs/concepts/prompts
+##################################################
+
+
+@mcp.prompt()
+def explain_error(code: str) -> str:
+    """Look up a Qiskit error code and explain what it means and how to fix it."""
+    return (
+        f"Look up error code {code} using lookup_error_code_tool, then explain the "
+        "error in plain language and suggest how to fix it."
+    )
+
+
+@mcp.prompt()
+def module_overview(module: str) -> str:
+    """Get an overview of a Qiskit SDK module."""
+    return (
+        f"Fetch the documentation for the '{module}' module using get_page_tool with "
+        f"url 'api/qiskit/{module}', then provide a concise overview of the module's "
+        "purpose, key classes, and common usage patterns."
+    )
+
+
+@mcp.prompt()
+def how_to(task: str) -> str:
+    """Find documentation on how to accomplish a task with Qiskit."""
+    return (
+        f"Search for '{task}' using search_docs_tool, then fetch the most relevant "
+        "result using get_page_tool, and explain how to accomplish this task step by step."
+    )
+
+
+##################################################
 ## MCP Resources
 ## - https://modelcontextprotocol.io/docs/concepts/resources
 ##################################################
@@ -183,3 +217,27 @@ def guides_resource() -> dict[str, Any]:
 def error_codes_resource() -> dict[str, Any]:
     """Get list of IBM Quantum error code categories and registry URL."""
     return get_list_of_error_code_categories()
+
+
+##################################################
+## MCP Resource Templates
+## - https://modelcontextprotocol.io/docs/concepts/resources#resource-templates
+##################################################
+
+
+@mcp.resource("qiskit-docs://modules/{module_name}", mime_type="application/json")
+async def module_docs_resource(module_name: str) -> dict[str, Any]:
+    """Get documentation for a specific Qiskit SDK module."""
+    return await get_page_docs(f"api/qiskit/{module_name}")
+
+
+@mcp.resource("qiskit-docs://guides/{guide_name}", mime_type="application/json")
+async def guide_docs_resource(guide_name: str) -> dict[str, Any]:
+    """Get a specific Qiskit implementation guide."""
+    return await get_page_docs(f"guides/{guide_name}")
+
+
+@mcp.resource("qiskit-docs://addons/{addon_name}", mime_type="application/json")
+async def addon_docs_resource(addon_name: str) -> dict[str, Any]:
+    """Get documentation for a specific Qiskit addon package."""
+    return await get_page_docs(f"api/qiskit-addon-{addon_name}")
