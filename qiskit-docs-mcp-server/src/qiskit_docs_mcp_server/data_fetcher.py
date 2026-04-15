@@ -12,6 +12,7 @@
 
 import logging
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote, urlparse
@@ -24,6 +25,7 @@ from qiskit_docs_mcp_server.constants import (
     AVAILABLE_GUIDES,
     AVAILABLE_MODULES,
     BASE_URL,
+    CACHE_TTL,
     ERROR_CODE_CATEGORIES,
     HTTP_TIMEOUT,
     QISKIT_DOCS_BASE,
@@ -35,6 +37,47 @@ logger = logging.getLogger(__name__)
 
 # Allowed hostname for URL validation (derived from configurable QISKIT_DOCS_BASE)
 _ALLOWED_HOST = urlparse(QISKIT_DOCS_BASE).netloc
+
+
+class _TTLCache:
+    """Simple in-memory cache with TTL and LRU eviction."""
+
+    def __init__(self, ttl: float = 3600.0, max_size: int = 128):
+        self._ttl = ttl
+        self._max_size = max_size
+        self._cache: dict[str, tuple[float, Any]] = {}
+
+    def get(self, key: str) -> Any | None:
+        if key in self._cache:
+            timestamp, value = self._cache[key]
+            if time.monotonic() - timestamp < self._ttl:
+                return value
+            del self._cache[key]
+        return None
+
+    def set(self, key: str, value: Any) -> None:
+        if len(self._cache) >= self._max_size and key not in self._cache:
+            oldest_key = min(self._cache, key=lambda k: self._cache[k][0])
+            del self._cache[oldest_key]
+        self._cache[key] = (time.monotonic(), value)
+
+    def clear(self) -> None:
+        self._cache.clear()
+
+
+_text_cache = _TTLCache(ttl=CACHE_TTL)
+_json_cache = _TTLCache(ttl=CACHE_TTL)
+
+_client_holder: dict[str, httpx.AsyncClient] = {}
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    """Get or create a shared HTTP client."""
+    client = _client_holder.get("client")
+    if client is None or client.is_closed:
+        client = httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True)
+        _client_holder["client"] = client
+    return client
 
 
 def _strip_html_tags(text: str) -> str:
@@ -163,11 +206,17 @@ async def fetch_text(url: str) -> str | None:
     Returns:
         The text content of the page, or None if fetch fails
     """
+    cached = _text_cache.get(url)
+    if cached is not None:
+        return cached
+
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
-            return response.text
+        client = _get_http_client()
+        response = await client.get(url, follow_redirects=True)
+        response.raise_for_status()
+        result = response.text
+        _text_cache.set(url, result)
+        return result
     except httpx.HTTPError as e:
         logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
         return None
@@ -185,11 +234,17 @@ async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     Returns:
         The JSON content as a list of dicts, or None if fetch fails
     """
+    cached = _json_cache.get(url)
+    if cached is not None:
+        return cached
+
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
-            return response.json()  # type: ignore[no-any-return]
+        client = _get_http_client()
+        response = await client.get(url, follow_redirects=True)
+        response.raise_for_status()
+        result = response.json()
+        _json_cache.set(url, result)
+        return result
     except httpx.HTTPError as e:
         logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
         return None
