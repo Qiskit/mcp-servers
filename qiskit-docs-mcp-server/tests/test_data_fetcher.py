@@ -22,6 +22,7 @@ from qiskit_docs_mcp_server.constants import (
     AVAILABLE_MODULES,
     CACHE_TTL,
     HTTP_TIMEOUT,
+    SEARCH_CACHE_TTL,
     _get_env_float,
 )
 from qiskit_docs_mcp_server.data_fetcher import (
@@ -767,6 +768,10 @@ class TestEnvironmentConfiguration:
         assert CACHE_TTL > 0
         assert CACHE_TTL <= 86400  # At most 24 hours
 
+    def test_search_cache_ttl_default(self):
+        """Test that SEARCH_CACHE_TTL defaults to 300.0 (5 minutes)."""
+        assert SEARCH_CACHE_TTL == 300.0
+
     @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
     def test_fetch_text_uses_http_timeout(self, mock_client_class):
         """Test that _get_http_client creates client with HTTP_TIMEOUT."""
@@ -857,15 +862,41 @@ class TestCaching:
         assert _text_cache.get("key") is None
 
     def test_cache_evicts_oldest_at_max_size(self):
-        """Test that cache evicts the oldest entry when at capacity."""
+        """Test that cache evicts the LRU entry when at capacity."""
         cache = _TTLCache(ttl=3600.0, max_size=2)
         cache.set("a", 1)
         cache.set("b", 2)
         assert cache.get("a") == 1
         assert cache.get("b") == 2
 
-        # Adding a third entry should evict the oldest ("a")
+        # Adding a third entry should evict LRU ("a", since get("b") was most recent)
         cache.set("c", 3)
         assert cache.get("a") is None
         assert cache.get("b") == 2
         assert cache.get("c") == 3
+
+    def test_cache_lru_eviction_order(self):
+        """Test that LRU eviction respects access order, not insertion order."""
+        cache = _TTLCache(ttl=3600.0, max_size=2)
+        cache.set("a", 1)
+        cache.set("b", 2)
+
+        # Touch "a" so it becomes most recently used
+        assert cache.get("a") == 1
+
+        # Adding "c" should evict "b" (LRU), not "a"
+        cache.set("c", 3)
+        assert cache.get("b") is None  # "b" was evicted (LRU)
+        assert cache.get("a") == 1  # "a" survives (recently accessed)
+        assert cache.get("c") == 3
+
+    def test_cache_update_existing_key_no_eviction(self):
+        """Test that updating an existing key does not evict other entries."""
+        cache = _TTLCache(ttl=3600.0, max_size=2)
+        cache.set("a", 1)
+        cache.set("b", 2)
+
+        # Update "a" with a new value — should not evict "b"
+        cache.set("a", 10)
+        assert cache.get("a") == 10
+        assert cache.get("b") == 2
