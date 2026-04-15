@@ -277,7 +277,7 @@ async def _fetch_with_retry(url: str) -> httpx.Response | None:
             response = await client.get(url, follow_redirects=True)
             response.raise_for_status()
             return response
-        except httpx.TimeoutException as e:
+        except httpx.TimeoutException as e:  # noqa: PERF203
             last_error = e
             if attempt < _MAX_RETRIES - 1:
                 logger.warning(
