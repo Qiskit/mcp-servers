@@ -446,6 +446,32 @@ class TestSearchQiskitDocs:
         for scope in ["all", "documentation", "api", "learning", "tutorials"]:
             assert scope in _VALID_SCOPES
 
+    async def test_search_empty_query_returns_error(self):
+        """Test that empty query returns an error without hitting the API."""
+        result = await search_qiskit_docs("")
+        assert result["status"] == "error"
+        assert "provide a search query" in result["message"].lower()
+
+    async def test_search_whitespace_only_query_returns_error(self):
+        """Test that whitespace-only query returns an error."""
+        result = await search_qiskit_docs("   ")
+        assert result["status"] == "error"
+        assert "provide a search query" in result["message"].lower()
+
+    async def test_search_too_long_query_returns_error(self):
+        """Test that overly long query returns an error."""
+        result = await search_qiskit_docs("a" * 501)
+        assert result["status"] == "error"
+        assert "too long" in result["message"].lower()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_max_length_query_accepted(self, mock_fetch):
+        """Test that a query at exactly 500 chars is accepted."""
+        # This test needs the fetch mock since it will proceed to API call
+        mock_fetch.return_value = []
+        result = await search_qiskit_docs("a" * 500)
+        assert result["status"] == "success"
+
 
 class TestLookupErrorCode:
     """Test lookup_error_code function."""
