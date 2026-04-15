@@ -787,7 +787,7 @@ async def get_fake_backend_coupling_map(backend_name: str) -> dict[str, Any]:
     for offline development and testing.
 
     Args:
-        backend_name: Backend name (e.g., "ibm_fez", "ibm_brisbane", "ibm_torino")
+        backend_name: Backend name (e.g., "ibm_fez", "ibm_brisbane", "ibm_boston")
 
     Returns:
         Dict with exact coupling map edges, num_qubits, and backend info

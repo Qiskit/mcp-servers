@@ -872,7 +872,7 @@ async def get_fake_backend_coupling_map_tool(backend_name: str) -> dict[str, Any
     topologies for offline development.
 
     Args:
-        backend_name: Backend name (e.g., "ibm_fez", "ibm_brisbane", "ibm_torino",
+        backend_name: Backend name (e.g., "ibm_fez", "ibm_brisbane", "ibm_boston",
             "ibm_sherbrooke"). Use list_available_fake_backends to see all options.
 
     Returns:
