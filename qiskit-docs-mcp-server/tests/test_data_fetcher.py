@@ -540,6 +540,20 @@ class TestLookupErrorCode:
         assert result["code"] == "3002"
         assert "Queue is full" in result["details"]
 
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found_in_heading(self, mock_fetch):
+        """Test finding an error code in a heading element."""
+        mock_fetch.return_value = (
+            "<html><body>"
+            "<h3>Error 4001: Session expired</h3>"
+            "<p>Details about the session timeout.</p>"
+            "</body></html>"
+        )
+        result = await lookup_error_code("4001")
+        assert result["status"] == "success"
+        assert result["code"] == "4001"
+        assert "Session expired" in result["details"]
+
 
 class TestExtractMainContent:
     """Test main content extraction from HTML."""
