@@ -19,6 +19,7 @@ from urllib.parse import quote, urlparse
 
 import html2text
 import httpx
+from bs4 import BeautifulSoup
 
 from qiskit_docs_mcp_server.constants import (
     AVAILABLE_ADDONS,
@@ -92,8 +93,62 @@ def _strip_html_tags(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text)
 
 
+def extract_main_content(html: str) -> str:
+    """Extract main content from HTML, removing navigation chrome.
+
+    Strips nav, header, footer, aside elements and ARIA-role navigation,
+    then returns the <main>, <article>, or role='main' content. Falls back
+    to <body> (with chrome removed) if no semantic main content is found.
+
+    Args:
+        html: Full HTML page content
+
+    Returns:
+        HTML string with only the main content
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Remove structural chrome elements
+    for tag_name in ["nav", "header", "footer", "aside"]:
+        for element in soup.find_all(tag_name):
+            element.decompose()
+
+    # Remove ARIA-role navigation elements
+    for role in ["navigation", "banner", "contentinfo", "complementary"]:
+        for element in soup.find_all(attrs={"role": role}):
+            element.decompose()
+
+    # Remove skip-to-content links
+    for element in soup.find_all("a", class_=lambda c: c and "skip" in c.lower()):
+        element.decompose()
+    for element in soup.find_all("a", string=lambda s: s and "skip to" in s.lower()):
+        element.decompose()
+
+    # Return the best semantic container
+    main_content = soup.find("main")
+    if main_content:
+        return str(main_content)
+
+    article = soup.find("article")
+    if article:
+        return str(article)
+
+    main_role = soup.find(attrs={"role": "main"})
+    if main_role:
+        return str(main_role)
+
+    body = soup.find("body")
+    if body:
+        return str(body)
+
+    return str(soup)
+
+
 def convert_html_to_markdown(html: str) -> str:
     """Convert HTML content to Markdown format.
+
+    Strips navigation chrome (header, footer, nav, aside) before conversion
+    to produce cleaner markdown output.
 
     Args:
         html: HTML content string
@@ -101,11 +156,12 @@ def convert_html_to_markdown(html: str) -> str:
     Returns:
         Markdown formatted content
     """
+    content_html = extract_main_content(html)
     h = html2text.HTML2Text()
     h.ignore_links = False
     h.body_width = 0
     h.ignore_images = False
-    return h.handle(html)
+    return h.handle(content_html)
 
 
 def _truncate_content(content: str, max_length: int = 20000, offset: int = 0) -> dict[str, Any]:
