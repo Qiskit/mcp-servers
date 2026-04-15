@@ -498,9 +498,7 @@ class TestLookupErrorCode:
     async def test_code_found_in_paragraph(self, mock_fetch):
         """Test finding an error code outside a table, in a paragraph."""
         mock_fetch.return_value = (
-            "<html><body>"
-            "<p>Error 2001: The circuit could not be transpiled.</p>"
-            "</body></html>"
+            "<html><body><p>Error 2001: The circuit could not be transpiled.</p></body></html>"
         )
         result = await lookup_error_code("2001")
         assert result["status"] == "success"
