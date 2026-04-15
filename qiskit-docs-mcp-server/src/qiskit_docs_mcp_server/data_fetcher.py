@@ -122,7 +122,8 @@ def extract_main_content(html: str) -> str:
     for element in soup.find_all("a", class_=lambda c: c and "skip" in c.lower()):
         element.decompose()
     for element in soup.find_all(
-        "a", string=lambda s: s and "skip to" in s.lower()  # type: ignore[call-overload]
+        "a",
+        string=lambda s: s and "skip to" in s.lower(),  # type: ignore[call-overload]
     ):
         element.decompose()
 
