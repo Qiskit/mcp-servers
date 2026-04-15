@@ -69,7 +69,7 @@ def mock_ai_synthesis_failure():
 @pytest.fixture
 def backend_name():
     """Set real backend name"""
-    return os.getenv("TEST_BACKEND_NAME", "ibm_torino")
+    return os.getenv("TEST_BACKEND_NAME", "ibm_boston")
 
 
 @pytest.fixture

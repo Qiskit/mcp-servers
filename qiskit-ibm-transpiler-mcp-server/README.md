@@ -246,7 +246,7 @@ hybrid_ai_transpile(
 ```
 **Parameters:**
 - `circuit`: quantum circuit as QASM 3.0 string or base64-encoded QPY
-- `backend_name`: Target IBM Quantum backend (e.g., 'ibm_torino', 'ibm_fez')
+- `backend_name`: Target IBM Quantum backend (e.g., 'ibm_boston', 'ibm_fez')
 - `ai_optimization_level` (optional): Optimization level (1-3) for AI components. Higher values yield better results but require more computational resources
 - `optimization_level` (optional): Optimization level (1-3) for heuristic components in the PassManager
 - `ai_layout_mode` (optional): Specifies how the AI routing component handles layout selection:
