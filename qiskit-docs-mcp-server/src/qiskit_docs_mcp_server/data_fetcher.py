@@ -411,12 +411,19 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
 
     # Strip HTML tags from search result fields (shallow copy to avoid mutating cached data)
     cleaned = []
+    base = QISKIT_DOCS_BASE.rstrip("/")
     for item in results:
         entry = dict(item)
         if "title" in entry:
             entry["title"] = _strip_html_tags(entry["title"])
         if "text" in entry:
             entry["text"] = _strip_html_tags(entry["text"])
+        # Normalize URL to full URL if relative
+        url_val = entry.get("url")
+        if url_val:
+            parsed = urlparse(url_val)
+            if not parsed.scheme and not parsed.netloc:
+                entry["url"] = f"{base}/{url_val.lstrip('/')}"
         cleaned.append(entry)
 
     return {
@@ -497,10 +504,16 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
 
 def get_list_of_modules() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules with descriptions and URL paths."""
+    base = QISKIT_DOCS_BASE.rstrip("/")
     return {
         "status": "success",
         "modules": [
-            {"name": name, "description": desc, "url_path": f"api/qiskit/{name}"}
+            {
+                "name": name,
+                "description": desc,
+                "url_path": f"api/qiskit/{name}",
+                "full_url": f"{base}/api/qiskit/{name}",
+            }
             for name, desc in AVAILABLE_MODULES.items()
         ],
     }
@@ -508,10 +521,16 @@ def get_list_of_modules() -> dict[str, Any]:
 
 def get_list_of_addons() -> dict[str, Any]:
     """Get list of all Qiskit addon modules with descriptions and URL paths."""
+    base = QISKIT_DOCS_BASE.rstrip("/")
     return {
         "status": "success",
         "addons": [
-            {"name": name, "description": desc, "url_path": f"api/qiskit-addon-{name}"}
+            {
+                "name": name,
+                "description": desc,
+                "url_path": f"api/qiskit-addon-{name}",
+                "full_url": f"{base}/api/qiskit-addon-{name}",
+            }
             for name, desc in AVAILABLE_ADDONS.items()
         ],
     }
@@ -519,10 +538,16 @@ def get_list_of_addons() -> dict[str, Any]:
 
 def get_list_of_guides() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices with descriptions and URL paths."""
+    base = QISKIT_DOCS_BASE.rstrip("/")
     return {
         "status": "success",
         "guides": [
-            {"name": name, "description": desc, "url_path": f"guides/{name}"}
+            {
+                "name": name,
+                "description": desc,
+                "url_path": f"guides/{name}",
+                "full_url": f"{base}/guides/{name}",
+            }
             for name, desc in AVAILABLE_GUIDES.items()
         ],
     }

@@ -432,6 +432,31 @@ class TestSearchQiskitDocs:
         assert result["status"] == "success"
         assert len(result["results"]) == 1
 
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_normalizes_relative_urls(self, mock_fetch):
+        """Test that relative URLs in search results are resolved to full URLs."""
+        mock_fetch.return_value = [
+            {"title": "Circuit", "url": "/docs/api/qiskit/circuit", "text": "Circuit module"},
+        ]
+        result = await search_qiskit_docs("circuit")
+        assert result["status"] == "success"
+        assert result["results"][0]["url"].startswith("https://")
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_preserves_absolute_urls(self, mock_fetch):
+        """Test that absolute URLs in search results are preserved as-is."""
+        mock_fetch.return_value = [
+            {
+                "title": "Circuit",
+                "url": "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit",
+                "text": "test",
+            },
+        ]
+        result = await search_qiskit_docs("circuit")
+        assert (
+            result["results"][0]["url"] == "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit"
+        )
+
     async def test_search_invalid_scope_returns_error(self):
         """Test that an invalid scope returns an error without calling the API."""
         result = await search_qiskit_docs("test", scope="invalid")
@@ -641,6 +666,8 @@ class TestListHelpers:
         assert "description" in first
         assert "url_path" in first
         assert first["url_path"].startswith("api/qiskit/")
+        assert "full_url" in first
+        assert first["full_url"].startswith("https://")
 
     def test_get_list_of_addons(self):
         """Test get_list_of_addons returns correct structure with url_path."""
@@ -653,6 +680,7 @@ class TestListHelpers:
         assert "description" in first
         assert "url_path" in first
         assert "qiskit-addon-" in first["url_path"]
+        assert "full_url" in first
 
     def test_get_list_of_guides(self):
         """Test get_list_of_guides returns correct structure with url_path."""
@@ -665,6 +693,7 @@ class TestListHelpers:
         assert "description" in first
         assert "url_path" in first
         assert first["url_path"].startswith("guides/")
+        assert "full_url" in first
 
     def test_get_list_of_error_code_categories(self):
         """Test get_list_of_error_code_categories returns correct structure."""
