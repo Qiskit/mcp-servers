@@ -121,7 +121,9 @@ def extract_main_content(html: str) -> str:
     # Remove skip-to-content links
     for element in soup.find_all("a", class_=lambda c: c and "skip" in c.lower()):
         element.decompose()
-    for element in soup.find_all("a", string=lambda s: s and "skip to" in s.lower()):
+    for element in soup.find_all(
+        "a", string=lambda s: s and "skip to" in s.lower()  # type: ignore[call-overload]
+    ):
         element.decompose()
 
     # Return the best semantic container
@@ -262,7 +264,7 @@ async def fetch_text(url: str) -> str | None:
     Returns:
         The text content of the page, or None if fetch fails
     """
-    cached = _text_cache.get(url)
+    cached: str | None = _text_cache.get(url)
     if cached is not None:
         return cached
 
@@ -290,7 +292,7 @@ async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     Returns:
         The JSON content as a list of dicts, or None if fetch fails
     """
-    cached = _json_cache.get(url)
+    cached: list[dict[str, Any]] | None = _json_cache.get(url)
     if cached is not None:
         return cached
 
@@ -298,7 +300,7 @@ async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
         client = _get_http_client()
         response = await client.get(url, follow_redirects=True)
         response.raise_for_status()
-        result = response.json()
+        result: list[dict[str, Any]] = response.json()
         _json_cache.set(url, result)
         return result
     except httpx.HTTPError as e:
