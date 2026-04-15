@@ -86,8 +86,9 @@ class TestFetchText:
         result = await fetch_text("https://example.com")
         assert result is None
 
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
     @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
-    async def test_fetch_text_timeout(self, mock_get_client):
+    async def test_fetch_text_timeout(self, mock_get_client, mock_sleep):
         """Test fetch_text with timeout."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.TimeoutException("Request timed out")
@@ -95,6 +96,178 @@ class TestFetchText:
 
         result = await fetch_text("https://example.com")
         assert result is None
+
+
+class TestFetchTextRetry:
+    """Test retry logic in fetch_text function."""
+
+    def setup_method(self):
+        """Clear cache before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_timeout_then_success(self, mock_get_client, mock_sleep):
+        """Test that a timeout on first attempt succeeds on retry."""
+        mock_success = MagicMock()
+        mock_success.text = "Success after retry"
+        mock_success.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [
+            httpx.TimeoutException("Request timed out"),
+            mock_success,
+        ]
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text("https://example.com")
+        assert result == "Success after retry"
+        assert mock_client.get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_503_then_success(self, mock_get_client, mock_sleep):
+        """Test that a 503 on first attempt succeeds on retry."""
+        mock_503_response = MagicMock()
+        mock_503_response.status_code = 503
+        error_503 = httpx.HTTPStatusError(
+            "Server Error",
+            request=httpx.Request("GET", "https://example.com"),
+            response=mock_503_response,
+        )
+        mock_success = MagicMock()
+        mock_success.text = "Success after 503"
+        mock_success.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [error_503, mock_success]
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text("https://example.com")
+        assert result == "Success after 503"
+        assert mock_client.get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_404_not_retried(self, mock_get_client, mock_sleep):
+        """Test that a 404 is NOT retried (4xx errors)."""
+        mock_404_response = MagicMock()
+        mock_404_response.status_code = 404
+        error_404 = httpx.HTTPStatusError(
+            "Not Found",
+            request=httpx.Request("GET", "https://example.com"),
+            response=mock_404_response,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = error_404
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text("https://example.com")
+        assert result is None
+        assert mock_client.get.call_count == 1
+        mock_sleep.assert_not_called()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_retries_exhausted(self, mock_get_client, mock_sleep):
+        """Test that retries are exhausted and return None."""
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.TimeoutException("Request timed out")
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text("https://example.com")
+        assert result is None
+        assert mock_client.get.call_count == 2
+
+
+class TestFetchTextJsonRetry:
+    """Test retry logic in fetch_text_json function."""
+
+    def setup_method(self):
+        """Clear cache before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_json_timeout_then_success(self, mock_get_client, mock_sleep):
+        """Test that a timeout on first attempt succeeds on retry for JSON."""
+        mock_success = MagicMock()
+        mock_success.json.return_value = [{"key": "value"}]
+        mock_success.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [
+            httpx.TimeoutException("Request timed out"),
+            mock_success,
+        ]
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text_json("https://example.com/api")
+        assert result == [{"key": "value"}]
+        assert mock_client.get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_json_503_then_success(self, mock_get_client, mock_sleep):
+        """Test that a 503 on first attempt succeeds on retry for JSON."""
+        mock_503_response = MagicMock()
+        mock_503_response.status_code = 503
+        error_503 = httpx.HTTPStatusError(
+            "Server Error",
+            request=httpx.Request("GET", "https://example.com/api"),
+            response=mock_503_response,
+        )
+        mock_success = MagicMock()
+        mock_success.json.return_value = [{"data": "ok"}]
+        mock_success.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [error_503, mock_success]
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text_json("https://example.com/api")
+        assert result == [{"data": "ok"}]
+        assert mock_client.get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_json_404_not_retried(self, mock_get_client, mock_sleep):
+        """Test that a 404 is NOT retried for JSON fetch."""
+        mock_404_response = MagicMock()
+        mock_404_response.status_code = 404
+        error_404 = httpx.HTTPStatusError(
+            "Not Found",
+            request=httpx.Request("GET", "https://example.com/api"),
+            response=mock_404_response,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = error_404
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text_json("https://example.com/api")
+        assert result is None
+        assert mock_client.get.call_count == 1
+        mock_sleep.assert_not_called()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_json_retries_exhausted(self, mock_get_client, mock_sleep):
+        """Test that retries are exhausted and return None for JSON."""
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.TimeoutException("Request timed out")
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text_json("https://example.com/api")
+        assert result is None
+        assert mock_client.get.call_count == 2
 
 
 class TestFetchTextJson:

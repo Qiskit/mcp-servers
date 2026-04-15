@@ -10,6 +10,7 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+import asyncio
 import logging
 import re
 import time
@@ -38,6 +39,10 @@ logger = logging.getLogger(__name__)
 
 # Allowed hostname for URL validation (derived from configurable QISKIT_DOCS_BASE)
 _ALLOWED_HOST = urlparse(QISKIT_DOCS_BASE).netloc
+
+# Retry configuration for transient HTTP failures
+_MAX_RETRIES = 2  # Total attempts (1 initial + 1 retry)
+_RETRY_DELAY = 1.0  # Seconds between retries
 
 
 class _TTLCache:
@@ -256,8 +261,59 @@ def _resolve_url(url: str) -> str:
     return f"{base}/{path}"
 
 
+async def _fetch_with_retry(url: str) -> httpx.Response | None:
+    """Fetch a URL with retry for transient errors (5xx, timeouts).
+
+    Args:
+        url: The URL to fetch
+
+    Returns:
+        The httpx Response on success, or None if all attempts fail
+    """
+    client = _get_http_client()
+    last_error: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            response = await client.get(url, follow_redirects=True)
+            response.raise_for_status()
+            return response
+        except httpx.TimeoutException as e:
+            last_error = e
+            if attempt < _MAX_RETRIES - 1:
+                logger.warning(
+                    "Timeout fetching %s (attempt %d), retrying...",
+                    url,
+                    attempt + 1,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+        except httpx.HTTPStatusError as e:
+            last_error = e
+            if attempt < _MAX_RETRIES - 1 and e.response.status_code >= 500:
+                logger.warning(
+                    "Server error %d fetching %s (attempt %d), retrying...",
+                    e.response.status_code,
+                    url,
+                    attempt + 1,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+            break  # 4xx errors — don't retry
+        except httpx.HTTPError as e:
+            logger.error("Failed to fetch %s: %s", url, e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error fetching %s: %s", url, e)
+            return None
+
+    logger.error("Failed to fetch %s after %d attempts: %s", url, _MAX_RETRIES, last_error)
+    return None
+
+
 async def fetch_text(url: str) -> str | None:
     """Fetch text content from a URL using httpx.
+
+    Retries on transient errors (5xx status codes and timeouts).
 
     Args:
         url: The URL to fetch
@@ -269,23 +325,19 @@ async def fetch_text(url: str) -> str | None:
     if cached is not None:
         return cached
 
-    try:
-        client = _get_http_client()
-        response = await client.get(url, follow_redirects=True)
-        response.raise_for_status()
-        result = response.text
-        _text_cache.set(url, result)
-        return result
-    except httpx.HTTPError as e:
-        logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
+    response = await _fetch_with_retry(url)
+    if response is None:
         return None
-    except Exception as e:
-        logger.error(f"Unexpected error fetching {url}: {e}")
-        return None
+
+    result = response.text
+    _text_cache.set(url, result)
+    return result
 
 
 async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     """Fetch JSON content from a URL using httpx.
+
+    Retries on transient errors (5xx status codes and timeouts).
 
     Args:
         url: The URL to fetch
@@ -297,19 +349,13 @@ async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     if cached is not None:
         return cached
 
-    try:
-        client = _get_http_client()
-        response = await client.get(url, follow_redirects=True)
-        response.raise_for_status()
-        result: list[dict[str, Any]] = response.json()
-        _json_cache.set(url, result)
-        return result
-    except httpx.HTTPError as e:
-        logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
+    response = await _fetch_with_retry(url)
+    if response is None:
         return None
-    except Exception as e:
-        logger.error(f"Unexpected error fetching {url}: {e}")
-        return None
+
+    result: list[dict[str, Any]] = response.json()
+    _json_cache.set(url, result)
+    return result
 
 
 async def get_page_docs(url: str, max_length: int = 20000, offset: int = 0) -> dict[str, Any]:
@@ -335,7 +381,7 @@ async def get_page_docs(url: str, max_length: int = 20000, offset: int = 0) -> d
             "message": str(e),
         }
 
-    logger.info(f"Fetching page docs from {resolved_url}")
+    logger.info("Fetching page docs from %s", resolved_url)
     html = await fetch_text(resolved_url)
 
     if html is None:
@@ -395,7 +441,7 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
         }
 
     url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(scope)}"
-    logger.info(f"Searching docs for '{query}' in scope '{scope}'")
+    logger.info("Searching docs for '%s' in scope '%s'", query, scope)
 
     results = await fetch_text_json(url)
 
@@ -451,7 +497,7 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
         }
 
     url = f"{QISKIT_DOCS_BASE}errors"
-    logger.info(f"Fetching error code {code} from {url}")
+    logger.info("Fetching error code %s from %s", code, url)
     html = await fetch_text(url)
 
     if not html:
