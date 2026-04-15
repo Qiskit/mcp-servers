@@ -25,6 +25,8 @@ from qiskit_docs_mcp_server.constants import (
     _get_env_float,
 )
 from qiskit_docs_mcp_server.data_fetcher import (
+    _client_holder,
+    _get_http_client,
     _json_cache,
     _resolve_url,
     _strip_html_tags,
@@ -869,3 +871,62 @@ class TestCaching:
         assert cache.get("a") is None
         assert cache.get("b") == 2
         assert cache.get("c") == 3
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.time")
+    def test_cache_entry_expires_after_ttl(self, mock_time):
+        """Test that cache entries expire after TTL."""
+        mock_time.monotonic.return_value = 1000.0
+        cache = _TTLCache(ttl=60.0, max_size=10)
+        cache.set("key", "value")
+        assert cache.get("key") == "value"
+
+        # Advance time past TTL
+        mock_time.monotonic.return_value = 1061.0
+        assert cache.get("key") is None
+
+    def test_cache_update_existing_key(self):
+        """Test that updating an existing key doesn't trigger eviction."""
+        cache = _TTLCache(ttl=3600.0, max_size=2)
+        cache.set("a", "1")
+        cache.set("b", "2")
+        cache.set("a", "3")  # Update, not new entry
+        assert cache.get("a") == "3"
+        assert cache.get("b") == "2"
+
+    def test_get_http_client_reuse(self):
+        """Test that _get_http_client returns the same instance on repeated calls."""
+        _client_holder.clear()
+        client1 = _get_http_client()
+        client2 = _get_http_client()
+        assert client1 is client2
+        # Cleanup
+        _client_holder.clear()
+
+
+@pytest.mark.integration
+class TestIntegration:
+    """Integration tests that hit the real Qiskit documentation API.
+
+    Run with: pytest -m integration
+    Skipped by default in CI.
+    """
+
+    async def test_search_docs_live(self):
+        """Test that search returns results from the live API."""
+        result = await search_qiskit_docs("QuantumCircuit")
+        assert result["status"] == "success"
+        assert result["total_results"] > 0
+
+    async def test_get_page_docs_live(self):
+        """Test that page fetch works against the live API."""
+        result = await get_page_docs("api/qiskit/circuit", max_length=1000)
+        assert result["status"] == "success"
+        assert len(result["documentation"]) > 0
+
+    async def test_lookup_error_code_live(self):
+        """Test that error code lookup works against the live API."""
+        result = await lookup_error_code("1002")
+        # May or may not find the code, but should not error
+        assert result["status"] in ("success", "error")
+        if result["status"] == "error":
+            assert "not found" in result["message"].lower() or "Failed" in result["message"]
