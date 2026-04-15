@@ -72,6 +72,16 @@ _json_cache = _TTLCache(ttl=CACHE_TTL)
 _client_holder: dict[str, httpx.AsyncClient] = {}
 
 
+def set_http_client(client: httpx.AsyncClient) -> None:
+    """Set the shared HTTP client (called by server lifespan)."""
+    _client_holder["client"] = client
+
+
+def clear_http_client() -> None:
+    """Clear the shared HTTP client (called on server shutdown)."""
+    _client_holder.clear()
+
+
 def _get_http_client() -> httpx.AsyncClient:
     """Get or create a shared HTTP client."""
     client = _client_holder.get("client")
