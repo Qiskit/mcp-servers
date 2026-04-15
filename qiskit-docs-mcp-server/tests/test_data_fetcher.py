@@ -15,24 +15,31 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 from qiskit_docs_mcp_server.constants import (
     AVAILABLE_ADDONS,
+    AVAILABLE_GUIDES,
     AVAILABLE_MODULES,
+    CACHE_TTL,
     HTTP_TIMEOUT,
     _get_env_float,
 )
 from qiskit_docs_mcp_server.data_fetcher import (
-    _find_similar,
+    _json_cache,
+    _resolve_url,
+    _strip_html_tags,
+    _text_cache,
+    _truncate_content,
+    _TTLCache,
     convert_html_to_markdown,
+    extract_main_content,
     fetch_text,
     fetch_text_json,
-    get_addon_docs,
-    get_component_docs,
-    get_guide_docs,
     get_list_of_addons,
     get_list_of_error_code_categories,
     get_list_of_guides,
     get_list_of_modules,
+    get_page_docs,
     lookup_error_code,
     search_qiskit_docs,
 )
@@ -41,44 +48,50 @@ from qiskit_docs_mcp_server.data_fetcher import (
 class TestFetchText:
     """Test fetch_text function."""
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_success(self, mock_client_class):
+    def setup_method(self):
+        """Clear cache before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_success(self, mock_get_client):
         """Test successful text fetch."""
         mock_response = MagicMock()
         mock_response.text = "Sample documentation"
+        mock_response.raise_for_status = MagicMock()
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text("https://example.com")
         assert result == "Sample documentation"
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_http_error(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_http_error(self, mock_get_client):
         """Test fetch_text with HTTP error."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.HTTPError("Connection failed")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text("https://example.com")
         assert result is None
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_generic_exception(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_generic_exception(self, mock_get_client):
         """Test fetch_text with generic exception."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = Exception("Unexpected error")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text("https://example.com")
         assert result is None
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_timeout(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_timeout(self, mock_get_client):
         """Test fetch_text with timeout."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.TimeoutException("Request timed out")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text("https://example.com")
         assert result is None
@@ -87,326 +100,623 @@ class TestFetchText:
 class TestFetchTextJson:
     """Test fetch_text_json function."""
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_success(self, mock_client_class):
+    def setup_method(self):
+        """Clear cache before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_success(self, mock_get_client):
         """Test successful JSON fetch."""
         mock_response = MagicMock()
         mock_response.json.return_value = [{"key": "value"}]
+        mock_response.raise_for_status = MagicMock()
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text_json("https://example.com/api")
         assert result == [{"key": "value"}]
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_http_error(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_http_error(self, mock_get_client):
         """Test fetch_text_json with HTTP error."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.HTTPError("Connection failed")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text_json("https://example.com/api")
         assert result is None
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_generic_exception(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_generic_exception(self, mock_get_client):
         """Test fetch_text_json with generic exception."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = Exception("Unexpected error")
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text_json("https://example.com/api")
         assert result is None
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_returns_list(self, mock_client_class):
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_returns_list(self, mock_get_client):
         """Test that fetch_text_json returns list."""
         mock_response = MagicMock()
         mock_response.json.return_value = [{"name": "test"}]
+        mock_response.raise_for_status = MagicMock()
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
         result = await fetch_text_json("https://example.com")
         assert isinstance(result, list)
 
 
-class TestGetComponentDocs:
-    """Test get_component_docs function."""
+class TestResolveUrl:
+    """Test URL resolution and validation."""
+
+    def test_resolve_relative_path(self):
+        """Test resolving a relative path."""
+        url = _resolve_url("guides/transpile")
+        assert url == "https://quantum.cloud.ibm.com/docs/guides/transpile"
+
+    def test_resolve_relative_path_with_leading_slash(self):
+        """Test resolving a relative path with leading slash."""
+        url = _resolve_url("/guides/transpile")
+        assert url == "https://quantum.cloud.ibm.com/docs/guides/transpile"
+
+    def test_resolve_api_path(self):
+        """Test resolving an API path."""
+        url = _resolve_url("api/qiskit/circuit")
+        assert url == "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit"
+
+    def test_resolve_class_path(self):
+        """Test resolving a class-level API path."""
+        url = _resolve_url("api/qiskit/qiskit.circuit.QuantumCircuit")
+        assert "qiskit.circuit.QuantumCircuit" in url
+
+    def test_full_url_allowed_domain(self):
+        """Test that full URLs with allowed domain pass through."""
+        url = _resolve_url("https://quantum.cloud.ibm.com/docs/guides/transpile")
+        assert url == "https://quantum.cloud.ibm.com/docs/guides/transpile"
+
+    def test_full_url_disallowed_domain(self):
+        """Test that URLs with disallowed domains raise ValueError."""
+        with pytest.raises(ValueError, match="not allowed"):
+            _resolve_url("https://evil.com/malicious")
+
+    def test_resolve_addon_path(self):
+        """Test resolving an addon path."""
+        url = _resolve_url("api/qiskit-addon-sqd")
+        assert url == "https://quantum.cloud.ibm.com/docs/api/qiskit-addon-sqd"
+
+    def test_resolve_empty_string(self):
+        """Test resolving an empty string returns base URL."""
+        url = _resolve_url("")
+        assert url == "https://quantum.cloud.ibm.com/docs/"
+
+
+class TestGetPageDocs:
+    """Test get_page_docs function."""
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_component_docs_valid_module(self, mock_fetch):
-        """Test getting docs for a valid module."""
-        mock_fetch.return_value = "Circuit documentation"
-        result = await get_component_docs("circuit")
-
+    async def test_get_page_relative_path(self, mock_fetch):
+        """Test fetching a page by relative path."""
+        mock_fetch.return_value = "<h1>Circuit</h1><p>Documentation</p>"
+        result = await get_page_docs("api/qiskit/circuit")
         assert result["status"] == "success"
-        assert result["module"] == "circuit"
+        assert "documentation" in result
         assert "metadata" in result
-        mock_fetch.assert_called_once()
+        assert "Circuit" in result["documentation"]
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_component_docs_invalid_module(self, mock_fetch):
-        """Test getting docs for an invalid module."""
-        result = await get_component_docs("invalid_module")
-        assert result["status"] == "error"
-        assert "not found" in result["message"]
-        assert "available_modules" in result
-        mock_fetch.assert_not_called()
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_component_docs_invalid_with_suggestions(self, mock_fetch):
-        """Test getting docs with similar module suggestions."""
-        result = await get_component_docs("circuitt")  # Typo of 'circuit'
-        assert result["status"] == "error"
-        assert "available_modules" in result
-        # May or may not have suggestions depending on similarity cutoff
-        if "suggestions" in result:
-            assert "circuit" in result["suggestions"]
-        mock_fetch.assert_not_called()
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_component_docs_all_valid_modules(self, mock_fetch):
-        """Test getting docs for all valid modules."""
-        mock_fetch.return_value = "Documentation"
-
-        for module in AVAILABLE_MODULES:
-            result = await get_component_docs(module)
-            assert result["status"] == "success"
-            assert result["module"] == module
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_component_docs_fetch_fails(self, mock_fetch):
-        """Test get_component_docs when fetch fails."""
-        mock_fetch.return_value = None
-        result = await get_component_docs("circuit")
-        assert result["status"] == "error"
-
-
-class TestGetGuideDocs:
-    """Test get_guide_docs function."""
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_guide_docs_valid_guide(self, mock_fetch):
-        """Test getting docs for a valid guide."""
-        mock_fetch.return_value = "Quick start guide"
-        result = await get_guide_docs("quick-start")
-
+    async def test_get_page_full_url(self, mock_fetch):
+        """Test fetching a page by full URL."""
+        mock_fetch.return_value = "<h1>Guide</h1>"
+        result = await get_page_docs("https://quantum.cloud.ibm.com/docs/guides/transpile")
         assert result["status"] == "success"
-        assert result["guide"] == "quick-start"
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_page_fetch_fails(self, mock_fetch):
+        """Test get_page when fetch fails."""
+        mock_fetch.return_value = None
+        result = await get_page_docs("api/qiskit/nonexistent")
+        assert result["status"] == "error"
+        assert "search_docs_tool" in result["message"]
+
+    async def test_get_page_disallowed_domain(self):
+        """Test get_page rejects disallowed domains."""
+        result = await get_page_docs("https://evil.com/page")
+        assert result["status"] == "error"
+        assert "not allowed" in result["message"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_page_has_metadata(self, mock_fetch):
+        """Test that get_page response includes metadata."""
+        mock_fetch.return_value = "<p>Content</p>"
+        result = await get_page_docs("guides/quick-start")
         assert "metadata" in result
-        mock_fetch.assert_called_once()
+        assert "url" in result["metadata"]
+        assert "timestamp" in result["metadata"]
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_guide_docs_invalid_guide(self, mock_fetch):
-        """Test getting docs for an invalid guide."""
-        result = await get_guide_docs("nonexistent-guide")
-        assert result["status"] == "error"
-        assert "not found" in result["message"]
-        assert "available_guides" in result
-        mock_fetch.assert_not_called()
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_guide_docs_invalid_with_suggestions(self, mock_fetch):
-        """Test getting docs with similar guide suggestions."""
-        result = await get_guide_docs(
-            "transpile-with-pass-manager"
-        )  # Similar to 'transpile-with-pass-managers'
-        assert result["status"] == "error"
-        assert "available_guides" in result
-        # May or may not have suggestions depending on similarity cutoff
-        if "suggestions" in result:
-            assert "transpile-with-pass-managers" in result["suggestions"]
-        mock_fetch.assert_not_called()
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_guide_docs_all_valid_guides(self, mock_fetch):
-        """Test getting docs for all valid guides."""
-        mock_fetch.return_value = "Guide documentation"
-        valid_guides = [
-            "quick-start",
-            "construct-circuits",
-            "transpile",
-            "dynamic-circuits",
-            "primitives",
-            "configure-error-mitigation",
-        ]
-
-        for guide in valid_guides:
-            result = await get_guide_docs(guide)
-            assert result["status"] == "success"
-            assert result["guide"] == guide
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_guide_docs_fetch_fails(self, mock_fetch):
-        """Test get_guide_docs when fetch fails."""
-        mock_fetch.return_value = None
-        result = await get_guide_docs("quick-start")
-        assert result["status"] == "error"
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_guide_docs_error_mitigation(self, mock_fetch):
-        """Test getting error-mitigation guide."""
-        mock_fetch.return_value = "Error mitigation techniques"
-        result = await get_guide_docs("configure-error-mitigation")
+    async def test_get_page_pagination_has_more(self, mock_fetch):
+        """Test that get_page_docs returns pagination fields."""
+        mock_fetch.return_value = "<p>" + "x" * 50000 + "</p>"
+        result = await get_page_docs("api/qiskit/circuit", max_length=1000)
         assert result["status"] == "success"
-        assert result["guide"] == "configure-error-mitigation"
+        assert result["has_more"] is True
+        assert result["next_offset"] is not None
+        assert result["total_length"] > 1000
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_page_pagination_with_offset(self, mock_fetch):
+        """Test pagination with offset retrieves subsequent content."""
+        mock_fetch.return_value = "<p>" + "A" * 100 + "</p>"
+        result = await get_page_docs("api/qiskit/circuit", max_length=50, offset=10)
+        assert result["status"] == "success"
+        assert "has_more" in result
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_get_page_unlimited_length(self, mock_fetch):
+        """Test max_length=0 returns all content without truncation."""
+        mock_fetch.return_value = "<p>" + "y" * 50000 + "</p>"
+        result = await get_page_docs("api/qiskit/circuit", max_length=0)
+        assert result["status"] == "success"
+        assert result["has_more"] is False
+
+
+class TestTruncateContent:
+    """Test _truncate_content function."""
+
+    def test_short_content_no_truncation(self):
+        """Test that short content is not truncated."""
+        result = _truncate_content("hello world", max_length=100)
+        assert result["content"] == "hello world"
+        assert result["has_more"] is False
+        assert result["next_offset"] is None
+
+    def test_long_content_truncated(self):
+        """Test that content exceeding max_length is truncated."""
+        content = "a" * 200
+        result = _truncate_content(content, max_length=100)
+        assert len(result["content"]) <= 100
+        assert result["has_more"] is True
+        assert result["next_offset"] is not None
+        assert result["total_length"] == 200
+
+    def test_offset_skips_content(self):
+        """Test that offset skips the beginning of content."""
+        content = "0123456789"
+        result = _truncate_content(content, max_length=100, offset=5)
+        assert result["content"] == "56789"
+        assert result["has_more"] is False
+
+    def test_unlimited_returns_all(self):
+        """Test max_length=0 returns all content."""
+        content = "a" * 50000
+        result = _truncate_content(content, max_length=0)
+        assert result["content"] == content
+        assert result["has_more"] is False
+
+    def test_negative_offset_clamped_to_zero(self):
+        """Test that negative offset is clamped to 0."""
+        result = _truncate_content("hello", max_length=100, offset=-5)
+        assert result["content"] == "hello"
+        assert result["offset"] == 0
+
+    def test_negative_max_length_treated_as_unlimited(self):
+        """Test that negative max_length is treated as unlimited (clamped to 0)."""
+        content = "a" * 500
+        result = _truncate_content(content, max_length=-10)
+        assert result["content"] == content
+        assert result["has_more"] is False
+
+    def test_truncation_snaps_to_line_boundary(self):
+        """Test that truncation snaps to a nearby newline boundary."""
+        lines = "\n".join(["line " + str(i) for i in range(50)])
+        result = _truncate_content(lines, max_length=100)
+        assert result["content"].endswith("\n")
+        assert result["has_more"] is True
+
+    def test_offset_beyond_content_returns_empty(self):
+        """Test that offset beyond content length is clamped and returns empty."""
+        result = _truncate_content("hello", max_length=100, offset=9999)
+        assert result["content"] == ""
+        assert result["has_more"] is False
+        assert result["offset"] == 5  # Clamped to total_length
+        assert result["total_length"] == 5
+
+    def test_offset_at_exact_length_returns_empty(self):
+        """Test that offset exactly at content length returns empty."""
+        result = _truncate_content("hello", max_length=100, offset=5)
+        assert result["content"] == ""
+        assert result["has_more"] is False
+
+
+class TestStripHtmlTags:
+    """Test HTML tag stripping."""
+
+    def test_strip_em_tags(self):
+        """Test stripping em tags."""
+        assert _strip_html_tags("<em>Transpiler</em> stages") == "Transpiler stages"
+
+    def test_strip_multiple_tags(self):
+        """Test stripping multiple tags."""
+        assert _strip_html_tags("<em>error</em> <strong>mitigation</strong>") == "error mitigation"
+
+    def test_no_tags(self):
+        """Test string without tags."""
+        assert _strip_html_tags("plain text") == "plain text"
+
+    def test_empty_string(self):
+        """Test empty string."""
+        assert _strip_html_tags("") == ""
 
 
 class TestSearchQiskitDocs:
     """Test search_qiskit_docs function."""
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
-    async def test_search_qiskit_docs_with_results(self, mock_fetch):
+    async def test_search_with_results(self, mock_fetch):
         """Test search with results."""
         mock_fetch.return_value = [
-            {"name": "circuit", "type": "module"},
-            {"name": "optimization", "type": "guide"},
+            {"title": "Circuit", "url": "/docs/api/qiskit/circuit"},
         ]
         result = await search_qiskit_docs("circuit")
-
         assert result["status"] == "success"
         assert result["query"] == "circuit"
-        assert len(result["results"]) == 2
-        assert result["total_results"] == 2
-        assert "metadata" in result
-        mock_fetch.assert_called_once()
+        assert len(result["results"]) == 1
+        assert result["total_results"] == 1
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
-    async def test_search_qiskit_docs_no_results(self, mock_fetch):
+    async def test_search_no_results(self, mock_fetch):
         """Test search with no results."""
         mock_fetch.return_value = []
         result = await search_qiskit_docs("nonexistent")
-
         assert result["status"] == "success"
-        assert result["query"] == "nonexistent"
         assert result["results"] == []
         assert result["total_results"] == 0
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
-    async def test_search_qiskit_docs_returns_dict(self, mock_fetch):
-        """Test that search returns a dict with proper structure."""
-        mock_fetch.return_value = [{"result": "test"}]
-        result = await search_qiskit_docs("test")
-        assert isinstance(result, dict)
-        assert "status" in result
-        assert "results" in result
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
-    async def test_search_qiskit_docs_fetch_fails(self, mock_fetch):
-        """Test search when fetch fails returns error status."""
+    async def test_search_fetch_fails(self, mock_fetch):
+        """Test search when fetch fails."""
         mock_fetch.return_value = None
         result = await search_qiskit_docs("circuit")
         assert result["status"] == "error"
-        assert "Failed to search" in result["message"]
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
-    async def test_search_qiskit_docs_empty_results(self, mock_fetch):
-        """Test search with empty results list."""
+    async def test_search_strips_html_tags(self, mock_fetch):
+        """Test that HTML tags are stripped from search results."""
+        mock_fetch.return_value = [
+            {
+                "title": "<em>Transpiler</em> options",
+                "text": "<em>Transpiler</em> passes",
+            },
+        ]
+        result = await search_qiskit_docs("transpiler")
+        assert result["results"][0]["title"] == "Transpiler options"
+        assert result["results"][0]["text"] == "Transpiler passes"
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_uses_scope_param(self, mock_fetch):
+        """Test that scope parameter is passed to API."""
         mock_fetch.return_value = []
-        result = await search_qiskit_docs("nonexistent")
-        assert result["status"] == "success"
-        assert result["results"] == []
-        assert result["total_results"] == 0
+        await search_qiskit_docs("test", scope="api")
+        call_url = mock_fetch.call_args[0][0]
+        assert "module=api" in call_url
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
-    async def test_search_qiskit_docs_url_encodes_query(self, mock_fetch):
+    async def test_search_default_scope_is_all(self, mock_fetch):
+        """Test that default scope is 'all'."""
+        mock_fetch.return_value = []
+        await search_qiskit_docs("test")
+        call_url = mock_fetch.call_args[0][0]
+        assert "module=all" in call_url
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_url_encodes_query(self, mock_fetch):
         """Test that search query is URL-encoded."""
         mock_fetch.return_value = []
         await search_qiskit_docs("error mitigation")
         call_url = mock_fetch.call_args[0][0]
         assert "error%20mitigation" in call_url
 
-
-class TestFuzzyMatching:
-    """Test fuzzy matching functionality."""
-
-    def test_find_similar_exact_match(self):
-        """Test finding exact match."""
-        available = ["circuit", "primitives", "transpiler"]
-        result = _find_similar("circuit", available)
-        assert "circuit" in result
-
-    def test_find_similar_typo_match(self):
-        """Test finding close match with typo."""
-        available = ["circuit", "primitives", "transpiler"]
-        result = _find_similar("circuitt", available)
-        assert "circuit" in result
-
-    def test_find_similar_no_match(self):
-        """Test no match returns empty list."""
-        available = ["circuit", "primitives", "transpiler"]
-        result = _find_similar("xyz123", available)
-        assert len(result) == 0
-
-    def test_find_similar_empty_available(self):
-        """Test with empty available list."""
-        result = _find_similar("circuit", [])
-        assert result == []
-
-    def test_find_similar_empty_query(self):
-        """Test with empty query."""
-        available = ["circuit", "primitives", "transpiler"]
-        result = _find_similar("", available)
-        assert result == []
-
-    def test_find_similar_partial_match(self):
-        """Test finding partial matches."""
-        available = ["optimization", "quantum-circuits", "error-mitigation"]
-        # Test with a query that should match "error-mitigation"
-        result = _find_similar("error", available, cutoff=0.5)
-        assert isinstance(result, list)
-        # May or may not have matches depending on similarity
-
-    def test_find_similar_limit_results(self):
-        """Test that results are limited to 3."""
-        available = ["circuit", "circuits", "circuitry", "circular", "circulate"]
-        result = _find_similar("circuit", available)
-        # difflib.get_close_matches returns at most n=3 by default
-        assert len(result) <= 3
-
-
-class TestMetadataHandling:
-    """Test metadata functionality."""
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_component_docs_has_metadata(self, mock_fetch):
-        """Test that component docs response includes metadata."""
-        mock_fetch.return_value = "Documentation"
-        result = await get_component_docs("circuit")
-
-        assert "metadata" in result
-        metadata = result["metadata"]
-        assert "url" in metadata
-        assert "timestamp" in metadata
-        assert "content_type" in metadata
-        assert "content_length" in metadata
-        assert metadata["content_type"] == "markdown"
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_guide_docs_has_metadata(self, mock_fetch):
-        """Test that guide docs response includes metadata."""
-        mock_fetch.return_value = "Guide content"
-        result = await get_guide_docs("quick-start")
-
-        assert "metadata" in result
-        metadata = result["metadata"]
-        assert "url" in metadata
-        assert "timestamp" in metadata
-        assert metadata["content_type"] == "markdown"
-
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
-    async def test_search_docs_has_metadata(self, mock_fetch):
-        """Test that search docs response includes metadata."""
-        mock_fetch.return_value = [{"name": "circuit"}]
+    async def test_search_results_missing_title_text_keys(self, mock_fetch):
+        """Test that search results without title/text keys don't error."""
+        mock_fetch.return_value = [
+            {"url": "/docs/api/qiskit/circuit"},
+        ]
         result = await search_qiskit_docs("circuit")
+        assert result["status"] == "success"
+        assert len(result["results"]) == 1
 
-        assert "metadata" in result
-        metadata = result["metadata"]
-        assert "url" in metadata
-        assert "timestamp" in metadata
-        assert metadata["content_type"] == "json"
+    async def test_search_invalid_scope_returns_error(self):
+        """Test that an invalid scope returns an error without calling the API."""
+        result = await search_qiskit_docs("test", scope="invalid")
+        assert result["status"] == "error"
+        assert "Invalid scope" in result["message"]
+        assert "invalid" in result["message"]
+
+    async def test_search_all_valid_scopes_accepted(self):
+        """Test that all documented scopes are accepted."""
+        from qiskit_docs_mcp_server.data_fetcher import _VALID_SCOPES
+
+        for scope in ["all", "documentation", "api", "learning", "tutorials"]:
+            assert scope in _VALID_SCOPES
+
+
+class TestLookupErrorCode:
+    """Test lookup_error_code function."""
+
+    async def test_invalid_code_format_letters(self):
+        """Test that non-numeric codes return an error."""
+        result = await lookup_error_code("abcd")
+        assert result["status"] == "error"
+        assert "Invalid error code format" in result["message"]
+
+    async def test_invalid_code_format_short(self):
+        """Test that codes with wrong length return an error."""
+        result = await lookup_error_code("12")
+        assert result["status"] == "error"
+
+    async def test_invalid_code_format_long(self):
+        """Test that 5-digit codes return an error."""
+        result = await lookup_error_code("12345")
+        assert result["status"] == "error"
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_fetch_failure(self, mock_fetch):
+        """Test lookup when fetch fails."""
+        mock_fetch.return_value = None
+        result = await lookup_error_code("1002")
+        assert result["status"] == "error"
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found(self, mock_fetch):
+        """Test successful error code lookup."""
+        mock_fetch.return_value = (
+            "<table><tr><td>1002</td>"
+            "<td>Error in the validation process.</td>"
+            "<td>Check the job.</td></tr></table>"
+        )
+        result = await lookup_error_code("1002")
+        assert result["status"] == "success"
+        assert result["code"] == "1002"
+        assert "1002" in result["details"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_not_found(self, mock_fetch):
+        """Test lookup for a code that does not exist."""
+        mock_fetch.return_value = "<table><tr><td>1002</td><td>Some error</td></tr></table>"
+        result = await lookup_error_code("9999")
+        assert result["status"] == "error"
+        assert "not found" in result["message"]
+
+
+class TestExtractMainContent:
+    """Test main content extraction from HTML."""
+
+    def test_extracts_main_tag(self):
+        """Test extraction of main tag content."""
+        html = "<html><body><nav>Nav</nav><main><h1>Title</h1><p>Content</p></main><footer>Footer</footer></body></html>"
+        result = extract_main_content(html)
+        assert "Title" in result
+        assert "Content" in result
+        assert "Nav" not in result
+        assert "Footer" not in result
+
+    def test_extracts_article_fallback(self):
+        """Test fallback to article tag."""
+        html = "<html><body><nav>Nav</nav><article><h1>Title</h1></article></body></html>"
+        result = extract_main_content(html)
+        assert "Title" in result
+        assert "Nav" not in result
+
+    def test_extracts_role_main_fallback(self):
+        """Test fallback to role=main."""
+        html = '<html><body><nav>Nav</nav><div role="main"><p>Content</p></div></body></html>'
+        result = extract_main_content(html)
+        assert "Content" in result
+        assert "Nav" not in result
+
+    def test_removes_nav_elements(self):
+        """Test that nav elements are removed."""
+        html = "<html><body><nav>Navigation</nav><main><p>Content</p></main></body></html>"
+        result = extract_main_content(html)
+        assert "Navigation" not in result
+
+    def test_removes_header_elements(self):
+        """Test that header elements are removed."""
+        html = "<html><body><header>Header</header><main><p>Content</p></main></body></html>"
+        result = extract_main_content(html)
+        assert "Header" not in result
+
+    def test_removes_footer_elements(self):
+        """Test that footer elements are removed."""
+        html = "<html><body><main><p>Content</p></main><footer>Footer</footer></body></html>"
+        result = extract_main_content(html)
+        assert "Footer" not in result
+
+    def test_removes_aside_elements(self):
+        """Test that aside elements are removed."""
+        html = "<html><body><aside>Sidebar</aside><main><p>Content</p></main></body></html>"
+        result = extract_main_content(html)
+        assert "Sidebar" not in result
+
+    def test_removes_navigation_role(self):
+        """Test that elements with role=navigation are removed."""
+        html = (
+            '<html><body><div role="navigation">Nav</div><main><p>Content</p></main></body></html>'
+        )
+        result = extract_main_content(html)
+        assert "Nav" not in result
+
+    def test_removes_skip_links(self):
+        """Test that skip-to-content links are removed."""
+        html = '<html><body><a class="skip-link">Skip to main content</a><main><p>Content</p></main></body></html>'
+        result = extract_main_content(html)
+        assert "Skip to main content" not in result
+
+    def test_body_fallback(self):
+        """Test fallback to body when no main/article found."""
+        html = "<html><body><nav>Nav</nav><div><p>Content</p></div></body></html>"
+        result = extract_main_content(html)
+        assert "Content" in result
+        assert "Nav" not in result
+
+    def test_empty_html(self):
+        """Test with empty HTML."""
+        result = extract_main_content("")
+        assert result is not None
+
+    def test_plain_content(self):
+        """Test with simple content without structure."""
+        html = "<p>Just a paragraph</p>"
+        result = extract_main_content(html)
+        assert "Just a paragraph" in result
+
+
+class TestConvertHtmlToMarkdownWithExtraction:
+    """Test that convert_html_to_markdown strips chrome before converting."""
+
+    def test_chrome_not_in_markdown(self):
+        """Test that navigation chrome is not in final markdown output."""
+        html = """
+        <html>
+        <body>
+            <nav><ul><li><a href="/">Home</a></li><li><a href="/docs">Docs</a></li></ul></nav>
+            <header><h1>IBM Quantum Platform</h1></header>
+            <main>
+                <h1>Circuit Module</h1>
+                <p>The circuit module provides QuantumCircuit class.</p>
+            </main>
+            <footer><p>Copyright IBM 2026</p></footer>
+        </body>
+        </html>
+        """
+        result = convert_html_to_markdown(html)
+        assert "Circuit Module" in result
+        assert "QuantumCircuit" in result
+        assert "IBM Quantum Platform" not in result
+        assert "Copyright IBM" not in result
+
+
+class TestConvertHtmlToMarkdown:
+    """Test convert_html_to_markdown function."""
+
+    def test_basic_html(self):
+        """Test conversion of basic HTML."""
+        html = "<h1>Title</h1><p>Paragraph text.</p>"
+        result = convert_html_to_markdown(html)
+        assert "Title" in result
+        assert "Paragraph text." in result
+
+    def test_links_preserved(self):
+        """Test that links are preserved."""
+        html = '<a href="https://example.com">Click here</a>'
+        result = convert_html_to_markdown(html)
+        assert "https://example.com" in result
+
+    def test_empty_html(self):
+        """Test conversion of empty HTML."""
+        result = convert_html_to_markdown("")
+        assert result.strip() == ""
+
+
+class TestListHelpers:
+    """Test list helper functions."""
+
+    def test_get_list_of_modules(self):
+        """Test get_list_of_modules returns correct structure with url_path."""
+        result = get_list_of_modules()
+        assert result["status"] == "success"
+        assert "modules" in result
+        assert isinstance(result["modules"], list)
+        assert len(result["modules"]) > 0
+        # Check structure includes name, description, url_path
+        first = result["modules"][0]
+        assert "name" in first
+        assert "description" in first
+        assert "url_path" in first
+        assert first["url_path"].startswith("api/qiskit/")
+
+    def test_get_list_of_addons(self):
+        """Test get_list_of_addons returns correct structure with url_path."""
+        result = get_list_of_addons()
+        assert result["status"] == "success"
+        assert "addons" in result
+        assert len(result["addons"]) > 0
+        first = result["addons"][0]
+        assert "name" in first
+        assert "description" in first
+        assert "url_path" in first
+        assert "qiskit-addon-" in first["url_path"]
+
+    def test_get_list_of_guides(self):
+        """Test get_list_of_guides returns correct structure with url_path."""
+        result = get_list_of_guides()
+        assert result["status"] == "success"
+        assert "guides" in result
+        assert len(result["guides"]) > 0
+        first = result["guides"][0]
+        assert "name" in first
+        assert "description" in first
+        assert "url_path" in first
+        assert first["url_path"].startswith("guides/")
+
+    def test_get_list_of_error_code_categories(self):
+        """Test get_list_of_error_code_categories returns correct structure."""
+        result = get_list_of_error_code_categories()
+        assert result["status"] == "success"
+        assert "categories" in result
+        assert isinstance(result["categories"], dict)
+        assert "registry_url" in result
+
+
+class TestDocFetcherConstants:
+    """Test data_fetcher constants."""
+
+    def test_qiskit_modules_not_empty(self):
+        """Test that AVAILABLE_MODULES is not empty."""
+        assert len(AVAILABLE_MODULES) > 0
+
+    def test_qiskit_modules_has_circuit(self):
+        """Test that AVAILABLE_MODULES contains circuit."""
+        assert "circuit" in AVAILABLE_MODULES
+
+    def test_qiskit_modules_are_dict_with_descriptions(self):
+        """Test that AVAILABLE_MODULES values are description strings."""
+        assert isinstance(AVAILABLE_MODULES, dict)
+        for key, value in AVAILABLE_MODULES.items():
+            assert isinstance(key, str)
+            assert isinstance(value, str)
+            assert len(value) > 0
+
+    def test_qiskit_addon_modules_not_empty(self):
+        """Test that AVAILABLE_ADDONS is not empty."""
+        assert len(AVAILABLE_ADDONS) > 0
+
+    def test_qiskit_addons_are_dict_with_descriptions(self):
+        """Test that AVAILABLE_ADDONS values are description strings."""
+        assert isinstance(AVAILABLE_ADDONS, dict)
+        for key, value in AVAILABLE_ADDONS.items():
+            assert isinstance(key, str)
+            assert isinstance(value, str)
+            assert len(value) > 0
+
+    def test_qiskit_guides_not_empty(self):
+        """Test that AVAILABLE_GUIDES is not empty."""
+        assert len(AVAILABLE_GUIDES) > 0
+
+    def test_qiskit_guides_are_dict_with_descriptions(self):
+        """Test that AVAILABLE_GUIDES values are description strings."""
+        assert isinstance(AVAILABLE_GUIDES, dict)
+        for key, value in AVAILABLE_GUIDES.items():
+            assert isinstance(key, str)
+            assert isinstance(value, str)
+            assert len(value) > 0
 
 
 class TestEnvironmentConfiguration:
@@ -450,272 +760,112 @@ class TestEnvironmentConfiguration:
     def test_http_timeout_default(self):
         """Test that HTTP_TIMEOUT has a reasonable default."""
         assert HTTP_TIMEOUT > 0
-        assert HTTP_TIMEOUT <= 30.0  # Reasonable timeout range
+        assert HTTP_TIMEOUT <= 30.0
+
+    def test_cache_ttl_default(self):
+        """Test that CACHE_TTL has a reasonable default."""
+        assert CACHE_TTL > 0
+        assert CACHE_TTL <= 86400  # At most 24 hours
 
     @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_uses_http_timeout(self, mock_client_class):
-        """Test that fetch_text uses HTTP_TIMEOUT."""
+    def test_fetch_text_uses_http_timeout(self, mock_client_class):
+        """Test that _get_http_client creates client with HTTP_TIMEOUT."""
+        import qiskit_docs_mcp_server.data_fetcher as df
+        from qiskit_docs_mcp_server.data_fetcher import _get_http_client
+
+        # Force creation of a new client
+        original_holder = df._client_holder.copy()
+        df._client_holder.clear()
+        try:
+            _get_http_client()
+            mock_client_class.assert_called_once()
+            call_kwargs = mock_client_class.call_args[1]
+            assert "timeout" in call_kwargs
+            assert call_kwargs["timeout"] == HTTP_TIMEOUT
+            assert call_kwargs["follow_redirects"] is True
+        finally:
+            df._client_holder.clear()
+            df._client_holder.update(original_holder)
+
+
+class TestCaching:
+    """Test in-memory caching functionality."""
+
+    def setup_method(self):
+        """Clear caches before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_caches_result(self, mock_get_client):
+        """Test that fetch_text caches successful results."""
         mock_response = MagicMock()
-        mock_response.text = "Content"
+        mock_response.text = "Cached content"
+        mock_response.raise_for_status = MagicMock()
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
-        await fetch_text("https://example.com")
+        # First call — should hit network
+        result1 = await fetch_text("https://example.com/page")
+        assert result1 == "Cached content"
+        assert mock_client.get.call_count == 1
 
-        # Verify httpx.AsyncClient was called with timeout parameter
-        mock_client_class.assert_called_once()
-        call_kwargs = mock_client_class.call_args[1]
-        assert "timeout" in call_kwargs
-        assert call_kwargs["timeout"] == HTTP_TIMEOUT
+        # Second call — should use cache
+        result2 = await fetch_text("https://example.com/page")
+        assert result2 == "Cached content"
+        assert mock_client.get.call_count == 1  # No additional network call
 
-    @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
-    async def test_fetch_text_json_uses_http_timeout(self, mock_client_class):
-        """Test that fetch_text_json uses HTTP_TIMEOUT."""
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_json_caches_result(self, mock_get_client):
+        """Test that fetch_text_json caches successful results."""
         mock_response = MagicMock()
-        mock_response.json.return_value = []
+        mock_response.json.return_value = [{"key": "value"}]
+        mock_response.raise_for_status = MagicMock()
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
-        mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_get_client.return_value = mock_client
 
-        await fetch_text_json("https://example.com/api")
+        result1 = await fetch_text_json("https://example.com/api")
+        assert result1 == [{"key": "value"}]
+        assert mock_client.get.call_count == 1
 
-        # Verify httpx.AsyncClient was called with timeout parameter
-        mock_client_class.assert_called_once()
-        call_kwargs = mock_client_class.call_args[1]
-        assert "timeout" in call_kwargs
-        assert call_kwargs["timeout"] == HTTP_TIMEOUT
+        result2 = await fetch_text_json("https://example.com/api")
+        assert result2 == [{"key": "value"}]
+        assert mock_client.get.call_count == 1
 
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_fetch_text_does_not_cache_errors(self, mock_get_client):
+        """Test that failed fetches are not cached."""
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.HTTPError("Connection failed")
+        mock_get_client.return_value = mock_client
 
-class TestDocFetcherConstants:
-    """Test data_fetcher constants."""
+        result1 = await fetch_text("https://example.com/fail")
+        assert result1 is None
 
-    def test_qiskit_modules_not_empty(self):
-        """Test that AVAILABLE_MODULES is not empty."""
-        assert len(AVAILABLE_MODULES) > 0
+        # Should try network again (not serve None from cache)
+        result2 = await fetch_text("https://example.com/fail")
+        assert result2 is None
+        assert mock_client.get.call_count == 2
 
-    def test_qiskit_modules_has_circuit(self):
-        """Test that AVAILABLE_MODULES contains circuit."""
-        assert "circuit" in AVAILABLE_MODULES
+    def test_cache_clear(self):
+        """Test cache clear functionality."""
+        _text_cache.set("key", "value")
+        assert _text_cache.get("key") == "value"
+        _text_cache.clear()
+        assert _text_cache.get("key") is None
 
-    def test_qiskit_modules_has_primitives(self):
-        """Test that AVAILABLE_MODULES contains primitives."""
-        assert "primitives" in AVAILABLE_MODULES
+    def test_cache_evicts_oldest_at_max_size(self):
+        """Test that cache evicts the oldest entry when at capacity."""
+        cache = _TTLCache(ttl=3600.0, max_size=2)
+        cache.set("a", 1)
+        cache.set("b", 2)
+        assert cache.get("a") == 1
+        assert cache.get("b") == 2
 
-    def test_qiskit_modules_has_transpiler(self):
-        """Test that AVAILABLE_MODULES contains transpiler."""
-        assert "transpiler" in AVAILABLE_MODULES
-
-    def test_qiskit_addon_modules_not_empty(self):
-        """Test that AVAILABLE_ADDONS is not empty."""
-        assert len(AVAILABLE_ADDONS) > 0
-
-    def test_qiskit_addon_modules_has_sqd(self):
-        """Test that AVAILABLE_ADDONS contains SQD."""
-        assert "sqd" in AVAILABLE_ADDONS
-
-    def test_qiskit_addon_modules_has_cutting(self):
-        """Test that AVAILABLE_ADDONS contains cutting."""
-        assert "cutting" in AVAILABLE_ADDONS
-
-    def test_qiskit_modules_entries_are_strings(self):
-        """Test that AVAILABLE_MODULES entries are strings."""
-        for value in AVAILABLE_MODULES:
-            assert isinstance(value, str)
-
-    def test_qiskit_addon_modules_entries_are_strings(self):
-        """Test that AVAILABLE_ADDONS entries are strings."""
-        for value in AVAILABLE_ADDONS:
-            assert isinstance(value, str)
-
-
-class TestLookupErrorCode:
-    """Test lookup_error_code function."""
-
-    async def test_invalid_code_format_letters(self):
-        """Test that non-numeric codes return an error."""
-        result = await lookup_error_code("abcd")
-        assert result["status"] == "error"
-        assert "Invalid error code format" in result["message"]
-
-    async def test_invalid_code_format_short(self):
-        """Test that codes with wrong length return an error."""
-        result = await lookup_error_code("12")
-        assert result["status"] == "error"
-        assert "Invalid error code format" in result["message"]
-
-    async def test_invalid_code_format_long(self):
-        """Test that 5-digit codes return an error."""
-        result = await lookup_error_code("12345")
-        assert result["status"] == "error"
-        assert "Invalid error code format" in result["message"]
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_fetch_failure(self, mock_fetch):
-        """Test lookup when fetch fails."""
-        mock_fetch.return_value = None
-        result = await lookup_error_code("1002")
-        assert result["status"] == "error"
-        assert "Failed to fetch" in result["message"]
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_code_found(self, mock_fetch):
-        """Test successful error code lookup."""
-        mock_fetch.return_value = (
-            "<table><tr><td>1002</td>"
-            "<td>Error in the validation process.</td>"
-            "<td>Check the job.</td></tr></table>"
-        )
-        result = await lookup_error_code("1002")
-        assert result["status"] == "success"
-        assert result["code"] == "1002"
-        assert "details" in result
-        assert "1002" in result["details"]
-        assert "metadata" in result
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_code_not_found(self, mock_fetch):
-        """Test lookup for a code that does not exist in the page."""
-        mock_fetch.return_value = "<table><tr><td>1002</td><td>Some error</td></tr></table>"
-        result = await lookup_error_code("9999")
-        assert result["status"] == "error"
-        assert "not found" in result["message"]
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_metadata_url_includes_range(self, mock_fetch):
-        """Test that metadata URL points to the correct error range anchor."""
-        mock_fetch.return_value = "<table><tr><td>7001</td><td>Error</td><td>Fix</td></tr></table>"
-        result = await lookup_error_code("7001")
-        assert result["status"] == "success"
-        assert "7xxx" in result["metadata"]["url"]
-
-
-class TestGetAddonDocs:
-    """Test get_addon_docs function."""
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_addon_docs_valid(self, mock_fetch):
-        """Test getting docs for a valid addon."""
-        mock_fetch.return_value = "SQD documentation"
-        result = await get_addon_docs("sqd")
-        assert result["status"] == "success"
-        assert result["addon"] == "sqd"
-        assert "metadata" in result
-        assert "qiskit-addon-sqd" in result["metadata"]["url"]
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_addon_docs_invalid(self, mock_fetch):
-        """Test getting docs for an invalid addon."""
-        result = await get_addon_docs("nonexistent")
-        assert result["status"] == "error"
-        assert "not found" in result["message"]
-        assert "available_addons" in result
-        mock_fetch.assert_not_called()
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_addon_docs_with_suggestions(self, mock_fetch):
-        """Test getting docs with fuzzy match suggestions."""
-        result = await get_addon_docs("cut")
-        assert result["status"] == "error"
-        if "suggestions" in result:
-            assert "cutting" in result["suggestions"]
-        mock_fetch.assert_not_called()
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_addon_docs_fetch_fails(self, mock_fetch):
-        """Test get_addon_docs when fetch fails."""
-        mock_fetch.return_value = None
-        result = await get_addon_docs("cutting")
-        assert result["status"] == "error"
-
-    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
-    async def test_get_addon_docs_all_valid(self, mock_fetch):
-        """Test getting docs for all valid addons."""
-        mock_fetch.return_value = "Addon docs"
-        for addon in AVAILABLE_ADDONS:
-            result = await get_addon_docs(addon)
-            assert result["status"] == "success"
-            assert result["addon"] == addon
-
-
-class TestConvertHtmlToMarkdown:
-    """Test convert_html_to_markdown function."""
-
-    def test_basic_html(self):
-        """Test conversion of basic HTML tags."""
-        html = "<h1>Title</h1><p>Paragraph text.</p>"
-        result = convert_html_to_markdown(html)
-        assert "Title" in result
-        assert "Paragraph text." in result
-
-    def test_links_preserved(self):
-        """Test that links are preserved in markdown output."""
-        html = '<a href="https://example.com">Click here</a>'
-        result = convert_html_to_markdown(html)
-        assert "https://example.com" in result
-        assert "Click here" in result
-
-    def test_empty_html(self):
-        """Test conversion of empty HTML."""
-        result = convert_html_to_markdown("")
-        assert result.strip() == ""
-
-    def test_nested_html(self):
-        """Test conversion of nested HTML structures."""
-        html = "<div><ul><li>Item 1</li><li>Item 2</li></ul></div>"
-        result = convert_html_to_markdown(html)
-        assert "Item 1" in result
-        assert "Item 2" in result
-
-    def test_code_blocks(self):
-        """Test conversion of code blocks."""
-        html = "<pre><code>print('hello')</code></pre>"
-        result = convert_html_to_markdown(html)
-        assert "print('hello')" in result
-
-    def test_table_html(self):
-        """Test conversion of HTML tables."""
-        html = "<table><tr><td>1002</td><td>Error message</td></tr></table>"
-        result = convert_html_to_markdown(html)
-        assert "1002" in result
-        assert "Error message" in result
-
-
-class TestListHelpers:
-    """Test list helper functions."""
-
-    def test_get_list_of_modules(self):
-        """Test get_list_of_modules returns correct structure."""
-        result = get_list_of_modules()
-        assert result["status"] == "success"
-        assert "modules" in result
-        assert isinstance(result["modules"], list)
-        assert len(result["modules"]) > 0
-        assert "circuit" in result["modules"]
-
-    def test_get_list_of_addons(self):
-        """Test get_list_of_addons returns correct structure."""
-        result = get_list_of_addons()
-        assert result["status"] == "success"
-        assert "addons" in result
-        assert isinstance(result["addons"], list)
-        assert len(result["addons"]) > 0
-        assert "sqd" in result["addons"]
-
-    def test_get_list_of_guides(self):
-        """Test get_list_of_guides returns correct structure."""
-        result = get_list_of_guides()
-        assert result["status"] == "success"
-        assert "guides" in result
-        assert isinstance(result["guides"], list)
-        assert len(result["guides"]) > 0
-        assert "quick-start" in result["guides"]
-
-    def test_get_list_of_error_code_categories(self):
-        """Test get_list_of_error_code_categories returns correct structure."""
-        result = get_list_of_error_code_categories()
-        assert result["status"] == "success"
-        assert "categories" in result
-        assert isinstance(result["categories"], dict)
-        assert "registry_url" in result
-        assert "errors" in result["registry_url"]
+        # Adding a third entry should evict the oldest ("a")
+        cache.set("c", 3)
+        assert cache.get("a") is None
+        assert cache.get("b") == 2
+        assert cache.get("c") == 3

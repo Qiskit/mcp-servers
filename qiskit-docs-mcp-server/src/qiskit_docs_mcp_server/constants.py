@@ -57,85 +57,86 @@ ERROR_CODE_CATEGORIES = {
 
 # HTTP timeout configuration (in seconds)
 HTTP_TIMEOUT = _get_env_float("QISKIT_HTTP_TIMEOUT", 10.0)
+CACHE_TTL = _get_env_float("QISKIT_DOCS_CACHE_TTL", 3600.0)
 
 # Qiskit modules and their documentation paths
-AVAILABLE_MODULES = [
+AVAILABLE_MODULES = {
     # Circuit construction
-    "circuit",
+    "circuit": "Quantum circuit construction and manipulation (QuantumCircuit, gates, registers)",
     # Quantum information
-    "quantum_info",
+    "quantum_info": "Quantum information utilities (states, operators, channels, measures)",
     # Transpilation
-    "transpiler",
-    "synthesis",
-    "dagcircuit",
-    "passmanager",
-    "converters",
-    "compiler",
+    "transpiler": "Circuit transpilation and optimization for target hardware",
+    "synthesis": "Circuit synthesis algorithms (unitary, Clifford, linear functions)",
+    "dagcircuit": "Directed acyclic graph (DAG) representation of quantum circuits",
+    "passmanager": "Transpiler pass manager framework for custom transpilation pipelines",
+    "converters": "Circuit format converters and interoperability utilities",
+    "compiler": "High-level compilation routines (transpile shortcut)",
     # Primitives and providers
-    "primitives",
-    "providers",
+    "primitives": "Sampler and Estimator primitives for quantum execution",
+    "providers": "Backend providers and job management interfaces",
     # Results and visualization
-    "result",
-    "visualization",
+    "result": "Quantum job result handling and analysis",
+    "visualization": "Circuit and result visualization tools",
     # Serialization
-    "qasm2",
-    "qasm3",
-    "qpy",
+    "qasm2": "OpenQASM 2.0 parsing and generation",
+    "qasm3": "OpenQASM 3.0 parsing and generation",
+    "qpy": "Qiskit Python serialization format (QPY) for circuit persistence",
     # Utilities
-    "utils",
-    "exceptions",
-]
+    "utils": "General utility functions and helpers",
+    "exceptions": "Qiskit exception classes and error hierarchy",
+}
 
-AVAILABLE_ADDONS = [
-    "aqc-tensor",
-    "cutting",
-    "mpf",
-    "obp",
-    "sqd",
-    "utils",
-]
+AVAILABLE_ADDONS = {
+    "aqc-tensor": "Approximate Quantum Compiler with tensor network techniques",
+    "cutting": "Circuit cutting to run large circuits on smaller devices",
+    "mpf": "Multi-product formulas for Hamiltonian simulation",
+    "obp": "Operator backpropagation for expectation value estimation",
+    "sqd": "Sample-based Quantum Diagonalization for chemistry and optimization",
+    "utils": "Shared utilities for Qiskit addon packages",
+}
 
-AVAILABLE_GUIDES = [
+AVAILABLE_GUIDES = {
     # Getting started
-    "quick-start",
+    "quick-start": "Get started with Qiskit — create and run your first circuit",
     # Circuit building
-    "construct-circuits",
+    "construct-circuits": "Build and manipulate quantum circuits",
     # Transpilation
-    "transpile",
-    "transpiler-stages",
-    "transpile-with-pass-managers",
-    "defaults-and-configuration-options",
-    "circuit-transpilation-settings",
-    "qiskit-transpiler-service",
+    "transpile": "Transpile circuits for target backends",
+    "transpiler-stages": "Understand the six stages of the transpiler pipeline",
+    "transpile-with-pass-managers": "Use custom pass managers for transpilation",
+    "defaults-and-configuration-options": "Transpiler defaults and configuration options",
+    "circuit-transpilation-settings": "Circuit-level transpilation settings",
+    "qiskit-transpiler-service": "Use the Qiskit Transpiler cloud service",
     # Error mitigation and suppression
-    "error-mitigation-and-suppression-techniques",
-    "configure-error-mitigation",
-    "configure-error-suppression",
+    "error-mitigation-and-suppression-techniques": "Overview of error mitigation and suppression techniques",
+    "configure-error-mitigation": "Configure error mitigation for Qiskit primitives",
+    "configure-error-suppression": "Configure error suppression techniques",
     # Execution
-    "primitives",
-    "execution-modes",
-    "runtime-options-overview",
-    "directed-execution-model",
+    "primitives": "Use Sampler and Estimator primitives for quantum execution",
+    "execution-modes": "Job, session, and batch execution modes",
+    "runtime-options-overview": "Overview of Qiskit Runtime configuration options",
+    "directed-execution-model": "Use the directed execution model",
     # Dynamic circuits
-    "dynamic-circuits",
+    "dynamic-circuits": "Mid-circuit measurements and classical control flow",
     # Post-processing addons
-    "qiskit-addons-sqd",
+    "qiskit-addons-sqd": "Use Sample-based Quantum Diagonalization (SQD)",
     # Qiskit Functions - circuit functions
-    "functions",
-    "ibm-circuit-function",
-    "algorithmiq-tem",
-    "qedma-qesem",
-    "q-ctrl-performance-management",
+    "functions": "Overview of Qiskit Functions",
+    "ibm-circuit-function": "IBM Circuit Function for optimized execution",
+    "algorithmiq-tem": "Algorithmiq Tensor Error Mitigation (TEM)",
+    "qedma-qesem": "Qedma Quantum Error Suppression and Error Mitigation (QESEM)",
+    "q-ctrl-performance-management": "Q-CTRL Performance Management for optimized circuits",
     # Qiskit Functions - application functions
-    "colibritd-pde",
-    "global-data-quantum-optimizer",
-    "qunova-chemistry",
-    "kipu-optimization",
-    "q-ctrl-optimization-solver",
-    "multiverse-computing-singularity",
+    "colibritd-pde": "ColibrITD PDE solver function",
+    "global-data-quantum-optimizer": "Global Data Quantum Optimizer function",
+    "qunova-chemistry": "Qunova Chemistry solver function",
+    "kipu-optimization": "Kipu Optimization solver function",
+    "q-ctrl-optimization-solver": "Q-CTRL Optimization Solver function",
+    "multiverse-computing-singularity": "Multiverse Computing Singularity function",
     # Security and support
-    "secure-data",
-    "support",
-]
+    "secure-data": "Data security and privacy on IBM Quantum",
+    "support": "Getting support and help with Qiskit and IBM Quantum",
+}
 
 SEARCH_PATH = "endpoints-docs-learning/api/search"
