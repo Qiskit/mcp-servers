@@ -451,7 +451,7 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
         }
 
     url = f"{QISKIT_DOCS_BASE}errors"
-    logger.info(f"Fetching error code {code} from {url}")
+    logger.info("Fetching error code %s from %s", code, url)
     html = await fetch_text(url)
 
     if not html:
@@ -461,29 +461,44 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
             "metadata": {"url": url},
         }
 
-    docs = convert_html_to_markdown(html)
+    soup = BeautifulSoup(html, "html.parser")
 
-    # Search for the error code in the markdown content
-    lines = docs.split("\n")
-    matching_lines: list[str] = []
-    for i, line in enumerate(lines):
-        if re.search(rf"\b{code}\b", line):
-            start = max(0, i - 2)
-            end = min(len(lines), i + 3)
-            matching_lines.extend(lines[start:end])
-            break
+    # Strategy 1: Search in table rows
+    for row in soup.find_all("tr"):
+        cells = row.find_all(["td", "th"])
+        row_text = " ".join(cell.get_text(strip=True) for cell in cells)
+        if re.search(rf"\b{code}\b", row_text):
+            details = " | ".join(cell.get_text(strip=True) for cell in cells)
+            return {
+                "status": "success",
+                "code": code,
+                "details": details,
+                "metadata": {
+                    "url": f"{url}#{code[0]}xxx",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "content_type": "text",
+                },
+            }
 
-    if matching_lines:
-        return {
-            "status": "success",
-            "code": code,
-            "details": "\n".join(matching_lines).strip(),
-            "metadata": {
-                "url": f"{url}#{code[0]}xxx",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "content_type": "markdown",
-            },
-        }
+    # Strategy 2: Search in any element containing the code
+    code_pattern = re.compile(rf"\b{code}\b")
+    for element in soup.find_all(string=code_pattern):
+        # Get the parent block element for context
+        parent = element.find_parent(
+            ["p", "div", "li", "dd", "section", "td", "h1", "h2", "h3", "h4", "h5", "h6"]
+        )
+        if parent:
+            details = parent.get_text(strip=True)
+            return {
+                "status": "success",
+                "code": code,
+                "details": details,
+                "metadata": {
+                    "url": f"{url}#{code[0]}xxx",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "content_type": "text",
+                },
+            }
 
     return {
         "status": "error",

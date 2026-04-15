@@ -494,6 +494,52 @@ class TestLookupErrorCode:
         assert result["status"] == "error"
         assert "not found" in result["message"]
 
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found_in_paragraph(self, mock_fetch):
+        """Test finding an error code outside a table, in a paragraph."""
+        mock_fetch.return_value = (
+            "<html><body>"
+            "<p>Error 2001: The circuit could not be transpiled.</p>"
+            "</body></html>"
+        )
+        result = await lookup_error_code("2001")
+        assert result["status"] == "success"
+        assert result["code"] == "2001"
+        assert "circuit could not be transpiled" in result["details"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found_correct_row_among_multiple(self, mock_fetch):
+        """Test that the correct row is returned when multiple rows exist."""
+        mock_fetch.return_value = (
+            "<table>"
+            "<tr><td>1001</td><td>Timeout error.</td><td>Retry the job.</td></tr>"
+            "<tr><td>1002</td><td>Validation error.</td><td>Check the input.</td></tr>"
+            "<tr><td>1003</td><td>Compilation error.</td><td>Review the circuit.</td></tr>"
+            "</table>"
+        )
+        result = await lookup_error_code("1002")
+        assert result["status"] == "success"
+        assert result["code"] == "1002"
+        assert "Validation error." in result["details"]
+        assert "Check the input." in result["details"]
+        # Make sure we didn't pick up adjacent rows
+        assert "Timeout error." not in result["details"]
+        assert "Compilation error." not in result["details"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found_in_list_item(self, mock_fetch):
+        """Test finding an error code in a list item element."""
+        mock_fetch.return_value = (
+            "<html><body><ul>"
+            "<li>3001 - Backend not available.</li>"
+            "<li>3002 - Queue is full.</li>"
+            "</ul></body></html>"
+        )
+        result = await lookup_error_code("3002")
+        assert result["status"] == "success"
+        assert result["code"] == "3002"
+        assert "Queue is full" in result["details"]
+
 
 class TestExtractMainContent:
     """Test main content extraction from HTML."""
