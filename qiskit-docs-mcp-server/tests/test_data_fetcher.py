@@ -644,6 +644,25 @@ class TestSearchQiskitDocs:
         for scope in ["all", "documentation", "api", "learning", "tutorials"]:
             assert scope in _VALID_SCOPES
 
+    async def test_search_empty_query_returns_error(self):
+        """Test that empty query returns an error without hitting the API."""
+        result = await search_qiskit_docs("")
+        assert result["status"] == "error"
+        assert "provide a search query" in result["message"].lower()
+
+    async def test_search_whitespace_only_query_returns_error(self):
+        """Test that whitespace-only query returns an error."""
+        result = await search_qiskit_docs("   ")
+        assert result["status"] == "error"
+        assert "provide a search query" in result["message"].lower()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_long_query_accepted(self, mock_fetch):
+        """Test that long queries are passed through to the API."""
+        mock_fetch.return_value = []
+        result = await search_qiskit_docs("a" * 1000)
+        assert result["status"] == "success"
+
 
 class TestLookupErrorCode:
     """Test lookup_error_code function."""

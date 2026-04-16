@@ -442,6 +442,12 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
     Returns:
         Search results with matching entries, total count, and metadata
     """
+    query = query.strip()
+    if not query:
+        return {
+            "status": "error",
+            "message": "Please provide a search query.",
+        }
     if scope not in _VALID_SCOPES:
         return {
             "status": "error",
