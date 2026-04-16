@@ -61,7 +61,7 @@ class TestServerRegistration:
         assert len(mcp._tool_manager._tools) == 3
 
     def test_resource_count(self):
-        """Test the expected number of resources."""
+        """Test the expected number of static resources."""
         assert len(mcp._resource_manager._resources) == 4
 
     def test_old_tools_removed(self):
@@ -74,4 +74,32 @@ class TestServerRegistration:
         }
         assert removed_tools.isdisjoint(tool_names), (
             f"Old tools still registered: {removed_tools & tool_names}"
+        )
+
+    def test_prompts_registered(self):
+        """Test that all expected prompts are registered."""
+        prompt_names = set(mcp._prompt_manager._prompts.keys())
+        expected_prompts = {
+            "explain_error",
+            "module_overview",
+            "how_to",
+        }
+        assert expected_prompts.issubset(prompt_names), (
+            f"Missing prompts: {expected_prompts - prompt_names}"
+        )
+
+    def test_prompt_count(self):
+        """Test the expected number of prompts."""
+        assert len(mcp._prompt_manager._prompts) == 3
+
+    def test_resource_templates_registered(self):
+        """Test that all expected resource templates are registered."""
+        template_uris = set(mcp._resource_manager._templates.keys())
+        expected_templates = {
+            "qiskit-docs://modules/{module_name}",
+            "qiskit-docs://guides/{guide_name}",
+            "qiskit-docs://addons/{addon_name}",
+        }
+        assert expected_templates.issubset(template_uris), (
+            f"Missing resource templates: {expected_templates - template_uris}"
         )
