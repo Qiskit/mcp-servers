@@ -92,6 +92,7 @@ The server can be configured using environment variables:
 |----------|-------------|---------|
 | `QISKIT_DOCS_BASE` | Base URL for Qiskit documentation | `https://quantum.cloud.ibm.com/docs/` |
 | `QISKIT_HTTP_TIMEOUT` | HTTP request timeout in seconds | `10.0` |
+| `QISKIT_DOCS_CACHE_TTL` | Cache TTL for fetched pages in seconds | `3600.0` |
 | `QISKIT_SEARCH_BASE_URL` | Search API base URL | `https://quantum.cloud.ibm.com/` |
 
 ### Optional Configuration
