@@ -14,6 +14,7 @@ import asyncio
 import logging
 import re
 import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote, urlparse
@@ -31,6 +32,7 @@ from qiskit_docs_mcp_server.constants import (
     ERROR_CODE_CATEGORIES,
     HTTP_TIMEOUT,
     QISKIT_DOCS_BASE,
+    SEARCH_CACHE_TTL,
     SEARCH_PATH,
 )
 
@@ -51,20 +53,22 @@ class _TTLCache:
     def __init__(self, ttl: float = 3600.0, max_size: int = 128):
         self._ttl = ttl
         self._max_size = max_size
-        self._cache: dict[str, tuple[float, Any]] = {}
+        self._cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
 
     def get(self, key: str) -> Any | None:
         if key in self._cache:
             timestamp, value = self._cache[key]
             if time.monotonic() - timestamp < self._ttl:
+                self._cache.move_to_end(key)  # LRU touch
                 return value
             del self._cache[key]
         return None
 
     def set(self, key: str, value: Any) -> None:
-        if len(self._cache) >= self._max_size and key not in self._cache:
-            oldest_key = min(self._cache, key=lambda k: self._cache[k][0])
-            del self._cache[oldest_key]
+        if key in self._cache:
+            del self._cache[key]
+        elif len(self._cache) >= self._max_size:
+            self._cache.popitem(last=False)  # Evict LRU — O(1)
         self._cache[key] = (time.monotonic(), value)
 
     def clear(self) -> None:
@@ -72,7 +76,7 @@ class _TTLCache:
 
 
 _text_cache = _TTLCache(ttl=CACHE_TTL)
-_json_cache = _TTLCache(ttl=CACHE_TTL)
+_json_cache = _TTLCache(ttl=SEARCH_CACHE_TTL)
 
 _client_holder: dict[str, httpx.AsyncClient] = {}
 
