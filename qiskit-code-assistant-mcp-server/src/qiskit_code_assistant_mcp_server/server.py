@@ -200,6 +200,49 @@ async def accept_completion_tool(completion_id: str) -> dict[str, Any]:
     return await accept_completion(completion_id)
 
 
+##################################################
+## MCP Prompts
+## - https://modelcontextprotocol.io/docs/concepts/prompts
+##################################################
+
+
+@mcp.prompt()
+def generate_qiskit_code(task: str) -> str:
+    """Generate Qiskit Python code for a quantum computing task."""
+    return (
+        f"Generate Qiskit code for: '{task}'. "
+        f"1) Call get_completion_tool with prompt='{task}' to generate the code, "
+        "2) Display the generated code from the response, "
+        "3) If the user confirms the code is useful, call accept_completion_tool "
+        "with the completion_id from the response."
+    )
+
+
+@mcp.prompt()
+def explain_qiskit_concept(concept: str) -> str:
+    """Explain a Qiskit or quantum computing concept using the knowledge base."""
+    return (
+        f"Explain '{concept}' using the Qiskit Code Assistant knowledge base: "
+        f"Call get_rag_completion_tool with prompt='{concept}' and present the "
+        "explanation from the response. If the answer is helpful, call "
+        "accept_completion_tool with the completion_id."
+    )
+
+
+@mcp.prompt()
+def setup_model(model_id: str) -> str:
+    """Set up a Qiskit Code Assistant model by reviewing its info and accepting the disclaimer."""
+    return (
+        f"Set up model '{model_id}' for use: "
+        f"1) Read the qca://model/{model_id} resource to get model details, "
+        f"2) Read the qca://disclaimer/{model_id} resource to get the disclaimer, "
+        "3) If a disclaimer is present, show it to the user and call "
+        f"accept_model_disclaimer_tool with model_id='{model_id}' and the "
+        "disclaimer_id from the response, "
+        "4) Confirm the model is ready for use."
+    )
+
+
 if __name__ == "__main__":
     import atexit
 
