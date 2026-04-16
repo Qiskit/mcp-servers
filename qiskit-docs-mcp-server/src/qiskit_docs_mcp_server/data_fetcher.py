@@ -13,6 +13,7 @@
 import logging
 import re
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote, urlparse
@@ -23,14 +24,17 @@ from bs4 import BeautifulSoup
 
 from qiskit_docs_mcp_server.constants import (
     AVAILABLE_ADDONS,
+    AVAILABLE_API_PACKAGES,
     AVAILABLE_GUIDES,
     AVAILABLE_MODULES,
+    AVAILABLE_TUTORIALS,
     BASE_URL,
     CACHE_TTL,
     ERROR_CODE_CATEGORIES,
     HTTP_TIMEOUT,
     QISKIT_DOCS_BASE,
     SEARCH_PATH,
+    SITEMAP_URL,
 )
 
 
@@ -68,6 +72,13 @@ class _TTLCache:
 
 _text_cache = _TTLCache(ttl=CACHE_TTL)
 _json_cache = _TTLCache(ttl=CACHE_TTL)
+_sitemap_cache = _TTLCache(ttl=CACHE_TTL)
+
+_SITEMAP_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+_SITEMAP_CACHE_KEY = "sitemap_pages"
+
+# Regex for versioned paths (e.g., /0.46, /1.0, /2.1, /dev)
+_VERSION_SEGMENT_RE = re.compile(r"/(?:\d+\.\d+|dev)(?:/|$)")
 
 _client_holder: dict[str, httpx.AsyncClient] = {}
 
@@ -79,6 +90,113 @@ def _get_http_client() -> httpx.AsyncClient:
         client = httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True)
         _client_holder["client"] = client
     return client
+
+
+def _classify_page(path: str, buckets: dict[str, set[str]]) -> None:
+    """Classify a single English doc path into the appropriate bucket.
+
+    Args:
+        path: Path relative to ``/docs/en/`` (e.g. ``guides/transpile``).
+        buckets: Mutable dict of sets to add the slug to.
+    """
+    for prefix, key in (("guides/", "guides"), ("tutorials/", "tutorials")):
+        if path.startswith(prefix):
+            slug = path[len(prefix) :]
+            if slug and "/" not in slug:
+                buckets[key].add(slug)
+            return
+
+    if not path.startswith("api/"):
+        return
+
+    if path.startswith("api/qiskit-addon-"):
+        rest = path.removeprefix("api/qiskit-addon-")
+        if rest and "/" not in rest:
+            buckets["addons"].add(rest)
+    elif path.startswith("api/qiskit/"):
+        slug = path.removeprefix("api/qiskit/")
+        if (
+            slug
+            and "/" not in slug
+            and not slug.startswith("qiskit.")
+            and slug not in {"release-notes", "root"}
+        ):
+            buckets["modules"].add(slug)
+    else:
+        slug = path.removeprefix("api/")
+        if slug and "/" not in slug and slug != "qiskit":
+            buckets["api_packages"].add(slug)
+
+
+def _parse_sitemap_xml(xml_text: str) -> dict[str, list[str]]:
+    """Parse sitemap XML and categorize English page paths.
+
+    Extracts ``/en/`` pages from the sitemap and groups them into:
+    modules, addons, api_packages, guides, and tutorials.
+
+    Args:
+        xml_text: Raw XML string from the sitemap
+
+    Returns:
+        Dict with keys 'modules', 'addons', 'api_packages', 'guides',
+        'tutorials', each mapping to a sorted list of slug strings.
+    """
+    root = ET.fromstring(xml_text)
+
+    buckets: dict[str, set[str]] = {
+        "modules": set(),
+        "addons": set(),
+        "api_packages": set(),
+        "guides": set(),
+        "tutorials": set(),
+    }
+
+    en_marker = "/docs/en/"
+    for loc in root.iter(f"{_SITEMAP_NS}loc"):
+        url = loc.text
+        if url is None:
+            continue
+        idx = url.find(en_marker)
+        if idx == -1:
+            continue
+        path = url[idx + len(en_marker) :]
+        if _VERSION_SEGMENT_RE.search(path):
+            continue
+        _classify_page(path, buckets)
+
+    return {key: sorted(values) for key, values in buckets.items()}
+
+
+async def _fetch_sitemap_pages() -> dict[str, list[str]] | None:
+    """Fetch and parse the documentation sitemap for dynamic page discovery.
+
+    Results are cached using the standard TTL cache.
+
+    Returns:
+        Categorized page lists, or None if the sitemap cannot be fetched.
+    """
+    cached: dict[str, list[str]] | None = _sitemap_cache.get(_SITEMAP_CACHE_KEY)
+    if cached is not None:
+        return cached
+
+    try:
+        client = _get_http_client()
+        response = await client.get(SITEMAP_URL, follow_redirects=True)
+        response.raise_for_status()
+        result = _parse_sitemap_xml(response.text)
+        _sitemap_cache.set(_SITEMAP_CACHE_KEY, result)
+        logger.info(
+            "Sitemap loaded: %d modules, %d addons, %d api_packages, %d guides, %d tutorials",
+            len(result["modules"]),
+            len(result["addons"]),
+            len(result["api_packages"]),
+            len(result["guides"]),
+            len(result["tutorials"]),
+        )
+        return result
+    except Exception as e:
+        logger.warning(f"Failed to fetch sitemap, using fallback constants: {e}")
+        return None
 
 
 def _strip_html_tags(text: str) -> str:
@@ -147,6 +265,12 @@ def extract_main_content(html: str) -> str:
     return str(soup)
 
 
+_html2text_converter = html2text.HTML2Text()
+_html2text_converter.ignore_links = False
+_html2text_converter.body_width = 0
+_html2text_converter.ignore_images = False
+
+
 def convert_html_to_markdown(html: str) -> str:
     """Convert HTML content to Markdown format.
 
@@ -160,11 +284,7 @@ def convert_html_to_markdown(html: str) -> str:
         Markdown formatted content
     """
     content_html = extract_main_content(html)
-    h = html2text.HTML2Text()
-    h.ignore_links = False
-    h.body_width = 0
-    h.ignore_images = False
-    return h.handle(content_html)
+    return _html2text_converter.handle(content_html)
 
 
 def _truncate_content(content: str, max_length: int = 20000, offset: int = 0) -> dict[str, Any]:
@@ -495,36 +615,74 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
     }
 
 
-def get_list_of_modules() -> dict[str, Any]:
-    """Get list of all Qiskit SDK modules with descriptions and URL paths."""
+async def get_list_of_modules() -> dict[str, Any]:
+    """Get list of all Qiskit SDK modules with URL paths.
+
+    Tries dynamic sitemap discovery first, falls back to hardcoded constants.
+    """
+    sitemap = await _fetch_sitemap_pages()
+    names = sitemap["modules"] if sitemap else AVAILABLE_MODULES
     return {
         "status": "success",
-        "modules": [
-            {"name": name, "description": desc, "url_path": f"api/qiskit/{name}"}
-            for name, desc in AVAILABLE_MODULES.items()
-        ],
+        "source": "sitemap" if sitemap else "fallback",
+        "modules": [{"name": name, "url_path": f"api/qiskit/{name}"} for name in names],
     }
 
 
-def get_list_of_addons() -> dict[str, Any]:
-    """Get list of all Qiskit addon modules with descriptions and URL paths."""
+async def get_list_of_addons() -> dict[str, Any]:
+    """Get list of all Qiskit addon packages with URL paths.
+
+    Tries dynamic sitemap discovery first, falls back to hardcoded constants.
+    """
+    sitemap = await _fetch_sitemap_pages()
+    names = sitemap["addons"] if sitemap else AVAILABLE_ADDONS
     return {
         "status": "success",
-        "addons": [
-            {"name": name, "description": desc, "url_path": f"api/qiskit-addon-{name}"}
-            for name, desc in AVAILABLE_ADDONS.items()
-        ],
+        "source": "sitemap" if sitemap else "fallback",
+        "addons": [{"name": name, "url_path": f"api/qiskit-addon-{name}"} for name in names],
     }
 
 
-def get_list_of_guides() -> dict[str, Any]:
-    """Get list of Qiskit guides and best practices with descriptions and URL paths."""
+async def get_list_of_guides() -> dict[str, Any]:
+    """Get list of Qiskit guides with URL paths.
+
+    Tries dynamic sitemap discovery first, falls back to hardcoded constants.
+    """
+    sitemap = await _fetch_sitemap_pages()
+    names = sitemap["guides"] if sitemap else AVAILABLE_GUIDES
     return {
         "status": "success",
-        "guides": [
-            {"name": name, "description": desc, "url_path": f"guides/{name}"}
-            for name, desc in AVAILABLE_GUIDES.items()
-        ],
+        "source": "sitemap" if sitemap else "fallback",
+        "guides": [{"name": name, "url_path": f"guides/{name}"} for name in names],
+    }
+
+
+async def get_list_of_tutorials() -> dict[str, Any]:
+    """Get list of Qiskit tutorials with URL paths.
+
+    Tries dynamic sitemap discovery first, falls back to hardcoded constants.
+    """
+    sitemap = await _fetch_sitemap_pages()
+    names = sitemap["tutorials"] if sitemap else AVAILABLE_TUTORIALS
+    return {
+        "status": "success",
+        "source": "sitemap" if sitemap else "fallback",
+        "tutorials": [{"name": name, "url_path": f"tutorials/{name}"} for name in names],
+    }
+
+
+async def get_list_of_api_packages() -> dict[str, Any]:
+    """Get list of all API packages (beyond SDK modules and addons) with URL paths.
+
+    Includes qiskit-ibm-runtime, qiskit-ibm-transpiler, REST APIs, etc.
+    Tries dynamic sitemap discovery first, falls back to hardcoded constants.
+    """
+    sitemap = await _fetch_sitemap_pages()
+    names = sitemap["api_packages"] if sitemap else AVAILABLE_API_PACKAGES
+    return {
+        "status": "success",
+        "source": "sitemap" if sitemap else "fallback",
+        "api_packages": [{"name": name, "url_path": f"api/{name}"} for name in names],
     }
 
 

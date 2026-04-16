@@ -18,15 +18,19 @@ import httpx
 import pytest
 from qiskit_docs_mcp_server.constants import (
     AVAILABLE_ADDONS,
+    AVAILABLE_API_PACKAGES,
     AVAILABLE_GUIDES,
     AVAILABLE_MODULES,
+    AVAILABLE_TUTORIALS,
     CACHE_TTL,
     HTTP_TIMEOUT,
     _get_env_float,
 )
 from qiskit_docs_mcp_server.data_fetcher import (
     _json_cache,
+    _parse_sitemap_xml,
     _resolve_url,
+    _sitemap_cache,
     _strip_html_tags,
     _text_cache,
     _truncate_content,
@@ -36,9 +40,11 @@ from qiskit_docs_mcp_server.data_fetcher import (
     fetch_text,
     fetch_text_json,
     get_list_of_addons,
+    get_list_of_api_packages,
     get_list_of_error_code_categories,
     get_list_of_guides,
     get_list_of_modules,
+    get_list_of_tutorials,
     get_page_docs,
     lookup_error_code,
     search_qiskit_docs,
@@ -625,46 +631,260 @@ class TestConvertHtmlToMarkdown:
         assert result.strip() == ""
 
 
+class TestParseSitemapXml:
+    """Test sitemap XML parsing."""
+
+    _SAMPLE_SITEMAP = """<?xml version="1.0" encoding="UTF-8"?>
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/guides/quick-start</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/guides/transpile</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/tutorials/grovers-algorithm</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/tutorials/shors-algorithm</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit/circuit</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit/transpiler</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.circuit.QuantumCircuit</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit/release-notes</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit-addon-sqd</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit-addon-sqd/submodule</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit-ibm-runtime</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/functions</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit/1.0/circuit</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/de/guides/quick-start</loc></url>
+      <url><loc>https://quantum.cloud.ibm.com/docs/en/errors</loc></url>
+    </urlset>"""
+
+    def test_parses_guides(self):
+        """Test that guides are correctly extracted."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        assert "quick-start" in result["guides"]
+        assert "transpile" in result["guides"]
+
+    def test_parses_tutorials(self):
+        """Test that tutorials are correctly extracted."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        assert "grovers-algorithm" in result["tutorials"]
+        assert "shors-algorithm" in result["tutorials"]
+
+    def test_parses_modules(self):
+        """Test that SDK modules are extracted (excluding class pages)."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        assert "circuit" in result["modules"]
+        assert "transpiler" in result["modules"]
+
+    def test_excludes_class_pages_from_modules(self):
+        """Test that qiskit.* class pages are not included as modules."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        module_names = result["modules"]
+        assert not any(n.startswith("qiskit.") for n in module_names)
+
+    def test_excludes_release_notes_from_modules(self):
+        """Test that release-notes is excluded from modules."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        assert "release-notes" not in result["modules"]
+
+    def test_parses_addons(self):
+        """Test that addon packages are extracted (top-level only)."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        assert "sqd" in result["addons"]
+        # Submodule pages should not create separate addon entries
+        assert len(result["addons"]) == 1
+
+    def test_parses_api_packages(self):
+        """Test that non-SDK, non-addon API packages are extracted."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        assert "qiskit-ibm-runtime" in result["api_packages"]
+        assert "functions" in result["api_packages"]
+
+    def test_excludes_versioned_paths(self):
+        """Test that versioned paths (e.g., /1.0/) are excluded."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        # The versioned /1.0/circuit should not add a duplicate 'circuit'
+        # but 'circuit' from the non-versioned path should be present
+        assert "circuit" in result["modules"]
+
+    def test_excludes_non_english_pages(self):
+        """Test that non-English pages are excluded."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        # The German guide should not appear
+        all_items = (
+            result["guides"]
+            + result["tutorials"]
+            + result["modules"]
+            + result["addons"]
+            + result["api_packages"]
+        )
+        # quick-start appears once (English), not duplicated from German
+        assert all_items.count("quick-start") <= 1
+
+    def test_results_are_sorted(self):
+        """Test that all result lists are sorted."""
+        result = _parse_sitemap_xml(self._SAMPLE_SITEMAP)
+        for key in ("guides", "tutorials", "modules", "addons", "api_packages"):
+            assert result[key] == sorted(result[key])
+
+    def test_empty_sitemap(self):
+        """Test parsing an empty sitemap."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+        </urlset>"""
+        result = _parse_sitemap_xml(xml)
+        assert result["guides"] == []
+        assert result["tutorials"] == []
+        assert result["modules"] == []
+        assert result["addons"] == []
+        assert result["api_packages"] == []
+
+
+class TestFetchSitemapPages:
+    """Test _fetch_sitemap_pages function."""
+
+    def setup_method(self):
+        """Clear sitemap cache before each test."""
+        _sitemap_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_returns_parsed_pages(self, mock_get_client):
+        """Test that _fetch_sitemap_pages returns categorized pages."""
+        from qiskit_docs_mcp_server.data_fetcher import _fetch_sitemap_pages
+
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://quantum.cloud.ibm.com/docs/en/guides/transpile</loc></url>
+          <url><loc>https://quantum.cloud.ibm.com/docs/en/api/qiskit/circuit</loc></url>
+        </urlset>"""
+        mock_response = MagicMock()
+        mock_response.text = xml
+        mock_response.raise_for_status = MagicMock()
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_get_client.return_value = mock_client
+
+        result = await _fetch_sitemap_pages()
+        assert result is not None
+        assert "transpile" in result["guides"]
+        assert "circuit" in result["modules"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_returns_none_on_failure(self, mock_get_client):
+        """Test that _fetch_sitemap_pages returns None on HTTP error."""
+        from qiskit_docs_mcp_server.data_fetcher import _fetch_sitemap_pages
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.HTTPError("Connection failed")
+        mock_get_client.return_value = mock_client
+
+        result = await _fetch_sitemap_pages()
+        assert result is None
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_caches_result(self, mock_get_client):
+        """Test that sitemap result is cached on second call."""
+        from qiskit_docs_mcp_server.data_fetcher import _fetch_sitemap_pages
+
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://quantum.cloud.ibm.com/docs/en/guides/quick-start</loc></url>
+        </urlset>"""
+        mock_response = MagicMock()
+        mock_response.text = xml
+        mock_response.raise_for_status = MagicMock()
+        mock_client = AsyncMock()
+        mock_client.get.return_value = mock_response
+        mock_get_client.return_value = mock_client
+
+        await _fetch_sitemap_pages()
+        await _fetch_sitemap_pages()
+        assert mock_client.get.call_count == 1
+
+
 class TestListHelpers:
     """Test list helper functions."""
 
-    def test_get_list_of_modules(self):
-        """Test get_list_of_modules returns correct structure with url_path."""
-        result = get_list_of_modules()
+    def setup_method(self):
+        """Clear sitemap cache to force fallback."""
+        _sitemap_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    async def test_get_list_of_modules_fallback(self, _mock):
+        """Test get_list_of_modules falls back to constants."""
+        result = await get_list_of_modules()
         assert result["status"] == "success"
+        assert result["source"] == "fallback"
         assert "modules" in result
         assert isinstance(result["modules"], list)
         assert len(result["modules"]) > 0
-        # Check structure includes name, description, url_path
         first = result["modules"][0]
         assert "name" in first
-        assert "description" in first
         assert "url_path" in first
         assert first["url_path"].startswith("api/qiskit/")
 
-    def test_get_list_of_addons(self):
-        """Test get_list_of_addons returns correct structure with url_path."""
-        result = get_list_of_addons()
+    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    async def test_get_list_of_addons_fallback(self, _mock):
+        """Test get_list_of_addons falls back to constants."""
+        result = await get_list_of_addons()
         assert result["status"] == "success"
+        assert result["source"] == "fallback"
         assert "addons" in result
         assert len(result["addons"]) > 0
         first = result["addons"][0]
         assert "name" in first
-        assert "description" in first
         assert "url_path" in first
         assert "qiskit-addon-" in first["url_path"]
 
-    def test_get_list_of_guides(self):
-        """Test get_list_of_guides returns correct structure with url_path."""
-        result = get_list_of_guides()
+    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    async def test_get_list_of_guides_fallback(self, _mock):
+        """Test get_list_of_guides falls back to constants."""
+        result = await get_list_of_guides()
         assert result["status"] == "success"
+        assert result["source"] == "fallback"
         assert "guides" in result
         assert len(result["guides"]) > 0
         first = result["guides"][0]
         assert "name" in first
-        assert "description" in first
         assert "url_path" in first
         assert first["url_path"].startswith("guides/")
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    async def test_get_list_of_tutorials_fallback(self, _mock):
+        """Test get_list_of_tutorials falls back to constants."""
+        result = await get_list_of_tutorials()
+        assert result["status"] == "success"
+        assert result["source"] == "fallback"
+        assert "tutorials" in result
+        assert len(result["tutorials"]) > 0
+        first = result["tutorials"][0]
+        assert "name" in first
+        assert "url_path" in first
+        assert first["url_path"].startswith("tutorials/")
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    async def test_get_list_of_api_packages_fallback(self, _mock):
+        """Test get_list_of_api_packages falls back to constants."""
+        result = await get_list_of_api_packages()
+        assert result["status"] == "success"
+        assert result["source"] == "fallback"
+        assert "api_packages" in result
+        assert len(result["api_packages"]) > 0
+        first = result["api_packages"][0]
+        assert "name" in first
+        assert "url_path" in first
+        assert first["url_path"].startswith("api/")
+
+    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages")
+    async def test_get_list_of_modules_from_sitemap(self, mock_sitemap):
+        """Test get_list_of_modules uses sitemap when available."""
+        mock_sitemap.return_value = {
+            "modules": ["circuit", "transpiler"],
+            "addons": [],
+            "api_packages": [],
+            "guides": [],
+            "tutorials": [],
+        }
+        result = await get_list_of_modules()
+        assert result["status"] == "success"
+        assert result["source"] == "sitemap"
+        names = [m["name"] for m in result["modules"]]
+        assert names == ["circuit", "transpiler"]
 
     def test_get_list_of_error_code_categories(self):
         """Test get_list_of_error_code_categories returns correct structure."""
@@ -686,37 +906,53 @@ class TestDocFetcherConstants:
         """Test that AVAILABLE_MODULES contains circuit."""
         assert "circuit" in AVAILABLE_MODULES
 
-    def test_qiskit_modules_are_dict_with_descriptions(self):
-        """Test that AVAILABLE_MODULES values are description strings."""
-        assert isinstance(AVAILABLE_MODULES, dict)
-        for key, value in AVAILABLE_MODULES.items():
-            assert isinstance(key, str)
-            assert isinstance(value, str)
-            assert len(value) > 0
+    def test_qiskit_modules_are_list_of_strings(self):
+        """Test that AVAILABLE_MODULES is a list of strings."""
+        assert isinstance(AVAILABLE_MODULES, list)
+        for item in AVAILABLE_MODULES:
+            assert isinstance(item, str)
+            assert len(item) > 0
 
     def test_qiskit_addon_modules_not_empty(self):
         """Test that AVAILABLE_ADDONS is not empty."""
         assert len(AVAILABLE_ADDONS) > 0
 
-    def test_qiskit_addons_are_dict_with_descriptions(self):
-        """Test that AVAILABLE_ADDONS values are description strings."""
-        assert isinstance(AVAILABLE_ADDONS, dict)
-        for key, value in AVAILABLE_ADDONS.items():
-            assert isinstance(key, str)
-            assert isinstance(value, str)
-            assert len(value) > 0
+    def test_qiskit_addons_are_list_of_strings(self):
+        """Test that AVAILABLE_ADDONS is a list of strings."""
+        assert isinstance(AVAILABLE_ADDONS, list)
+        for item in AVAILABLE_ADDONS:
+            assert isinstance(item, str)
+            assert len(item) > 0
 
     def test_qiskit_guides_not_empty(self):
         """Test that AVAILABLE_GUIDES is not empty."""
         assert len(AVAILABLE_GUIDES) > 0
 
-    def test_qiskit_guides_are_dict_with_descriptions(self):
-        """Test that AVAILABLE_GUIDES values are description strings."""
-        assert isinstance(AVAILABLE_GUIDES, dict)
-        for key, value in AVAILABLE_GUIDES.items():
-            assert isinstance(key, str)
-            assert isinstance(value, str)
-            assert len(value) > 0
+    def test_qiskit_guides_are_list_of_strings(self):
+        """Test that AVAILABLE_GUIDES is a list of strings."""
+        assert isinstance(AVAILABLE_GUIDES, list)
+        for item in AVAILABLE_GUIDES:
+            assert isinstance(item, str)
+            assert len(item) > 0
+
+    def test_qiskit_tutorials_not_empty(self):
+        """Test that AVAILABLE_TUTORIALS is not empty."""
+        assert len(AVAILABLE_TUTORIALS) > 0
+
+    def test_qiskit_tutorials_are_list_of_strings(self):
+        """Test that AVAILABLE_TUTORIALS is a list of strings."""
+        assert isinstance(AVAILABLE_TUTORIALS, list)
+        for item in AVAILABLE_TUTORIALS:
+            assert isinstance(item, str)
+            assert len(item) > 0
+
+    def test_api_packages_not_empty(self):
+        """Test that AVAILABLE_API_PACKAGES is not empty."""
+        assert len(AVAILABLE_API_PACKAGES) > 0
+
+    def test_api_packages_has_ibm_runtime(self):
+        """Test that AVAILABLE_API_PACKAGES contains qiskit-ibm-runtime."""
+        assert "qiskit-ibm-runtime" in AVAILABLE_API_PACKAGES
 
 
 class TestEnvironmentConfiguration:

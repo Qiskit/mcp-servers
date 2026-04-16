@@ -24,9 +24,11 @@ from fastmcp import FastMCP
 
 from qiskit_docs_mcp_server.data_fetcher import (
     get_list_of_addons,
+    get_list_of_api_packages,
     get_list_of_error_code_categories,
     get_list_of_guides,
     get_list_of_modules,
+    get_list_of_tutorials,
     get_page_docs,
     lookup_error_code,
     search_qiskit_docs,
@@ -148,35 +150,56 @@ async def lookup_error_code_tool(code: str) -> dict[str, Any]:
 
 
 @mcp.resource("qiskit-docs://modules", mime_type="application/json")
-def modules_resource() -> dict[str, Any]:
+async def modules_resource() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules with URL paths.
 
-    Returns curated list of common SDK modules. Use get_page_tool with
-    'api/qiskit/{module}' to fetch documentation, or search_docs_tool
-    to discover any module page.
+    Dynamically discovered from the documentation sitemap.
+    Use get_page_tool with 'api/qiskit/{module}' to fetch documentation,
+    or search_docs_tool to discover any module page.
     """
-    return get_list_of_modules()
+    return await get_list_of_modules()
 
 
 @mcp.resource("qiskit-docs://addons", mime_type="application/json")
-def addons_resource() -> dict[str, Any]:
+async def addons_resource() -> dict[str, Any]:
     """Get list of Qiskit addon packages with URL paths.
 
-    Returns curated list of addon packages. Use get_page_tool with
-    'api/qiskit-addon-{name}' to fetch documentation.
+    Dynamically discovered from the documentation sitemap.
+    Use get_page_tool with 'api/qiskit-addon-{name}' to fetch documentation.
     """
-    return get_list_of_addons()
+    return await get_list_of_addons()
 
 
 @mcp.resource("qiskit-docs://guides", mime_type="application/json")
-def guides_resource() -> dict[str, Any]:
+async def guides_resource() -> dict[str, Any]:
     """Get list of Qiskit implementation guides with URL paths.
 
-    Returns curated list of common guides. Use get_page_tool with
-    'guides/{name}' to fetch documentation, or search_docs_tool to
-    discover any guide.
+    Dynamically discovered from the documentation sitemap.
+    Use get_page_tool with 'guides/{name}' to fetch documentation,
+    or search_docs_tool to discover any guide.
     """
-    return get_list_of_guides()
+    return await get_list_of_guides()
+
+
+@mcp.resource("qiskit-docs://tutorials", mime_type="application/json")
+async def tutorials_resource() -> dict[str, Any]:
+    """Get list of Qiskit tutorials with URL paths.
+
+    Dynamically discovered from the documentation sitemap.
+    Use get_page_tool with 'tutorials/{name}' to fetch documentation.
+    """
+    return await get_list_of_tutorials()
+
+
+@mcp.resource("qiskit-docs://api-packages", mime_type="application/json")
+async def api_packages_resource() -> dict[str, Any]:
+    """Get list of API packages beyond SDK modules and addons.
+
+    Includes qiskit-ibm-runtime, qiskit-ibm-transpiler, REST API references, etc.
+    Dynamically discovered from the documentation sitemap.
+    Use get_page_tool with 'api/{name}' to fetch documentation.
+    """
+    return await get_list_of_api_packages()
 
 
 @mcp.resource("qiskit-docs://error-codes", mime_type="application/json")
