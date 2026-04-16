@@ -12,6 +12,7 @@
 
 """Test configuration and fixtures for Qiskit Code Assistant MCP Server tests."""
 
+import contextlib
 import os
 from unittest.mock import patch
 
@@ -49,14 +50,9 @@ async def reset_http_client():
     yield
 
     # Reset after test - properly close if still open
-    if utils_module._client is not None:
-        try:
-            if not utils_module._client.is_closed:
-                await utils_module._client.aclose()
-        except Exception:
-            pass  # Ignore errors during cleanup
-        finally:
-            utils_module.clear_http_client()
+    with contextlib.suppress(Exception):
+        await utils_module.close_http_client()
+    utils_module.clear_http_client()  # Ensure cleared even if close failed
     utils_module._cached_token = None  # Reset cached token after test
     utils_module._token_checked = False  # Reset token check flag after test
 
