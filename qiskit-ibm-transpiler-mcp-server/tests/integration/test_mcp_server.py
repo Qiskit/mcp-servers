@@ -37,6 +37,19 @@ class TestMCPServerIntegration:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
+    async def test_server_instructions(self, mock_env_vars):
+        """Test the MCP server has instructions set."""
+        assert mcp.instructions is not None
+        assert isinstance(mcp.instructions, str)
+        assert len(mcp.instructions) > 0
+        # Verify instructions mention key workflow concepts
+        assert "hybrid_ai_transpile_tool" in mcp.instructions
+        assert "ai_routing_tool" in mcp.instructions
+        assert "ai_clifford_synthesis_tool" in mcp.instructions
+        assert "setup_ibm_quantum_account_tool" in mcp.instructions
+
+    @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_service_initialization_flow(self, mocker, mock_env_vars, mock_runtime_service):
         """Test service initialization flow."""
         qiskit_runtime_sp = QiskitRuntimeServiceProvider()
