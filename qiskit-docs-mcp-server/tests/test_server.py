@@ -22,6 +22,17 @@ class TestServerRegistration:
         """Test the MCP server has the correct name."""
         assert mcp.name == "Qiskit Documentation"
 
+    def test_server_instructions(self):
+        """Test the MCP server has instructions set."""
+        assert mcp.instructions is not None
+        assert isinstance(mcp.instructions, str)
+        assert len(mcp.instructions) > 0
+        # Verify instructions mention key workflow concepts
+        assert "search_docs_tool" in mcp.instructions
+        assert "get_page_tool" in mcp.instructions
+        assert "lookup_error_code_tool" in mcp.instructions
+        assert "qiskit-docs://" in mcp.instructions
+
     def test_tools_registered(self):
         """Test that all expected tools are registered."""
         tool_names = {tool.name for tool in mcp._tool_manager._tools.values()}
