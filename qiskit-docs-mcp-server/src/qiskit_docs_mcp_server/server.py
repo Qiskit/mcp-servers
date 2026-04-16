@@ -54,7 +54,26 @@ async def lifespan(server: FastMCP) -> AsyncIterator[None]:
 
 
 # Initialize FastMCP server
-mcp = FastMCP("Qiskit Documentation", lifespan=lifespan)
+mcp = FastMCP(
+    "Qiskit Documentation",
+    lifespan=lifespan,
+    instructions="""\
+This server provides access to the Qiskit and IBM Quantum documentation.
+
+Recommended workflow:
+1. Use search_docs_tool to find relevant pages. Specific queries yield \
+better results than broad ones.
+2. Use get_page_tool to fetch the full content of pages found by search. \
+For large pages, use the offset parameter to paginate through content.
+3. Browse qiskit-docs:// resources (modules, addons, guides, error-codes) \
+to discover what documentation is available.
+4. Use lookup_error_code_tool with a 4-digit code when a user encounters \
+a Qiskit or IBM Quantum error.
+
+Prefer search over browsing for specific questions. Combine search to \
+find the right page, then fetch to read its content in full.\
+""",
+)
 
 logger.info("Qiskit Documentation MCP Server initialized")
 
