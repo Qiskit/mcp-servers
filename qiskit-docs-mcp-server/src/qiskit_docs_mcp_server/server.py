@@ -18,11 +18,16 @@ for querying and retrieving Qiskit documentation content and summaries.
 """
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from fastmcp import FastMCP
 
+from qiskit_docs_mcp_server.constants import HTTP_TIMEOUT
 from qiskit_docs_mcp_server.data_fetcher import (
+    clear_http_client,
     get_list_of_addons,
     get_list_of_error_code_categories,
     get_list_of_guides,
@@ -30,6 +35,7 @@ from qiskit_docs_mcp_server.data_fetcher import (
     get_page_docs,
     lookup_error_code,
     search_qiskit_docs,
+    set_http_client,
 )
 
 
@@ -37,9 +43,20 @@ from qiskit_docs_mcp_server.data_fetcher import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(server: FastMCP) -> AsyncIterator[None]:
+    """Manage the httpx client lifecycle."""
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True) as client:
+        set_http_client(client)
+        yield
+    clear_http_client()
+
+
 # Initialize FastMCP server
 mcp = FastMCP(
     "Qiskit Documentation",
+    lifespan=lifespan,
     instructions="""\
 This server provides access to the Qiskit and IBM Quantum documentation.
 
