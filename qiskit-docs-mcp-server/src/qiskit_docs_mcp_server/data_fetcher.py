@@ -392,11 +392,6 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
             "status": "error",
             "message": "Please provide a search query.",
         }
-    if len(query) > 500:
-        return {
-            "status": "error",
-            "message": "Search query is too long (max 500 characters).",
-        }
     if scope not in _VALID_SCOPES:
         return {
             "status": "error",
