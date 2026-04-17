@@ -22,6 +22,7 @@ from qiskit_docs_mcp_server.constants import (
     AVAILABLE_MODULES,
     CACHE_TTL,
     HTTP_TIMEOUT,
+    SEARCH_CACHE_TTL,
     _get_env_float,
 )
 from qiskit_docs_mcp_server.data_fetcher import (
@@ -88,8 +89,9 @@ class TestFetchText:
         result = await fetch_text("https://example.com")
         assert result is None
 
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
     @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
-    async def test_fetch_text_timeout(self, mock_get_client):
+    async def test_fetch_text_timeout(self, mock_get_client, mock_sleep):
         """Test fetch_text with timeout."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.TimeoutException("Request timed out")
@@ -97,6 +99,178 @@ class TestFetchText:
 
         result = await fetch_text("https://example.com")
         assert result is None
+
+
+class TestFetchTextRetry:
+    """Test retry logic in fetch_text function."""
+
+    def setup_method(self):
+        """Clear cache before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_timeout_then_success(self, mock_get_client, mock_sleep):
+        """Test that a timeout on first attempt succeeds on retry."""
+        mock_success = MagicMock()
+        mock_success.text = "Success after retry"
+        mock_success.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [
+            httpx.TimeoutException("Request timed out"),
+            mock_success,
+        ]
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text("https://example.com")
+        assert result == "Success after retry"
+        assert mock_client.get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_503_then_success(self, mock_get_client, mock_sleep):
+        """Test that a 503 on first attempt succeeds on retry."""
+        mock_503_response = MagicMock()
+        mock_503_response.status_code = 503
+        error_503 = httpx.HTTPStatusError(
+            "Server Error",
+            request=httpx.Request("GET", "https://example.com"),
+            response=mock_503_response,
+        )
+        mock_success = MagicMock()
+        mock_success.text = "Success after 503"
+        mock_success.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [error_503, mock_success]
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text("https://example.com")
+        assert result == "Success after 503"
+        assert mock_client.get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_404_not_retried(self, mock_get_client, mock_sleep):
+        """Test that a 404 is NOT retried (4xx errors)."""
+        mock_404_response = MagicMock()
+        mock_404_response.status_code = 404
+        error_404 = httpx.HTTPStatusError(
+            "Not Found",
+            request=httpx.Request("GET", "https://example.com"),
+            response=mock_404_response,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = error_404
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text("https://example.com")
+        assert result is None
+        assert mock_client.get.call_count == 1
+        mock_sleep.assert_not_called()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_retries_exhausted(self, mock_get_client, mock_sleep):
+        """Test that retries are exhausted and return None."""
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.TimeoutException("Request timed out")
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text("https://example.com")
+        assert result is None
+        assert mock_client.get.call_count == 2
+
+
+class TestFetchTextJsonRetry:
+    """Test retry logic in fetch_text_json function."""
+
+    def setup_method(self):
+        """Clear cache before each test."""
+        _text_cache.clear()
+        _json_cache.clear()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_json_timeout_then_success(self, mock_get_client, mock_sleep):
+        """Test that a timeout on first attempt succeeds on retry for JSON."""
+        mock_success = MagicMock()
+        mock_success.json.return_value = [{"key": "value"}]
+        mock_success.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [
+            httpx.TimeoutException("Request timed out"),
+            mock_success,
+        ]
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text_json("https://example.com/api")
+        assert result == [{"key": "value"}]
+        assert mock_client.get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_json_503_then_success(self, mock_get_client, mock_sleep):
+        """Test that a 503 on first attempt succeeds on retry for JSON."""
+        mock_503_response = MagicMock()
+        mock_503_response.status_code = 503
+        error_503 = httpx.HTTPStatusError(
+            "Server Error",
+            request=httpx.Request("GET", "https://example.com/api"),
+            response=mock_503_response,
+        )
+        mock_success = MagicMock()
+        mock_success.json.return_value = [{"data": "ok"}]
+        mock_success.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [error_503, mock_success]
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text_json("https://example.com/api")
+        assert result == [{"data": "ok"}]
+        assert mock_client.get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_json_404_not_retried(self, mock_get_client, mock_sleep):
+        """Test that a 404 is NOT retried for JSON fetch."""
+        mock_404_response = MagicMock()
+        mock_404_response.status_code = 404
+        error_404 = httpx.HTTPStatusError(
+            "Not Found",
+            request=httpx.Request("GET", "https://example.com/api"),
+            response=mock_404_response,
+        )
+
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = error_404
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text_json("https://example.com/api")
+        assert result is None
+        assert mock_client.get.call_count == 1
+        mock_sleep.assert_not_called()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.asyncio.sleep", new_callable=AsyncMock)
+    @patch("qiskit_docs_mcp_server.data_fetcher._get_http_client")
+    async def test_json_retries_exhausted(self, mock_get_client, mock_sleep):
+        """Test that retries are exhausted and return None for JSON."""
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = httpx.TimeoutException("Request timed out")
+        mock_get_client.return_value = mock_client
+
+        result = await fetch_text_json("https://example.com/api")
+        assert result is None
+        assert mock_client.get.call_count == 2
 
 
 class TestFetchTextJson:
@@ -434,6 +608,31 @@ class TestSearchQiskitDocs:
         assert result["status"] == "success"
         assert len(result["results"]) == 1
 
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_normalizes_relative_urls(self, mock_fetch):
+        """Test that relative URLs in search results are resolved to full URLs."""
+        mock_fetch.return_value = [
+            {"title": "Circuit", "url": "/docs/api/qiskit/circuit", "text": "Circuit module"},
+        ]
+        result = await search_qiskit_docs("circuit")
+        assert result["status"] == "success"
+        assert result["results"][0]["url"].startswith("https://")
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_preserves_absolute_urls(self, mock_fetch):
+        """Test that absolute URLs in search results are preserved as-is."""
+        mock_fetch.return_value = [
+            {
+                "title": "Circuit",
+                "url": "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit",
+                "text": "test",
+            },
+        ]
+        result = await search_qiskit_docs("circuit")
+        assert (
+            result["results"][0]["url"] == "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit"
+        )
+
     async def test_search_invalid_scope_returns_error(self):
         """Test that an invalid scope returns an error without calling the API."""
         result = await search_qiskit_docs("test", scope="invalid")
@@ -447,6 +646,25 @@ class TestSearchQiskitDocs:
 
         for scope in ["all", "documentation", "api", "learning", "tutorials"]:
             assert scope in _VALID_SCOPES
+
+    async def test_search_empty_query_returns_error(self):
+        """Test that empty query returns an error without hitting the API."""
+        result = await search_qiskit_docs("")
+        assert result["status"] == "error"
+        assert "provide a search query" in result["message"].lower()
+
+    async def test_search_whitespace_only_query_returns_error(self):
+        """Test that whitespace-only query returns an error."""
+        result = await search_qiskit_docs("   ")
+        assert result["status"] == "error"
+        assert "provide a search query" in result["message"].lower()
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_search_long_query_accepted(self, mock_fetch):
+        """Test that long queries are passed through to the API."""
+        mock_fetch.return_value = []
+        result = await search_qiskit_docs("a" * 1000)
+        assert result["status"] == "success"
 
 
 class TestLookupErrorCode:
@@ -495,6 +713,64 @@ class TestLookupErrorCode:
         result = await lookup_error_code("9999")
         assert result["status"] == "error"
         assert "not found" in result["message"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found_in_paragraph(self, mock_fetch):
+        """Test finding an error code outside a table, in a paragraph."""
+        mock_fetch.return_value = (
+            "<html><body><p>Error 2001: The circuit could not be transpiled.</p></body></html>"
+        )
+        result = await lookup_error_code("2001")
+        assert result["status"] == "success"
+        assert result["code"] == "2001"
+        assert "circuit could not be transpiled" in result["details"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found_correct_row_among_multiple(self, mock_fetch):
+        """Test that the correct row is returned when multiple rows exist."""
+        mock_fetch.return_value = (
+            "<table>"
+            "<tr><td>1001</td><td>Timeout error.</td><td>Retry the job.</td></tr>"
+            "<tr><td>1002</td><td>Validation error.</td><td>Check the input.</td></tr>"
+            "<tr><td>1003</td><td>Compilation error.</td><td>Review the circuit.</td></tr>"
+            "</table>"
+        )
+        result = await lookup_error_code("1002")
+        assert result["status"] == "success"
+        assert result["code"] == "1002"
+        assert "Validation error." in result["details"]
+        assert "Check the input." in result["details"]
+        # Make sure we didn't pick up adjacent rows
+        assert "Timeout error." not in result["details"]
+        assert "Compilation error." not in result["details"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found_in_list_item(self, mock_fetch):
+        """Test finding an error code in a list item element."""
+        mock_fetch.return_value = (
+            "<html><body><ul>"
+            "<li>3001 - Backend not available.</li>"
+            "<li>3002 - Queue is full.</li>"
+            "</ul></body></html>"
+        )
+        result = await lookup_error_code("3002")
+        assert result["status"] == "success"
+        assert result["code"] == "3002"
+        assert "Queue is full" in result["details"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text")
+    async def test_code_found_in_heading(self, mock_fetch):
+        """Test finding an error code in a heading element."""
+        mock_fetch.return_value = (
+            "<html><body>"
+            "<h3>Error 4001: Session expired</h3>"
+            "<p>Details about the session timeout.</p>"
+            "</body></html>"
+        )
+        result = await lookup_error_code("4001")
+        assert result["status"] == "success"
+        assert result["code"] == "4001"
+        assert "Session expired" in result["details"]
 
 
 class TestExtractMainContent:
@@ -643,6 +919,8 @@ class TestListHelpers:
         assert "description" in first
         assert "url_path" in first
         assert first["url_path"].startswith("api/qiskit/")
+        assert "full_url" in first
+        assert first["full_url"].startswith("https://")
 
     def test_get_list_of_addons(self):
         """Test get_list_of_addons returns correct structure with url_path."""
@@ -655,6 +933,7 @@ class TestListHelpers:
         assert "description" in first
         assert "url_path" in first
         assert "qiskit-addon-" in first["url_path"]
+        assert "full_url" in first
 
     def test_get_list_of_guides(self):
         """Test get_list_of_guides returns correct structure with url_path."""
@@ -667,6 +946,7 @@ class TestListHelpers:
         assert "description" in first
         assert "url_path" in first
         assert first["url_path"].startswith("guides/")
+        assert "full_url" in first
 
     def test_get_list_of_error_code_categories(self):
         """Test get_list_of_error_code_categories returns correct structure."""
@@ -769,6 +1049,10 @@ class TestEnvironmentConfiguration:
         assert CACHE_TTL > 0
         assert CACHE_TTL <= 86400  # At most 24 hours
 
+    def test_search_cache_ttl_default(self):
+        """Test that SEARCH_CACHE_TTL defaults to 300.0 (5 minutes)."""
+        assert SEARCH_CACHE_TTL == 300.0
+
     @patch("qiskit_docs_mcp_server.data_fetcher.httpx.AsyncClient")
     def test_fetch_text_uses_http_timeout(self, mock_client_class):
         """Test that _get_http_client creates client with HTTP_TIMEOUT."""
@@ -859,14 +1143,14 @@ class TestCaching:
         assert _text_cache.get("key") is None
 
     def test_cache_evicts_oldest_at_max_size(self):
-        """Test that cache evicts the oldest entry when at capacity."""
+        """Test that cache evicts the LRU entry when at capacity."""
         cache = _TTLCache(ttl=3600.0, max_size=2)
         cache.set("a", 1)
         cache.set("b", 2)
         assert cache.get("a") == 1
         assert cache.get("b") == 2
 
-        # Adding a third entry should evict the oldest ("a")
+        # Adding a third entry should evict LRU ("a", since get("b") was most recent)
         cache.set("c", 3)
         assert cache.get("a") is None
         assert cache.get("b") == 2
@@ -884,14 +1168,31 @@ class TestCaching:
         mock_time.monotonic.return_value = 1061.0
         assert cache.get("key") is None
 
-    def test_cache_update_existing_key(self):
-        """Test that updating an existing key doesn't trigger eviction."""
+    def test_cache_lru_eviction_order(self):
+        """Test that LRU eviction respects access order, not insertion order."""
         cache = _TTLCache(ttl=3600.0, max_size=2)
-        cache.set("a", "1")
-        cache.set("b", "2")
-        cache.set("a", "3")  # Update, not new entry
-        assert cache.get("a") == "3"
-        assert cache.get("b") == "2"
+        cache.set("a", 1)
+        cache.set("b", 2)
+
+        # Touch "a" so it becomes most recently used
+        assert cache.get("a") == 1
+
+        # Adding "c" should evict "b" (LRU), not "a"
+        cache.set("c", 3)
+        assert cache.get("b") is None  # "b" was evicted (LRU)
+        assert cache.get("a") == 1  # "a" survives (recently accessed)
+        assert cache.get("c") == 3
+
+    def test_cache_update_existing_key_no_eviction(self):
+        """Test that updating an existing key does not evict other entries."""
+        cache = _TTLCache(ttl=3600.0, max_size=2)
+        cache.set("a", 1)
+        cache.set("b", 2)
+
+        # Update "a" with a new value — should not evict "b"
+        cache.set("a", 10)
+        assert cache.get("a") == 10
+        assert cache.get("b") == 2
 
     def test_get_http_client_reuse(self):
         """Test that _get_http_client returns the same instance on repeated calls."""

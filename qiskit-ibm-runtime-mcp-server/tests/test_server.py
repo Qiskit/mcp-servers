@@ -44,6 +44,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     setup_ibm_quantum_account,
     usage_info,
 )
+from qiskit_ibm_runtime_mcp_server.server import mcp
 from qiskit_ibm_runtime_mcp_server.server import (
     active_account_info_tool,
     active_instance_info_tool,
@@ -2625,6 +2626,59 @@ class TestExampleCircuits:
         for circuit in circuits:
             assert "usage" in circuit
             assert "run_sampler_tool" in circuit["usage"]
+
+
+class TestServerRegistration:
+    """Test that tools, resources, prompts, and templates are registered."""
+
+    def test_server_name(self):
+        """Test the server name is correct."""
+        assert mcp.name == "Qiskit IBM Runtime"
+
+    def test_resources_registered(self):
+        """Test that all expected static resources are registered."""
+        resource_uris = set(mcp._resource_manager._resources.keys())
+        expected_resources = {
+            "ibm://status",
+            "circuits://bell-state",
+            "circuits://ghz-state",
+            "circuits://random",
+            "circuits://superposition",
+        }
+        assert expected_resources.issubset(resource_uris), (
+            f"Missing resources: {expected_resources - resource_uris}"
+        )
+
+    def test_resource_count(self):
+        """Test the expected number of static resources."""
+        assert len(mcp._resource_manager._resources) == 5
+
+    def test_prompts_registered(self):
+        """Test that all expected prompts are registered."""
+        prompt_names = set(mcp._prompt_manager._prompts.keys())
+        expected_prompts = {"run_bell_state", "explore_backend", "monitor_job"}
+        assert expected_prompts.issubset(prompt_names), (
+            f"Missing prompts: {expected_prompts - prompt_names}"
+        )
+
+    def test_prompt_count(self):
+        """Test the expected number of prompts."""
+        assert len(mcp._prompt_manager._prompts) == 3
+
+    def test_resource_templates_registered(self):
+        """Test that all expected resource templates are registered."""
+        template_uris = set(mcp._resource_manager._templates.keys())
+        expected_templates = {
+            "ibm://backends/{backend_name}",
+            "ibm://jobs/{job_id}",
+        }
+        assert expected_templates.issubset(template_uris), (
+            f"Missing resource templates: {expected_templates - template_uris}"
+        )
+
+    def test_resource_template_count(self):
+        """Test the expected number of resource templates."""
+        assert len(mcp._resource_manager._templates) == 2
 
 
 # Assisted by watsonx Code Assistant

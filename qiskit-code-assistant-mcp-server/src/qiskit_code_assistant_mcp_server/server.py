@@ -49,7 +49,30 @@ logging.basicConfig(level=getattr(logging, QCA_MCP_DEBUG_LEVEL, logging.INFO))
 logger = logging.getLogger(__name__)
 
 # Initialize FastMCP server
-mcp = FastMCP("Qiskit Code Assistant")
+mcp = FastMCP(
+    "Qiskit Code Assistant",
+    instructions="""\
+This server provides access to IBM Qiskit Code Assistant for quantum code \
+generation and conceptual Q&A.
+
+Recommended workflow:
+1. Use get_completion_tool for CODE GENERATION requests (e.g., "write a Bell \
+state circuit", "create VQE code"). It returns ready-to-use Python/Qiskit code.
+2. Use get_rag_completion_tool for CONCEPTUAL QUESTIONS (e.g., "what is \
+entanglement?", "how does the transpiler work?"). It retrieves answers from \
+IBM's knowledge base.
+3. After a successful completion, call accept_completion_tool with the \
+completion_id to provide positive feedback and help improve the service.
+
+Disclaimer handling:
+- Before first use, a model disclaimer may need to be accepted.
+- Browse qca://disclaimer/{model_id} to check disclaimer status, then call \
+accept_model_disclaimer_tool to accept it.
+
+Browse qca://models to discover available models and qca://status to check \
+service health.\
+""",
+)
 
 logger.info("Qiskit Code Assistant MCP Server initialized")
 
@@ -198,6 +221,49 @@ async def accept_completion_tool(completion_id: str) -> dict[str, Any]:
         Dict with 'status' ('success' or 'error') and 'result' or 'message'.
     """
     return await accept_completion(completion_id)
+
+
+##################################################
+## MCP Prompts
+## - https://modelcontextprotocol.io/docs/concepts/prompts
+##################################################
+
+
+@mcp.prompt()
+def generate_qiskit_code(task: str) -> str:
+    """Generate Qiskit Python code for a quantum computing task."""
+    return (
+        f"Generate Qiskit code for: '{task}'. "
+        f"1) Call get_completion_tool with prompt='{task}' to generate the code, "
+        "2) Display the generated code from the response, "
+        "3) If the user confirms the code is useful, call accept_completion_tool "
+        "with the completion_id from the response."
+    )
+
+
+@mcp.prompt()
+def explain_qiskit_concept(concept: str) -> str:
+    """Explain a Qiskit or quantum computing concept using the knowledge base."""
+    return (
+        f"Explain '{concept}' using the Qiskit Code Assistant knowledge base: "
+        f"Call get_rag_completion_tool with prompt='{concept}' and present the "
+        "explanation from the response. If the answer is helpful, call "
+        "accept_completion_tool with the completion_id."
+    )
+
+
+@mcp.prompt()
+def setup_model(model_id: str) -> str:
+    """Set up a Qiskit Code Assistant model by reviewing its info and accepting the disclaimer."""
+    return (
+        f"Set up model '{model_id}' for use: "
+        f"1) Read the qca://model/{model_id} resource to get model details, "
+        f"2) Read the qca://disclaimer/{model_id} resource to get the disclaimer, "
+        "3) If a disclaimer is present, show it to the user and call "
+        f"accept_model_disclaimer_tool with model_id='{model_id}' and the "
+        "disclaimer_id from the response, "
+        "4) Confirm the model is ready for use."
+    )
 
 
 if __name__ == "__main__":

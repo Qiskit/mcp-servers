@@ -36,6 +36,18 @@ class TestMCPServerIntegration:
         assert mcp.name == "Qiskit Code Assistant"
 
     @pytest.mark.asyncio
+    async def test_server_instructions(self, mock_env_vars):
+        """Test the MCP server has instructions set."""
+        assert mcp.instructions is not None
+        assert isinstance(mcp.instructions, str)
+        assert len(mcp.instructions) > 0
+        # Verify instructions mention key workflow concepts
+        assert "get_completion_tool" in mcp.instructions
+        assert "get_rag_completion_tool" in mcp.instructions
+        assert "accept_completion_tool" in mcp.instructions
+        assert "qca://" in mcp.instructions
+
+    @pytest.mark.asyncio
     async def test_configuration_validation(self, mock_env_vars):
         """Test that configuration validation runs on startup."""
         with patch(
@@ -232,6 +244,41 @@ class TestEndToEndScenarios:
         # 2. Accept disclaimer
         accept_result = await accept_model_disclaimer("mistral-small-3.2-24b-qiskit", disclaimer_id)
         assert accept_result["status"] == "success"
+
+
+class TestServerRegistration:
+    """Test that prompts and resource templates are registered."""
+
+    def test_prompts_registered(self):
+        """Test that all expected prompts are registered."""
+        prompt_names = set(mcp._prompt_manager._prompts.keys())
+        expected_prompts = {
+            "generate_qiskit_code",
+            "explain_qiskit_concept",
+            "setup_model",
+        }
+        assert expected_prompts.issubset(prompt_names), (
+            f"Missing prompts: {expected_prompts - prompt_names}"
+        )
+
+    def test_prompt_count(self):
+        """Test the expected number of prompts."""
+        assert len(mcp._prompt_manager._prompts) == 3
+
+    def test_resource_templates_registered(self):
+        """Test that all expected resource templates are registered."""
+        template_uris = set(mcp._resource_manager._templates.keys())
+        expected_templates = {
+            "qca://model/{model_id}",
+            "qca://disclaimer/{model_id}",
+        }
+        assert expected_templates.issubset(template_uris), (
+            f"Missing resource templates: {expected_templates - template_uris}"
+        )
+
+    def test_resource_template_count(self):
+        """Test the expected number of resource templates."""
+        assert len(mcp._resource_manager._templates) == 2
 
 
 # Assisted by watsonx Code Assistant
