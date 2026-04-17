@@ -35,6 +35,8 @@ class TestServerRegistration:
 
     def test_tools_registered(self):
         """Test that all expected tools are registered."""
+        # NOTE: Accessing FastMCP internals for introspection. Update if FastMCP
+        # exposes a public API for listing registered tools/resources.
         tool_names = {tool.name for tool in mcp._tool_manager._tools.values()}
         expected_tools = {
             "search_docs_tool",
@@ -45,6 +47,8 @@ class TestServerRegistration:
 
     def test_resources_registered(self):
         """Test that all expected resources are registered."""
+        # NOTE: Accessing FastMCP internals for introspection. Update if FastMCP
+        # exposes a public API for listing registered tools/resources.
         resource_uris = set(mcp._resource_manager._resources.keys())
         expected_resources = {
             "qiskit-docs://modules",
@@ -58,6 +62,8 @@ class TestServerRegistration:
 
     def test_tool_count(self):
         """Test the expected number of tools."""
+        # NOTE: Accessing FastMCP internals for introspection. Update if FastMCP
+        # exposes a public API for listing registered tools/resources.
         assert len(mcp._tool_manager._tools) == 3
 
     def test_resource_count(self):
@@ -66,6 +72,8 @@ class TestServerRegistration:
 
     def test_old_tools_removed(self):
         """Test that old category-specific tools are no longer registered."""
+        # NOTE: Accessing FastMCP internals for introspection. Update if FastMCP
+        # exposes a public API for listing registered tools/resources.
         tool_names = {tool.name for tool in mcp._tool_manager._tools.values()}
         removed_tools = {
             "get_sdk_module_docs_tool",

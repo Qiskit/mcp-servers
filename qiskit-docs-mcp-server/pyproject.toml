@@ -80,6 +80,10 @@ python_classes = "Test*"
 python_functions = "test_*"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: marks tests that hit real APIs (deselect with '-m \"not integration\"')",
+]
+addopts = "-m 'not integration'"
 
 [tool.bandit]
 skips = ["B101"]
