@@ -28,7 +28,34 @@ from qiskit_ibm_transpiler_mcp_server.utils import CircuitFormat, setup_ibm_quan
 logger = logging.getLogger(__name__)
 
 # Initialize FastMCP server
-mcp = FastMCP("Qiskit IBM Transpiler")
+mcp = FastMCP(
+    "Qiskit IBM Transpiler",
+    instructions="""\
+This server provides AI-powered quantum circuit transpilation and synthesis \
+using the Qiskit IBM Transpiler Service.
+
+Getting started:
+- Call setup_ibm_quantum_account_tool to authenticate before using other tools.
+
+Quick path (recommended for most users):
+- Use hybrid_ai_transpile_tool for end-to-end transpilation that combines \
+classical heuristic and AI-powered optimization in a single call.
+
+Granular control:
+1. Use ai_routing_tool FIRST to insert SWAP operations and map the circuit \
+to the target backend's connectivity.
+2. Then apply specialized synthesis tools to optimize specific sub-circuit types:
+   - ai_clifford_synthesis_tool: H, S, CX gate blocks (up to 9 qubits)
+   - ai_linear_function_synthesis_tool: CX, SWAP blocks (up to 9 qubits)
+   - ai_permutation_synthesis_tool: SWAP blocks (27, 33, 65 qubits)
+   - ai_pauli_network_synthesis_tool: H, S, SX, CX, RX, RY, RZ blocks \
+(up to 6 qubits)
+
+Tool chaining:
+- All tools output circuit_qpy (base64-encoded QPY) that can be passed \
+directly to the next tool using circuit_format="qpy".\
+""",
+)
 
 logger.info("Qiskit IBM Transpiler MCP Server initialized")
 

@@ -53,7 +53,34 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize MCP server
-mcp = FastMCP("Qiskit")
+mcp = FastMCP(
+    "Qiskit",
+    instructions="""\
+This server provides local Qiskit quantum computing capabilities for circuit \
+analysis, transpilation, and format conversion.
+
+Recommended workflow:
+1. Load circuits with load_circuit_from_qasm_tool (accepts both QASM 2.0 and \
+3.0). This validates the circuit and returns metadata (qubit count, depth, \
+gate counts).
+2. Use analyze_circuit_tool to understand circuit complexity before deciding \
+on a transpilation strategy.
+3. Transpile with transpile_circuit_tool. Optimization level 2 is recommended \
+for most circuits. Avoid level 3 for large circuits (100+ qubits or 1000+ \
+gates) as it can be very slow.
+4. Use compare_optimization_levels_tool to see trade-offs across all levels \
+when unsure which optimization level to use.
+
+Format conversion:
+- convert_qpy_to_qasm3_tool: Convert binary QPY output to human-readable QASM3
+- convert_qasm3_to_qpy_tool: Convert QASM to QPY for full circuit fidelity
+- export_circuit_to_qasm_tool: Export QPY circuits to QASM 2.0 or 3.0
+
+Browse qiskit://transpiler/ resources for available basis gate presets \
+(ibm_eagle, ibm_heron, ion_trap, etc.) and coupling map topologies \
+(linear, ring, grid, full).\
+""",
+)
 
 
 # Tools - Only action-oriented tools, metadata is via resources
