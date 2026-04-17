@@ -155,6 +155,18 @@ def _get_token() -> str:
 _client: httpx.AsyncClient | None = None
 
 
+def set_http_client(client: httpx.AsyncClient) -> None:
+    """Set the shared HTTP client (called by server lifespan)."""
+    global _client
+    _client = client
+
+
+def clear_http_client() -> None:
+    """Clear the shared HTTP client (called on server shutdown)."""
+    global _client
+    _client = None
+
+
 def get_http_client() -> httpx.AsyncClient:
     """Get or create the shared HTTP client."""
     global _client

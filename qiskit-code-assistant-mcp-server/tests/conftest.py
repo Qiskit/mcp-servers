@@ -12,6 +12,7 @@
 
 """Test configuration and fixtures for Qiskit Code Assistant MCP Server tests."""
 
+import contextlib
 import os
 from unittest.mock import patch
 
@@ -42,21 +43,16 @@ async def reset_http_client():
 
     # Reset before test - force clear without trying to close
     # (might already be closed or in invalid state)
-    utils_module._client = None
+    utils_module.clear_http_client()
     utils_module._cached_token = None  # Reset cached token for fresh state
     utils_module._token_checked = False  # Reset token check flag
 
     yield
 
     # Reset after test - properly close if still open
-    if utils_module._client is not None:
-        try:
-            if not utils_module._client.is_closed:
-                await utils_module._client.aclose()
-        except Exception:
-            pass  # Ignore errors during cleanup
-        finally:
-            utils_module._client = None
+    with contextlib.suppress(Exception):
+        await utils_module.close_http_client()
+    utils_module.clear_http_client()  # Ensure cleared even if close failed
     utils_module._cached_token = None  # Reset cached token after test
     utils_module._token_checked = False  # Reset token check flag after test
 
@@ -85,13 +81,14 @@ async def http_client_for_tests(mock_env_vars):
         "Accept": "application/json",
         "Authorization": f"Bearer {token}",
     }
-    utils_module._client = httpx.AsyncClient(
+    client = httpx.AsyncClient(
         headers=headers,
         timeout=httpx.Timeout(test_timeout),
         limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
     )
+    utils_module.set_http_client(client)
 
-    yield utils_module._client
+    yield client
 
     # Cleanup is handled by reset_http_client autouse fixture
 
