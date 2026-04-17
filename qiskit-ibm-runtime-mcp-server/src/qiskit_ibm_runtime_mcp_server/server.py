@@ -68,7 +68,38 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize MCP server
-mcp = FastMCP("Qiskit IBM Runtime")
+mcp = FastMCP(
+    "Qiskit IBM Runtime",
+    instructions="""\
+This server provides access to IBM Quantum hardware through Qiskit IBM Runtime.
+
+Getting started:
+1. Call setup_ibm_quantum_account_tool to authenticate (or it will attempt \
+to use QISKIT_IBM_TOKEN env var or saved credentials automatically).
+2. Use list_backends_tool to see available backends, or least_busy_backend_tool \
+to quickly find one with a short queue.
+
+Running circuits:
+1. Use run_sampler_tool for measurement sampling (bitstring counts) or \
+run_estimator_tool for expectation value estimation.
+2. Jobs are ASYNCHRONOUS. After submitting, use get_job_status_tool to poll \
+until the job completes, then get_job_results_tool to retrieve results.
+3. Browse circuits:// resources (bell-state, ghz-state, random, superposition) \
+for ready-to-run example circuits.
+
+Backend analysis:
+- Use get_backend_properties_tool for static info (processor type, basis gates, \
+qubit count).
+- Use get_backend_calibration_tool for live calibration data (T1, T2, gate \
+errors, faulty qubits).
+- Use find_optimal_qubit_chains_tool or find_optimal_qv_qubits_tool to select \
+the highest-fidelity qubits for your experiment.
+
+Account management:
+- Use available_instances_tool to see accessible instances and usage_info_tool \
+to check quota and consumption.\
+""",
+)
 
 
 # Tools

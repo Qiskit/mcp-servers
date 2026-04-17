@@ -64,6 +64,7 @@ ERROR_CODE_CATEGORIES = {
 # HTTP timeout configuration (in seconds)
 HTTP_TIMEOUT = _get_env_float("QISKIT_HTTP_TIMEOUT", 10.0)
 CACHE_TTL = _get_env_float("QISKIT_DOCS_CACHE_TTL", 3600.0)
+SEARCH_CACHE_TTL = _get_env_float("QISKIT_SEARCH_CACHE_TTL", 300.0)  # 5 min default
 
 # ---------------------------------------------------------------------------
 # Fallback lists — used when sitemap discovery is unavailable
