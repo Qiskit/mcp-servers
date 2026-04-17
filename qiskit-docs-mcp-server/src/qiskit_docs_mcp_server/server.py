@@ -27,7 +27,6 @@ from fastmcp import FastMCP
 
 from qiskit_docs_mcp_server.constants import HTTP_TIMEOUT
 from qiskit_docs_mcp_server.data_fetcher import (
-    clear_http_client,
     get_list_of_addons,
     get_list_of_api_packages,
     get_list_of_error_code_categories,
@@ -37,8 +36,8 @@ from qiskit_docs_mcp_server.data_fetcher import (
     get_page_docs,
     lookup_error_code,
     search_qiskit_docs,
-    set_http_client,
 )
+from qiskit_docs_mcp_server.http import clear_http_client, set_http_client
 
 
 # Configure logging

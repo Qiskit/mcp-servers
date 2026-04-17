@@ -10,18 +10,14 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-import asyncio
+"""Business logic for fetching and processing Qiskit documentation."""
+
 import logging
 import re
-import time
-import xml.etree.ElementTree as ET
-from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote, urlparse
 
-import html2text
-import httpx
 from bs4 import BeautifulSoup
 
 from qiskit_docs_mcp_server.constants import (
@@ -31,279 +27,21 @@ from qiskit_docs_mcp_server.constants import (
     AVAILABLE_MODULES,
     AVAILABLE_TUTORIALS,
     BASE_URL,
-    CACHE_TTL,
     ERROR_CODE_CATEGORIES,
-    HTTP_TIMEOUT,
     QISKIT_DOCS_BASE,
-    SEARCH_CACHE_TTL,
     SEARCH_PATH,
-    SITEMAP_URL,
 )
+from qiskit_docs_mcp_server.html_processing import (
+    _strip_html_tags,
+    convert_html_to_markdown,
+)
+from qiskit_docs_mcp_server.http import fetch_text, fetch_text_json
+from qiskit_docs_mcp_server.sitemap import _fetch_sitemap_pages
 
 
 logger = logging.getLogger(__name__)
 
-# Allowed hostname for URL validation (derived from configurable QISKIT_DOCS_BASE)
 _ALLOWED_HOST = urlparse(QISKIT_DOCS_BASE).netloc
-
-# Retry configuration for transient HTTP failures
-_MAX_RETRIES = 2  # Total attempts (1 initial + 1 retry)
-_RETRY_DELAY = 1.0  # Seconds between retries
-
-
-class _TTLCache:
-    """Simple in-memory cache with TTL and LRU eviction."""
-
-    def __init__(self, ttl: float = 3600.0, max_size: int = 128):
-        self._ttl = ttl
-        self._max_size = max_size
-        self._cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
-
-    def get(self, key: str) -> Any | None:
-        if key in self._cache:
-            timestamp, value = self._cache[key]
-            if time.monotonic() - timestamp < self._ttl:
-                self._cache.move_to_end(key)  # LRU touch
-                return value
-            del self._cache[key]
-        return None
-
-    def set(self, key: str, value: Any) -> None:
-        if key in self._cache:
-            del self._cache[key]
-        elif len(self._cache) >= self._max_size:
-            self._cache.popitem(last=False)  # Evict LRU — O(1)
-        self._cache[key] = (time.monotonic(), value)
-
-    def clear(self) -> None:
-        self._cache.clear()
-
-
-_text_cache = _TTLCache(ttl=CACHE_TTL)
-_json_cache = _TTLCache(ttl=SEARCH_CACHE_TTL)
-_sitemap_cache = _TTLCache(ttl=CACHE_TTL)
-
-_SITEMAP_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
-_SITEMAP_CACHE_KEY = "sitemap_pages"
-
-# Regex for versioned paths (e.g., /0.46, /1.0, /2.1, /dev)
-_VERSION_SEGMENT_RE = re.compile(r"/(?:\d+\.\d+|dev)(?:/|$)")
-
-_client_holder: dict[str, httpx.AsyncClient] = {}
-
-
-def set_http_client(client: httpx.AsyncClient) -> None:
-    """Set the shared HTTP client (called by server lifespan)."""
-    _client_holder["client"] = client
-
-
-def clear_http_client() -> None:
-    """Clear the shared HTTP client (called on server shutdown)."""
-    _client_holder.clear()
-
-
-def _get_http_client() -> httpx.AsyncClient:
-    """Get or create a shared HTTP client."""
-    client = _client_holder.get("client")
-    if client is None or client.is_closed:
-        client = httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True)
-        _client_holder["client"] = client
-    return client
-
-
-def _classify_page(path: str, buckets: dict[str, set[str]]) -> None:
-    """Classify a single English doc path into the appropriate bucket.
-
-    Args:
-        path: Path relative to ``/docs/en/`` (e.g. ``guides/transpile``).
-        buckets: Mutable dict of sets to add the slug to.
-    """
-    for prefix, key in (("guides/", "guides"), ("tutorials/", "tutorials")):
-        if path.startswith(prefix):
-            slug = path[len(prefix) :]
-            if slug and "/" not in slug:
-                buckets[key].add(slug)
-            return
-
-    if not path.startswith("api/"):
-        return
-
-    if path.startswith("api/qiskit-addon-"):
-        rest = path.removeprefix("api/qiskit-addon-")
-        if rest and "/" not in rest:
-            buckets["addons"].add(rest)
-    elif path.startswith("api/qiskit/"):
-        slug = path.removeprefix("api/qiskit/")
-        if (
-            slug
-            and "/" not in slug
-            and not slug.startswith("qiskit.")
-            and slug not in {"release-notes", "root"}
-        ):
-            buckets["modules"].add(slug)
-    else:
-        slug = path.removeprefix("api/")
-        if slug and "/" not in slug and slug != "qiskit":
-            buckets["api_packages"].add(slug)
-
-
-def _parse_sitemap_xml(xml_text: str) -> dict[str, list[str]]:
-    """Parse sitemap XML and categorize English page paths.
-
-    Extracts ``/en/`` pages from the sitemap and groups them into:
-    modules, addons, api_packages, guides, and tutorials.
-
-    Args:
-        xml_text: Raw XML string from the sitemap
-
-    Returns:
-        Dict with keys 'modules', 'addons', 'api_packages', 'guides',
-        'tutorials', each mapping to a sorted list of slug strings.
-    """
-    root = ET.fromstring(xml_text)
-
-    buckets: dict[str, set[str]] = {
-        "modules": set(),
-        "addons": set(),
-        "api_packages": set(),
-        "guides": set(),
-        "tutorials": set(),
-    }
-
-    en_marker = "/docs/en/"
-    for loc in root.iter(f"{_SITEMAP_NS}loc"):
-        url = loc.text
-        if url is None:
-            continue
-        idx = url.find(en_marker)
-        if idx == -1:
-            continue
-        path = url[idx + len(en_marker) :]
-        if _VERSION_SEGMENT_RE.search(path):
-            continue
-        _classify_page(path, buckets)
-
-    return {key: sorted(values) for key, values in buckets.items()}
-
-
-async def _fetch_sitemap_pages() -> dict[str, list[str]] | None:
-    """Fetch and parse the documentation sitemap for dynamic page discovery.
-
-    Results are cached using the standard TTL cache.
-
-    Returns:
-        Categorized page lists, or None if the sitemap cannot be fetched.
-    """
-    cached: dict[str, list[str]] | None = _sitemap_cache.get(_SITEMAP_CACHE_KEY)
-    if cached is not None:
-        return cached
-
-    try:
-        client = _get_http_client()
-        response = await client.get(SITEMAP_URL, follow_redirects=True)
-        response.raise_for_status()
-        result = _parse_sitemap_xml(response.text)
-        _sitemap_cache.set(_SITEMAP_CACHE_KEY, result)
-        logger.info(
-            "Sitemap loaded: %d modules, %d addons, %d api_packages, %d guides, %d tutorials",
-            len(result["modules"]),
-            len(result["addons"]),
-            len(result["api_packages"]),
-            len(result["guides"]),
-            len(result["tutorials"]),
-        )
-        return result
-    except Exception as e:
-        logger.warning(f"Failed to fetch sitemap, using fallback constants: {e}")
-        return None
-
-
-def _strip_html_tags(text: str) -> str:
-    """Strip HTML tags from a string.
-
-    Args:
-        text: String potentially containing HTML tags
-
-    Returns:
-        String with all HTML tags removed
-    """
-    return re.sub(r"<[^>]+>", "", text)
-
-
-def extract_main_content(html: str) -> str:
-    """Extract main content from HTML, removing navigation chrome.
-
-    Strips nav, header, footer, aside elements and ARIA-role navigation,
-    then returns the <main>, <article>, or role='main' content. Falls back
-    to <body> (with chrome removed) if no semantic main content is found.
-
-    Args:
-        html: Full HTML page content
-
-    Returns:
-        HTML string with only the main content
-    """
-    soup = BeautifulSoup(html, "html.parser")
-
-    # Remove structural chrome elements
-    for tag_name in ["nav", "header", "footer", "aside"]:
-        for element in soup.find_all(tag_name):
-            element.decompose()
-
-    # Remove ARIA-role navigation elements
-    for role in ["navigation", "banner", "contentinfo", "complementary"]:
-        for element in soup.find_all(attrs={"role": role}):
-            element.decompose()
-
-    # Remove skip-to-content links
-    for element in soup.find_all("a", class_=lambda c: c and "skip" in c.lower()):
-        element.decompose()
-    for element in soup.find_all(
-        "a",
-        string=lambda s: s and "skip to" in s.lower(),  # type: ignore[call-overload]
-    ):
-        element.decompose()
-
-    # Return the best semantic container
-    main_content = soup.find("main")
-    if main_content:
-        return str(main_content)
-
-    article = soup.find("article")
-    if article:
-        return str(article)
-
-    main_role = soup.find(attrs={"role": "main"})
-    if main_role:
-        return str(main_role)
-
-    body = soup.find("body")
-    if body:
-        return str(body)
-
-    return str(soup)
-
-
-_html2text_converter = html2text.HTML2Text()
-_html2text_converter.ignore_links = False
-_html2text_converter.body_width = 0
-_html2text_converter.ignore_images = False
-
-
-def convert_html_to_markdown(html: str) -> str:
-    """Convert HTML content to Markdown format.
-
-    Strips navigation chrome (header, footer, nav, aside) before conversion
-    to produce cleaner markdown output.
-
-    Args:
-        html: HTML content string
-
-    Returns:
-        Markdown formatted content
-    """
-    content_html = extract_main_content(html)
-    return _html2text_converter.handle(content_html)
 
 
 def _truncate_content(content: str, max_length: int = 20000, offset: int = 0) -> dict[str, Any]:
@@ -393,103 +131,6 @@ def _resolve_url(url: str) -> str:
     path = url.lstrip("/")
     base = QISKIT_DOCS_BASE.rstrip("/")
     return f"{base}/{path}"
-
-
-async def _fetch_with_retry(url: str) -> httpx.Response | None:
-    """Fetch a URL with retry for transient errors (5xx, timeouts).
-
-    Args:
-        url: The URL to fetch
-
-    Returns:
-        The httpx Response on success, or None if all attempts fail
-    """
-    client = _get_http_client()
-    last_error: Exception | None = None
-    for attempt in range(_MAX_RETRIES):
-        try:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
-            return response
-        except httpx.TimeoutException as e:  # noqa: PERF203
-            last_error = e
-            if attempt < _MAX_RETRIES - 1:
-                logger.warning(
-                    "Timeout fetching %s (attempt %d), retrying...",
-                    url,
-                    attempt + 1,
-                )
-                await asyncio.sleep(_RETRY_DELAY)
-                continue
-        except httpx.HTTPStatusError as e:
-            last_error = e
-            if attempt < _MAX_RETRIES - 1 and e.response.status_code >= 500:
-                logger.warning(
-                    "Server error %d fetching %s (attempt %d), retrying...",
-                    e.response.status_code,
-                    url,
-                    attempt + 1,
-                )
-                await asyncio.sleep(_RETRY_DELAY)
-                continue
-            break  # 4xx errors — don't retry
-        except httpx.HTTPError as e:
-            logger.error("Failed to fetch %s: %s", url, e)
-            return None
-        except Exception as e:
-            logger.error("Unexpected error fetching %s: %s", url, e)
-            return None
-
-    logger.error("Failed to fetch %s after %d attempts: %s", url, _MAX_RETRIES, last_error)
-    return None
-
-
-async def fetch_text(url: str) -> str | None:
-    """Fetch text content from a URL using httpx.
-
-    Retries on transient errors (5xx status codes and timeouts).
-
-    Args:
-        url: The URL to fetch
-
-    Returns:
-        The text content of the page, or None if fetch fails
-    """
-    cached: str | None = _text_cache.get(url)
-    if cached is not None:
-        return cached
-
-    response = await _fetch_with_retry(url)
-    if response is None:
-        return None
-
-    result = response.text
-    _text_cache.set(url, result)
-    return result
-
-
-async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
-    """Fetch JSON content from a URL using httpx.
-
-    Retries on transient errors (5xx status codes and timeouts).
-
-    Args:
-        url: The URL to fetch
-
-    Returns:
-        The JSON content as a list of dicts, or None if fetch fails
-    """
-    cached: list[dict[str, Any]] | None = _json_cache.get(url)
-    if cached is not None:
-        return cached
-
-    response = await _fetch_with_retry(url)
-    if response is None:
-        return None
-
-    result: list[dict[str, Any]] = response.json()
-    _json_cache.set(url, result)
-    return result
 
 
 async def get_page_docs(url: str, max_length: int = 20000, offset: int = 0) -> dict[str, Any]:
