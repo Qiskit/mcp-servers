@@ -22,6 +22,17 @@ class TestServerRegistration:
         """Test the server name is correct."""
         assert mcp.name == "Qiskit Gym"
 
+    def test_server_instructions(self):
+        """Test the MCP server has instructions set."""
+        assert mcp.instructions is not None
+        assert isinstance(mcp.instructions, str)
+        assert len(mcp.instructions) > 0
+        # Verify instructions mention key workflow concepts
+        assert "create_permutation_env_tool" in mcp.instructions
+        assert "start_training_tool" in mcp.instructions
+        assert "synthesize_permutation_tool" in mcp.instructions
+        assert "qiskit-gym://" in mcp.instructions
+
     def test_resources_registered(self):
         """Test that all expected static resources are registered."""
         resource_uris = set(mcp._resource_manager._resources.keys())
