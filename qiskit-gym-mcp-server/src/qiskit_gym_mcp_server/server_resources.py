@@ -30,10 +30,12 @@ from qiskit_gym_mcp_server.coupling_maps import (
     HARDWARE_PRESETS,
     get_coupling_map_presets,
 )
-from qiskit_gym_mcp_server.models import list_loaded_models
+from qiskit_gym_mcp_server.gym_core import get_environment_info
+from qiskit_gym_mcp_server.models import get_model_info, list_loaded_models
 from qiskit_gym_mcp_server.training import (
     get_available_algorithms,
     get_available_policies,
+    get_training_status,
     list_training_sessions,
 )
 
@@ -217,3 +219,72 @@ async def workflows_resource() -> dict[str, Any]:
             "Increase num_searches (up to 10000) for better synthesis results",
         ],
     }
+
+
+##################################################
+## MCP Prompts
+## - https://modelcontextprotocol.io/docs/concepts/prompts
+##################################################
+
+
+@mcp.prompt()
+def train_synthesis_model(env_type: str, num_qubits: str) -> str:
+    """Train a reinforcement learning model for quantum circuit synthesis."""
+    return (
+        f"Train an RL model for {env_type} synthesis on {num_qubits} qubits: "
+        f"1) Call create_{env_type}_env_tool with appropriate parameters for "
+        f"{num_qubits} qubits to create a training environment, "
+        "2) Call start_training_tool with the returned env_id and algorithm='ppo', "
+        "3) Call get_training_status_tool with the session_id to monitor progress, "
+        "4) When training completes, call save_model_tool to persist the trained model."
+    )
+
+
+@mcp.prompt()
+def synthesize_circuit(circuit_type: str) -> str:
+    """Synthesize a quantum circuit using a trained RL model."""
+    return (
+        f"Synthesize a {circuit_type} circuit using a trained model: "
+        "1) Call list_saved_models_tool to see available models, "
+        f"2) Call load_model_tool with a suitable model_name for {circuit_type} synthesis, "
+        f"3) Generate a test input using generate_random_{circuit_type}_tool, "
+        f"4) Call synthesize_{circuit_type}_tool with the model_id and the generated input, "
+        "5) Call convert_qpy_to_qasm3_tool to view the resulting circuit."
+    )
+
+
+@mcp.prompt()
+def explore_hardware_topology(backend_preset: str) -> str:
+    """Explore hardware topology and extract subtopologies for training."""
+    return (
+        f"Explore the '{backend_preset}' hardware topology: "
+        "1) Read the qiskit-gym://presets/coupling-maps resource to see available presets, "
+        f"2) Call extract_subtopologies_tool with preset='{backend_preset}' "
+        "to find connected subtopologies, "
+        "3) Call list_subtopology_shapes_tool to summarize the shapes found, "
+        "4) Create environments for each unique subtopology using create_permutation_env_tool."
+    )
+
+
+##################################################
+## MCP Resource Templates
+## - https://modelcontextprotocol.io/docs/concepts/resources#resource-templates
+##################################################
+
+
+@mcp.resource("qiskit-gym://environments/{env_id}", mime_type="application/json")
+async def environment_info_resource(env_id: str) -> dict[str, Any]:
+    """Get detailed information about a specific gym environment."""
+    return await get_environment_info(env_id)
+
+
+@mcp.resource("qiskit-gym://models/{model_name}", mime_type="application/json")
+async def model_info_resource(model_name: str) -> dict[str, Any]:
+    """Get information about a specific trained model."""
+    return await get_model_info(model_name=model_name)
+
+
+@mcp.resource("qiskit-gym://training/{session_id}", mime_type="application/json")
+async def training_status_resource(session_id: str) -> dict[str, Any]:
+    """Get the status and metrics of a specific training session."""
+    return await get_training_status(session_id)
