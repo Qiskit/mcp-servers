@@ -36,6 +36,18 @@ class TestMCPServerIntegration:
         assert mcp.name == "Qiskit Code Assistant"
 
     @pytest.mark.asyncio
+    async def test_server_instructions(self, mock_env_vars):
+        """Test the MCP server has instructions set."""
+        assert mcp.instructions is not None
+        assert isinstance(mcp.instructions, str)
+        assert len(mcp.instructions) > 0
+        # Verify instructions mention key workflow concepts
+        assert "get_completion_tool" in mcp.instructions
+        assert "get_rag_completion_tool" in mcp.instructions
+        assert "accept_completion_tool" in mcp.instructions
+        assert "qca://" in mcp.instructions
+
+    @pytest.mark.asyncio
     async def test_configuration_validation(self, mock_env_vars):
         """Test that configuration validation runs on startup."""
         with patch(

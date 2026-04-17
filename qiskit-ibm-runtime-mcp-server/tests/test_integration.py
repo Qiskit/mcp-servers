@@ -30,6 +30,19 @@ class TestMCPServerIntegration:
         assert mcp.name == "Qiskit IBM Runtime"
 
     @pytest.mark.asyncio
+    async def test_server_instructions(self, mock_env_vars):
+        """Test the MCP server has instructions set."""
+        assert mcp.instructions is not None
+        assert isinstance(mcp.instructions, str)
+        assert len(mcp.instructions) > 0
+        # Verify instructions mention key workflow concepts
+        assert "setup_ibm_quantum_account_tool" in mcp.instructions
+        assert "run_sampler_tool" in mcp.instructions
+        assert "run_estimator_tool" in mcp.instructions
+        assert "get_job_results_tool" in mcp.instructions
+        assert "circuits://" in mcp.instructions
+
+    @pytest.mark.asyncio
     async def test_service_initialization_flow(
         self, mock_env_vars, mock_runtime_service
     ):

@@ -77,7 +77,31 @@ async def lifespan(server: FastMCP) -> AsyncIterator[None]:
 
 
 # Initialize FastMCP server
-mcp = FastMCP("Qiskit Code Assistant", lifespan=lifespan)
+mcp = FastMCP(
+    "Qiskit Code Assistant",
+    instructions="""\
+This server provides access to IBM Qiskit Code Assistant for quantum code \
+generation and conceptual Q&A.
+
+Recommended workflow:
+1. Use get_completion_tool for CODE GENERATION requests (e.g., "write a Bell \
+state circuit", "create VQE code"). It returns ready-to-use Python/Qiskit code.
+2. Use get_rag_completion_tool for CONCEPTUAL QUESTIONS (e.g., "what is \
+entanglement?", "how does the transpiler work?"). It retrieves answers from \
+IBM's knowledge base.
+3. After a successful completion, call accept_completion_tool with the \
+completion_id to provide positive feedback and help improve the service.
+
+Disclaimer handling:
+- Before first use, a model disclaimer may need to be accepted.
+- Browse qca://disclaimer/{model_id} to check disclaimer status, then call \
+accept_model_disclaimer_tool to accept it.
+
+Browse qca://models to discover available models and qca://status to check \
+service health.\
+""",
+    lifespan=lifespan,
+)
 
 logger.info("Qiskit Code Assistant MCP Server initialized")
 

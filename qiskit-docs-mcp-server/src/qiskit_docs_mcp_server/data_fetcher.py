@@ -10,9 +10,11 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+import asyncio
 import logging
 import re
 import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote, urlparse
@@ -30,6 +32,7 @@ from qiskit_docs_mcp_server.constants import (
     ERROR_CODE_CATEGORIES,
     HTTP_TIMEOUT,
     QISKIT_DOCS_BASE,
+    SEARCH_CACHE_TTL,
     SEARCH_PATH,
 )
 
@@ -39,6 +42,10 @@ logger = logging.getLogger(__name__)
 # Allowed hostname for URL validation (derived from configurable QISKIT_DOCS_BASE)
 _ALLOWED_HOST = urlparse(QISKIT_DOCS_BASE).netloc
 
+# Retry configuration for transient HTTP failures
+_MAX_RETRIES = 2  # Total attempts (1 initial + 1 retry)
+_RETRY_DELAY = 1.0  # Seconds between retries
+
 
 class _TTLCache:
     """Simple in-memory cache with TTL and LRU eviction."""
@@ -46,20 +53,22 @@ class _TTLCache:
     def __init__(self, ttl: float = 3600.0, max_size: int = 128):
         self._ttl = ttl
         self._max_size = max_size
-        self._cache: dict[str, tuple[float, Any]] = {}
+        self._cache: OrderedDict[str, tuple[float, Any]] = OrderedDict()
 
     def get(self, key: str) -> Any | None:
         if key in self._cache:
             timestamp, value = self._cache[key]
             if time.monotonic() - timestamp < self._ttl:
+                self._cache.move_to_end(key)  # LRU touch
                 return value
             del self._cache[key]
         return None
 
     def set(self, key: str, value: Any) -> None:
-        if len(self._cache) >= self._max_size and key not in self._cache:
-            oldest_key = min(self._cache, key=lambda k: self._cache[k][0])
-            del self._cache[oldest_key]
+        if key in self._cache:
+            del self._cache[key]
+        elif len(self._cache) >= self._max_size:
+            self._cache.popitem(last=False)  # Evict LRU — O(1)
         self._cache[key] = (time.monotonic(), value)
 
     def clear(self) -> None:
@@ -67,9 +76,19 @@ class _TTLCache:
 
 
 _text_cache = _TTLCache(ttl=CACHE_TTL)
-_json_cache = _TTLCache(ttl=CACHE_TTL)
+_json_cache = _TTLCache(ttl=SEARCH_CACHE_TTL)
 
 _client_holder: dict[str, httpx.AsyncClient] = {}
+
+
+def set_http_client(client: httpx.AsyncClient) -> None:
+    """Set the shared HTTP client (called by server lifespan)."""
+    _client_holder["client"] = client
+
+
+def clear_http_client() -> None:
+    """Clear the shared HTTP client (called on server shutdown)."""
+    _client_holder.clear()
 
 
 def _get_http_client() -> httpx.AsyncClient:
@@ -256,8 +275,59 @@ def _resolve_url(url: str) -> str:
     return f"{base}/{path}"
 
 
+async def _fetch_with_retry(url: str) -> httpx.Response | None:
+    """Fetch a URL with retry for transient errors (5xx, timeouts).
+
+    Args:
+        url: The URL to fetch
+
+    Returns:
+        The httpx Response on success, or None if all attempts fail
+    """
+    client = _get_http_client()
+    last_error: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            response = await client.get(url, follow_redirects=True)
+            response.raise_for_status()
+            return response
+        except httpx.TimeoutException as e:  # noqa: PERF203
+            last_error = e
+            if attempt < _MAX_RETRIES - 1:
+                logger.warning(
+                    "Timeout fetching %s (attempt %d), retrying...",
+                    url,
+                    attempt + 1,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+        except httpx.HTTPStatusError as e:
+            last_error = e
+            if attempt < _MAX_RETRIES - 1 and e.response.status_code >= 500:
+                logger.warning(
+                    "Server error %d fetching %s (attempt %d), retrying...",
+                    e.response.status_code,
+                    url,
+                    attempt + 1,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+            break  # 4xx errors — don't retry
+        except httpx.HTTPError as e:
+            logger.error("Failed to fetch %s: %s", url, e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error fetching %s: %s", url, e)
+            return None
+
+    logger.error("Failed to fetch %s after %d attempts: %s", url, _MAX_RETRIES, last_error)
+    return None
+
+
 async def fetch_text(url: str) -> str | None:
     """Fetch text content from a URL using httpx.
+
+    Retries on transient errors (5xx status codes and timeouts).
 
     Args:
         url: The URL to fetch
@@ -269,23 +339,19 @@ async def fetch_text(url: str) -> str | None:
     if cached is not None:
         return cached
 
-    try:
-        client = _get_http_client()
-        response = await client.get(url, follow_redirects=True)
-        response.raise_for_status()
-        result = response.text
-        _text_cache.set(url, result)
-        return result
-    except httpx.HTTPError as e:
-        logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
+    response = await _fetch_with_retry(url)
+    if response is None:
         return None
-    except Exception as e:
-        logger.error(f"Unexpected error fetching {url}: {e}")
-        return None
+
+    result = response.text
+    _text_cache.set(url, result)
+    return result
 
 
 async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     """Fetch JSON content from a URL using httpx.
+
+    Retries on transient errors (5xx status codes and timeouts).
 
     Args:
         url: The URL to fetch
@@ -297,19 +363,13 @@ async def fetch_text_json(url: str) -> list[dict[str, Any]] | None:
     if cached is not None:
         return cached
 
-    try:
-        client = _get_http_client()
-        response = await client.get(url, follow_redirects=True)
-        response.raise_for_status()
-        result: list[dict[str, Any]] = response.json()
-        _json_cache.set(url, result)
-        return result
-    except httpx.HTTPError as e:
-        logger.error(f"Failed to fetch {url}: {e} because of a HTTP error.")
+    response = await _fetch_with_retry(url)
+    if response is None:
         return None
-    except Exception as e:
-        logger.error(f"Unexpected error fetching {url}: {e}")
-        return None
+
+    result: list[dict[str, Any]] = response.json()
+    _json_cache.set(url, result)
+    return result
 
 
 async def get_page_docs(url: str, max_length: int = 20000, offset: int = 0) -> dict[str, Any]:
@@ -335,7 +395,7 @@ async def get_page_docs(url: str, max_length: int = 20000, offset: int = 0) -> d
             "message": str(e),
         }
 
-    logger.info(f"Fetching page docs from {resolved_url}")
+    logger.info("Fetching page docs from %s", resolved_url)
     html = await fetch_text(resolved_url)
 
     if html is None:
@@ -386,6 +446,12 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
     Returns:
         Search results with matching entries, total count, and metadata
     """
+    query = query.strip()
+    if not query:
+        return {
+            "status": "error",
+            "message": "Please provide a search query.",
+        }
     if scope not in _VALID_SCOPES:
         return {
             "status": "error",
@@ -395,7 +461,7 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
         }
 
     url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(scope)}"
-    logger.info(f"Searching docs for '{query}' in scope '{scope}'")
+    logger.info("Searching docs for '%s' in scope '%s'", query, scope)
 
     results = await fetch_text_json(url)
 
@@ -411,12 +477,19 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
 
     # Strip HTML tags from search result fields (shallow copy to avoid mutating cached data)
     cleaned = []
+    base = QISKIT_DOCS_BASE.rstrip("/")
     for item in results:
         entry = dict(item)
         if "title" in entry:
             entry["title"] = _strip_html_tags(entry["title"])
         if "text" in entry:
             entry["text"] = _strip_html_tags(entry["text"])
+        # Normalize URL to full URL if relative
+        url_val = entry.get("url")
+        if url_val:
+            parsed = urlparse(url_val)
+            if not parsed.scheme and not parsed.netloc:
+                entry["url"] = f"{base}/{url_val.lstrip('/')}"
         cleaned.append(entry)
 
     return {
@@ -451,7 +524,7 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
         }
 
     url = f"{QISKIT_DOCS_BASE}errors"
-    logger.info(f"Fetching error code {code} from {url}")
+    logger.info("Fetching error code %s from %s", code, url)
     html = await fetch_text(url)
 
     if not html:
@@ -461,29 +534,44 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
             "metadata": {"url": url},
         }
 
-    docs = convert_html_to_markdown(html)
+    soup = BeautifulSoup(html, "html.parser")
 
-    # Search for the error code in the markdown content
-    lines = docs.split("\n")
-    matching_lines: list[str] = []
-    for i, line in enumerate(lines):
-        if re.search(rf"\b{code}\b", line):
-            start = max(0, i - 2)
-            end = min(len(lines), i + 3)
-            matching_lines.extend(lines[start:end])
-            break
+    # Strategy 1: Search in table rows
+    for row in soup.find_all("tr"):
+        cells = row.find_all(["td", "th"])
+        row_text = " ".join(cell.get_text(strip=True) for cell in cells)
+        if re.search(rf"\b{code}\b", row_text):
+            details = " | ".join(cell.get_text(strip=True) for cell in cells)
+            return {
+                "status": "success",
+                "code": code,
+                "details": details,
+                "metadata": {
+                    "url": f"{url}#{code[0]}xxx",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "content_type": "text",
+                },
+            }
 
-    if matching_lines:
-        return {
-            "status": "success",
-            "code": code,
-            "details": "\n".join(matching_lines).strip(),
-            "metadata": {
-                "url": f"{url}#{code[0]}xxx",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "content_type": "markdown",
-            },
-        }
+    # Strategy 2: Search in any element containing the code
+    code_pattern = re.compile(rf"\b{code}\b")
+    for element in soup.find_all(string=code_pattern):
+        # Get the parent block element for context
+        parent = element.find_parent(
+            ["p", "div", "li", "dd", "section", "td", "h1", "h2", "h3", "h4", "h5", "h6"]
+        )
+        if parent:
+            details = parent.get_text(strip=True)
+            return {
+                "status": "success",
+                "code": code,
+                "details": details,
+                "metadata": {
+                    "url": f"{url}#{code[0]}xxx",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "content_type": "text",
+                },
+            }
 
     return {
         "status": "error",
@@ -497,10 +585,16 @@ async def lookup_error_code(code: str) -> dict[str, Any]:
 
 def get_list_of_modules() -> dict[str, Any]:
     """Get list of all Qiskit SDK modules with descriptions and URL paths."""
+    base = QISKIT_DOCS_BASE.rstrip("/")
     return {
         "status": "success",
         "modules": [
-            {"name": name, "description": desc, "url_path": f"api/qiskit/{name}"}
+            {
+                "name": name,
+                "description": desc,
+                "url_path": f"api/qiskit/{name}",
+                "full_url": f"{base}/api/qiskit/{name}",
+            }
             for name, desc in AVAILABLE_MODULES.items()
         ],
     }
@@ -508,10 +602,16 @@ def get_list_of_modules() -> dict[str, Any]:
 
 def get_list_of_addons() -> dict[str, Any]:
     """Get list of all Qiskit addon modules with descriptions and URL paths."""
+    base = QISKIT_DOCS_BASE.rstrip("/")
     return {
         "status": "success",
         "addons": [
-            {"name": name, "description": desc, "url_path": f"api/qiskit-addon-{name}"}
+            {
+                "name": name,
+                "description": desc,
+                "url_path": f"api/qiskit-addon-{name}",
+                "full_url": f"{base}/api/qiskit-addon-{name}",
+            }
             for name, desc in AVAILABLE_ADDONS.items()
         ],
     }
@@ -519,10 +619,16 @@ def get_list_of_addons() -> dict[str, Any]:
 
 def get_list_of_guides() -> dict[str, Any]:
     """Get list of Qiskit guides and best practices with descriptions and URL paths."""
+    base = QISKIT_DOCS_BASE.rstrip("/")
     return {
         "status": "success",
         "guides": [
-            {"name": name, "description": desc, "url_path": f"guides/{name}"}
+            {
+                "name": name,
+                "description": desc,
+                "url_path": f"guides/{name}",
+                "full_url": f"{base}/guides/{name}",
+            }
             for name, desc in AVAILABLE_GUIDES.items()
         ],
     }
