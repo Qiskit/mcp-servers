@@ -601,6 +601,58 @@ async def run_sampler_tool(
     )
 
 
+##################################################
+## MCP Prompts
+## - https://modelcontextprotocol.io/docs/concepts/prompts
+##################################################
+
+
+@mcp.prompt()
+def run_bell_state(backend_name: str = "") -> str:
+    """Run a Bell state circuit on an IBM Quantum backend and interpret the results."""
+    backend_clause = (
+        f"on backend '{backend_name}'"
+        if backend_name
+        else "on the least busy backend (use least_busy_backend_tool to find it)"
+    )
+    return (
+        f"Run a Bell state circuit {backend_clause}: "
+        "1) Read the circuits://bell-state resource to get the circuit, "
+        f"2) Call run_sampler_tool with the circuit QPY and backend_name='{backend_name}', "
+        "3) Call get_job_status_tool with the returned job_id until status is DONE, "
+        "4) Call get_job_results_tool to retrieve measurement counts, "
+        "5) Interpret the results - expect approximately 50% '00' and 50% '11' outcomes."
+    )
+
+
+@mcp.prompt()
+def explore_backend(backend_name: str) -> str:
+    """Explore an IBM Quantum backend's properties, calibration, and connectivity."""
+    return (
+        f"Explore the '{backend_name}' IBM Quantum backend: "
+        f"1) Call get_backend_properties_tool with backend_name='{backend_name}' "
+        "to get static properties (qubits, gates, processor type), "
+        f"2) Call get_backend_calibration_tool with backend_name='{backend_name}' "
+        "to get T1/T2 times and error rates, "
+        f"3) Call get_coupling_map_tool with backend_name='{backend_name}' "
+        "for qubit connectivity, "
+        "4) Summarize the backend's key characteristics and any notable calibration issues."
+    )
+
+
+@mcp.prompt()
+def monitor_job(job_id: str) -> str:
+    """Monitor a running IBM Quantum job and retrieve its results when complete."""
+    return (
+        f"Monitor job '{job_id}' and retrieve results: "
+        f"1) Call get_job_status_tool with job_id='{job_id}', "
+        f"2) If status is DONE, call get_job_results_tool with job_id='{job_id}' "
+        "to get measurement counts, "
+        "3) If status is ERROR, report the error details from the status response, "
+        "4) If still running, report the current status and suggest checking again shortly."
+    )
+
+
 # Resources
 @mcp.resource("ibm://status", mime_type="text/plain")
 async def get_service_status_resource() -> str:
@@ -659,6 +711,24 @@ def get_superposition_resource() -> dict[str, Any]:
     Expected results: ~50% '0' and ~50% '1'.
     """
     return get_superposition_circuit()
+
+
+##################################################
+## MCP Resource Templates
+## - https://modelcontextprotocol.io/docs/concepts/resources#resource-templates
+##################################################
+
+
+@mcp.resource("ibm://backends/{backend_name}", mime_type="application/json")
+async def backend_properties_resource(backend_name: str) -> dict[str, Any]:
+    """Get properties for a specific IBM Quantum backend."""
+    return await get_backend_properties(backend_name)
+
+
+@mcp.resource("ibm://jobs/{job_id}", mime_type="application/json")
+async def job_status_resource(job_id: str) -> dict[str, Any]:
+    """Get the status of a specific IBM Quantum job."""
+    return await get_job_status(job_id)
 
 
 def main() -> None:
