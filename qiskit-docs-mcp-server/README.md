@@ -12,12 +12,13 @@ The Qiskit Documentation MCP Server provides AI assistants and agents with seaml
 
 ### Key Features
 
-- **📚 Complete Documentation Access**: Query all 16 Qiskit SDK modules, 6 addon packages, and 30+ implementation guides
+- **📚 Complete Documentation Access**: Query all Qiskit SDK modules, addon packages, API references, guides, and tutorials
+- **🔄 Dynamic Content Discovery**: Automatically discovers available documentation from the live sitemap — no manual updates needed when new content is published
 - **📖 Implementation Guides**: Access best practices for optimization, error mitigation, dynamic circuits, and more
 - **🔍 Smart Search**: Search across the entire Qiskit documentation with fuzzy matching
 - **🎯 No Authentication Required**: Public documentation access without API tokens
 - **📝 Markdown Output**: Clean, formatted documentation ready for AI consumption
-- **⚡ Fast Retrieval**: Efficient HTTP-based documentation fetching with configurable timeouts
+- **⚡ Fast Retrieval**: Efficient HTTP-based documentation fetching with TTL caching and configurable timeouts
 
 ## Components
 
@@ -33,14 +34,24 @@ The server implements three tools for documentation access:
 
 ### Resources
 
-The server provides four resources for listing available documentation:
+The server provides six resources for listing available documentation. Content lists for modules, addons, guides, tutorials, and API packages are **dynamically discovered** from the documentation sitemap and cached, with hardcoded fallback values used when the sitemap is unreachable.
 
 | Resource URI | Description |
 |--------------|-------------|
-| `qiskit-docs://modules` | List of all Qiskit SDK modules with descriptions |
-| `qiskit-docs://addons` | List of Qiskit addon modules and tutorials |
+| `qiskit-docs://modules` | List of all Qiskit SDK modules with URL paths |
+| `qiskit-docs://addons` | List of Qiskit addon packages with URL paths |
 | `qiskit-docs://guides` | List of implementation guides and best practices |
+| `qiskit-docs://tutorials` | List of Qiskit tutorials with URL paths |
+| `qiskit-docs://api-packages` | List of API packages (runtime, transpiler, REST APIs, etc.) |
 | `qiskit-docs://error-codes` | List of Qiskit error code categories |
+
+### Resource Templates
+
+| Resource URI | Description |
+|--------------|-------------|
+| `qiskit-docs://modules/{module_name}` | Documentation for a specific SDK module |
+| `qiskit-docs://guides/{guide_name}` | A specific implementation guide |
+| `qiskit-docs://addons/{addon_name}` | Documentation for a specific addon package |
 
 ## Prerequisites
 
@@ -302,11 +313,39 @@ All responses include rich metadata:
 }
 ```
 
+### Dynamic Sitemap Discovery
+
+Resource lists (modules, addons, guides, tutorials, API packages) are automatically discovered from the live documentation sitemap at startup. This means the server adapts to new content without code changes. If the sitemap is unreachable, the server falls back to hardcoded values in `constants.py`.
+
+To update the hardcoded fallback values from the live sitemap:
+
+```bash
+cd qiskit-docs-mcp-server
+uv run python scripts/update_fallback_constants.py
+```
+
+This prints updated constant lists that can be copied into `constants.py`.
+
 ### HTML to Markdown Conversion
 
 Documentation is automatically converted from HTML to clean Markdown format, optimized for AI consumption and human readability.
 
 ## Development
+
+### Project Structure
+
+```
+src/qiskit_docs_mcp_server/
+├── server.py           # MCP server definition (tools, resources, prompts)
+├── data_fetcher.py     # Business logic for fetching and processing documentation
+├── http.py             # HTTP infrastructure: client management, caching, retries
+├── sitemap.py          # Dynamic sitemap discovery and page classification
+├── html_processing.py  # HTML content extraction and markdown conversion
+└── constants.py        # Configuration constants and hardcoded fallback values
+
+scripts/
+└── update_fallback_constants.py  # Regenerate fallback values from live sitemap
+```
 
 ### Running Tests
 

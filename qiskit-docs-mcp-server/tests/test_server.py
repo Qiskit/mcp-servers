@@ -54,6 +54,8 @@ class TestServerRegistration:
             "qiskit-docs://modules",
             "qiskit-docs://addons",
             "qiskit-docs://guides",
+            "qiskit-docs://tutorials",
+            "qiskit-docs://api-packages",
             "qiskit-docs://error-codes",
         }
         assert expected_resources.issubset(resource_uris), (
@@ -67,8 +69,8 @@ class TestServerRegistration:
         assert len(mcp._tool_manager._tools) == 3
 
     def test_resource_count(self):
-        """Test the expected number of static resources."""
-        assert len(mcp._resource_manager._resources) == 4
+        """Test the expected number of resources."""
+        assert len(mcp._resource_manager._resources) == 6
 
     def test_old_tools_removed(self):
         """Test that old category-specific tools are no longer registered."""
