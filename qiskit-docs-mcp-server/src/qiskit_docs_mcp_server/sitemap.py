@@ -14,7 +14,8 @@
 
 import logging
 import re
-import defusedxml.ElementTree as ET
+
+from defusedxml.ElementTree import fromstring as parse_xml
 
 from qiskit_docs_mcp_server.constants import SITEMAP_URL
 from qiskit_docs_mcp_server.http import _get_http_client, _sitemap_cache
@@ -77,7 +78,7 @@ def _parse_sitemap_xml(xml_text: str) -> dict[str, list[str]]:
         Dict with keys 'modules', 'addons', 'api_packages', 'guides',
         'tutorials', each mapping to a sorted list of slug strings.
     """
-    root = ET.fromstring(xml_text)
+    root = parse_xml(xml_text)
 
     buckets: dict[str, set[str]] = {
         "modules": set(),
