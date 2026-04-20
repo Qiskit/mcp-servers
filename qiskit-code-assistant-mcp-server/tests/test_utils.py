@@ -20,10 +20,12 @@ import pytest
 import respx
 
 from qiskit_code_assistant_mcp_server.utils import (
+    clear_http_client,
     close_http_client,
     get_error_message,
     get_http_client,
     make_qca_request,
+    set_http_client,
 )
 
 
@@ -180,6 +182,22 @@ class TestHTTPClient:
 
             await close_http_client()
             assert client.is_closed
+
+    @pytest.mark.asyncio
+    async def test_set_http_client(self, mock_async_client):
+        """Test setting the shared HTTP client."""
+        set_http_client(mock_async_client)
+        client = get_http_client()
+        assert client is mock_async_client
+
+    def test_clear_http_client(self, mock_env_vars, mock_async_client):
+        """Test clearing the shared HTTP client."""
+        set_http_client(mock_async_client)
+        clear_http_client()
+        # After clearing, get_http_client should create a new instance
+        with patch.object(httpx, "AsyncClient", return_value=mock_async_client):
+            client = get_http_client()
+            assert client is mock_async_client
 
     @pytest.mark.asyncio
     async def test_get_client_after_close(self, mock_env_vars):

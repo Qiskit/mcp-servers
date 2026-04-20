@@ -269,6 +269,50 @@ async def export_circuit_to_qasm_tool(
     return export_circuit_to_qasm(circuit_qpy, qasm_version=qasm_version)
 
 
+##################################################
+## MCP Prompts
+## - https://modelcontextprotocol.io/docs/concepts/prompts
+##################################################
+
+
+@mcp.prompt()
+def transpile_for_hardware(circuit: str, backend_type: str) -> str:
+    """Transpile a quantum circuit for a specific hardware type."""
+    return (
+        f"Transpile the circuit for '{backend_type}' hardware: "
+        "1) Read the qiskit://transpiler/basis-gates resource to find the "
+        f"basis gate set for '{backend_type}', "
+        "2) Call transpile_circuit_tool with the circuit, the appropriate "
+        "basis_gates preset, and optimization_level=2, "
+        "3) Report the depth reduction and gate count improvements from the result."
+    )
+
+
+@mcp.prompt()
+def analyze_and_transpile(circuit: str) -> str:
+    """Analyze a quantum circuit and transpile it with the best optimization level."""
+    return (
+        "Analyze and transpile the circuit: "
+        "1) Call analyze_circuit_tool to understand the circuit structure, "
+        "2) Call compare_optimization_levels_tool to find the best trade-off "
+        "between compilation time and circuit quality, "
+        "3) Call transpile_circuit_tool with the recommended optimization level, "
+        "4) Call convert_qpy_to_qasm3_tool to view the final transpiled circuit."
+    )
+
+
+@mcp.prompt()
+def convert_circuit_format(circuit: str, target_format: str) -> str:
+    """Convert a quantum circuit between QASM and QPY formats."""
+    return (
+        f"Convert the circuit to {target_format} format: "
+        "If converting to QPY, call convert_qasm3_to_qpy_tool with the QASM string. "
+        "If converting to QASM3, call convert_qpy_to_qasm3_tool with the base64 QPY. "
+        "If the source format is unknown, call load_circuit_from_qasm_tool first to "
+        "detect and parse it."
+    )
+
+
 # Resources - Static metadata accessible without tool calls
 @mcp.resource("qiskit://transpiler/info", mime_type="application/json")
 async def transpiler_info_resource() -> dict[str, Any]:

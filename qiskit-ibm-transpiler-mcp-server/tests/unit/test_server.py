@@ -12,7 +12,7 @@
 
 """Tests for MCP server registration and configuration."""
 
-from qiskit_mcp_server.server import mcp
+from qiskit_ibm_transpiler_mcp_server.server import mcp
 
 
 class TestServerRegistration:
@@ -20,30 +20,19 @@ class TestServerRegistration:
 
     def test_server_name(self):
         """Test the server name is correct."""
-        assert mcp.name == "Qiskit"
-
-    def test_server_instructions(self):
-        """Test the MCP server has instructions set."""
-        assert mcp.instructions is not None
-        assert isinstance(mcp.instructions, str)
-        assert len(mcp.instructions) > 0
-        # Verify instructions mention key workflow concepts
-        assert "transpile_circuit_tool" in mcp.instructions
-        assert "analyze_circuit_tool" in mcp.instructions
-        assert "load_circuit_from_qasm_tool" in mcp.instructions
-        assert "qiskit://transpiler/" in mcp.instructions
+        assert mcp.name == "Qiskit IBM Transpiler"
 
     def test_tools_registered(self):
         """Test that all expected tools are registered."""
         tool_names = {tool.name for tool in mcp._tool_manager._tools.values()}
         expected_tools = {
-            "transpile_circuit_tool",
-            "analyze_circuit_tool",
-            "compare_optimization_levels_tool",
-            "convert_qpy_to_qasm3_tool",
-            "convert_qasm3_to_qpy_tool",
-            "load_circuit_from_qasm_tool",
-            "export_circuit_to_qasm_tool",
+            "setup_ibm_quantum_account_tool",
+            "ai_routing_tool",
+            "ai_linear_function_synthesis_tool",
+            "ai_clifford_synthesis_tool",
+            "ai_permutation_synthesis_tool",
+            "ai_pauli_network_synthesis_tool",
+            "hybrid_ai_transpile_tool",
         }
         assert expected_tools.issubset(tool_names), f"Missing tools: {expected_tools - tool_names}"
 
@@ -55,9 +44,8 @@ class TestServerRegistration:
         """Test that all expected resources are registered."""
         resource_uris = set(mcp._resource_manager._resources.keys())
         expected_resources = {
-            "qiskit://transpiler/info",
-            "qiskit://transpiler/basis-gates",
-            "qiskit://transpiler/topologies",
+            "qiskit-ibm-transpiler://info",
+            "qiskit-ibm-transpiler://synthesis-types",
         }
         assert expected_resources.issubset(resource_uris), (
             f"Missing resources: {expected_resources - resource_uris}"
@@ -65,15 +53,15 @@ class TestServerRegistration:
 
     def test_resource_count(self):
         """Test the expected number of resources."""
-        assert len(mcp._resource_manager._resources) == 3
+        assert len(mcp._resource_manager._resources) == 2
 
     def test_prompts_registered(self):
         """Test that all expected prompts are registered."""
         prompt_names = set(mcp._prompt_manager._prompts.keys())
         expected_prompts = {
-            "transpile_for_hardware",
-            "analyze_and_transpile",
-            "convert_circuit_format",
+            "transpile_circuit",
+            "optimize_circuit",
+            "explain_synthesis_type",
         }
         assert expected_prompts.issubset(prompt_names), (
             f"Missing prompts: {expected_prompts - prompt_names}"

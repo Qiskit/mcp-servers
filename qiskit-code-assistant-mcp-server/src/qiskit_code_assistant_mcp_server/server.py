@@ -23,12 +23,17 @@ Dependencies:
 """
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from fastmcp import FastMCP
 
 from qiskit_code_assistant_mcp_server.constants import (
     QCA_MCP_DEBUG_LEVEL,
+    QCA_REQUEST_TIMEOUT,
+    QCA_TOOL_X_CALLER,
     validate_configuration,
 )
 from qiskit_code_assistant_mcp_server.qca import (
@@ -41,12 +46,35 @@ from qiskit_code_assistant_mcp_server.qca import (
     get_service_status,
     list_models,
 )
-from qiskit_code_assistant_mcp_server.utils import close_http_client
+from qiskit_code_assistant_mcp_server.utils import (
+    _get_token,
+    clear_http_client,
+    set_http_client,
+)
 
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, QCA_MCP_DEBUG_LEVEL, logging.INFO))
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(server: FastMCP) -> AsyncIterator[None]:
+    """Manage the httpx client lifecycle."""
+    headers = {
+        "x-caller": QCA_TOOL_X_CALLER,
+        "Accept": "application/json",
+        "Authorization": f"Bearer {_get_token()}",
+    }
+    async with httpx.AsyncClient(
+        headers=headers,
+        timeout=httpx.Timeout(QCA_REQUEST_TIMEOUT),
+        limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+    ) as client:
+        set_http_client(client)
+        yield
+    clear_http_client()
+
 
 # Initialize FastMCP server
 mcp = FastMCP(
@@ -72,6 +100,7 @@ accept_model_disclaimer_tool to accept it.
 Browse qca://models to discover available models and qca://status to check \
 service health.\
 """,
+    lifespan=lifespan,
 )
 
 logger.info("Qiskit Code Assistant MCP Server initialized")
@@ -223,29 +252,52 @@ async def accept_completion_tool(completion_id: str) -> dict[str, Any]:
     return await accept_completion(completion_id)
 
 
+##################################################
+## MCP Prompts
+## - https://modelcontextprotocol.io/docs/concepts/prompts
+##################################################
+
+
+@mcp.prompt()
+def generate_qiskit_code(task: str) -> str:
+    """Generate Qiskit Python code for a quantum computing task."""
+    return (
+        f"Generate Qiskit code for: '{task}'. "
+        f"1) Call get_completion_tool with prompt='{task}' to generate the code, "
+        "2) Display the generated code from the response, "
+        "3) If the user confirms the code is useful, call accept_completion_tool "
+        "with the completion_id from the response."
+    )
+
+
+@mcp.prompt()
+def explain_qiskit_concept(concept: str) -> str:
+    """Explain a Qiskit or quantum computing concept using the knowledge base."""
+    return (
+        f"Explain '{concept}' using the Qiskit Code Assistant knowledge base: "
+        f"Call get_rag_completion_tool with prompt='{concept}' and present the "
+        "explanation from the response. If the answer is helpful, call "
+        "accept_completion_tool with the completion_id."
+    )
+
+
+@mcp.prompt()
+def setup_model(model_id: str) -> str:
+    """Set up a Qiskit Code Assistant model by reviewing its info and accepting the disclaimer."""
+    return (
+        f"Set up model '{model_id}' for use: "
+        f"1) Read the qca://model/{model_id} resource to get model details, "
+        f"2) Read the qca://disclaimer/{model_id} resource to get the disclaimer, "
+        "3) If a disclaimer is present, show it to the user and call "
+        f"accept_model_disclaimer_tool with model_id='{model_id}' and the "
+        "disclaimer_id from the response, "
+        "4) Confirm the model is ready for use."
+    )
+
+
 if __name__ == "__main__":
-    import atexit
-
     logger.info("Starting Qiskit Code Assistant MCP Server")
-
-    # Register cleanup function
-    def cleanup() -> None:
-        import asyncio
-
-        try:
-            asyncio.run(close_http_client())
-            logger.info("HTTP client closed successfully")
-        except Exception as e:
-            logger.error(f"Error closing HTTP client: {e}")
-
-    atexit.register(cleanup)
-
-    try:
-        mcp.run(transport="stdio", show_banner=False)
-    except KeyboardInterrupt:
-        logger.info("Server interrupted, shutting down...")
-    finally:
-        cleanup()
+    mcp.run(transport="stdio", show_banner=False)
 
 
 # Assisted by watsonx Code Assistant

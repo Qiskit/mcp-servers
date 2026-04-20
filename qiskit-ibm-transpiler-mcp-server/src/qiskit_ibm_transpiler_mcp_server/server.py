@@ -320,6 +320,107 @@ async def hybrid_ai_transpile_tool(
     )
 
 
+##################################################
+## MCP Prompts
+## - https://modelcontextprotocol.io/docs/concepts/prompts
+##################################################
+
+
+@mcp.prompt()
+def transpile_circuit(circuit: str, backend_name: str) -> str:
+    """Transpile a quantum circuit for an IBM backend using AI-powered routing and synthesis."""
+    return (
+        f"Transpile the circuit for backend '{backend_name}': "
+        "1) Call setup_ibm_quantum_account_tool to authenticate, "
+        f"2) Call ai_routing_tool with the circuit and backend_name='{backend_name}' "
+        "to route the circuit for the target topology, "
+        "3) Optionally apply ai_clifford_synthesis_tool or "
+        "ai_linear_function_synthesis_tool on the routed circuit_qpy to further optimize, "
+        "4) Report the improvements from the metrics in each response."
+    )
+
+
+@mcp.prompt()
+def optimize_circuit(circuit: str, backend_name: str) -> str:
+    """Run end-to-end AI-powered transpilation on a circuit for an IBM backend."""
+    return (
+        f"Run full AI-powered transpilation on the circuit for backend '{backend_name}': "
+        "1) Call setup_ibm_quantum_account_tool if not already authenticated, "
+        f"2) Call hybrid_ai_transpile_tool with the circuit and backend_name='{backend_name}' "
+        "to perform routing and synthesis in one pass, "
+        "3) Report the depth and gate count improvements from the response metrics."
+    )
+
+
+@mcp.prompt()
+def explain_synthesis_type(synthesis_type: str) -> str:
+    """Explain a specific AI synthesis pass type and when to use it."""
+    return (
+        "Read the qiskit-ibm-transpiler://synthesis-types resource to find information "
+        f"about the '{synthesis_type}' synthesis type, then explain what kinds of circuits "
+        "it applies to, its qubit limits, and when to use it in a transpilation pipeline."
+    )
+
+
+##################################################
+## MCP Resources
+## - https://modelcontextprotocol.io/docs/concepts/resources
+##################################################
+
+
+@mcp.resource("qiskit-ibm-transpiler://info", mime_type="application/json")
+def transpiler_info_resource() -> dict[str, Any]:
+    """Get information about the Qiskit IBM Transpiler server capabilities."""
+    return {
+        "status": "success",
+        "server": "Qiskit IBM Transpiler",
+        "description": (
+            "AI-powered quantum circuit transpilation using IBM's cloud AI passes "
+            "for routing and synthesis on IBM Quantum backends."
+        ),
+        "workflow": [
+            "1. setup_ibm_quantum_account_tool - authenticate with IBM Quantum",
+            "2. ai_routing_tool - route circuit for target backend",
+            "3. Optionally apply synthesis tools on the routed circuit_qpy",
+            "4. hybrid_ai_transpile_tool - alternative end-to-end transpilation",
+        ],
+    }
+
+
+@mcp.resource("qiskit-ibm-transpiler://synthesis-types", mime_type="application/json")
+def synthesis_types_resource() -> dict[str, Any]:
+    """Get documentation for the AI synthesis pass types supported by this server."""
+    return {
+        "status": "success",
+        "synthesis_types": {
+            "linear_function": {
+                "tool": "ai_linear_function_synthesis_tool",
+                "description": "AI synthesis for linear function circuits (CX and SWAP gates)",
+                "max_qubits": 9,
+                "input_gates": ["cx", "swap"],
+            },
+            "clifford": {
+                "tool": "ai_clifford_synthesis_tool",
+                "description": "AI synthesis for Clifford circuits (H, S, CX gates)",
+                "max_qubits": 9,
+                "input_gates": ["h", "s", "cx"],
+            },
+            "permutation": {
+                "tool": "ai_permutation_synthesis_tool",
+                "description": "AI synthesis for permutation circuits (SWAP gates)",
+                "supported_qubit_counts": [27, 33, 65],
+                "input_gates": ["swap"],
+            },
+            "pauli_network": {
+                "tool": "ai_pauli_network_synthesis_tool",
+                "description": "AI synthesis for Pauli network circuits",
+                "max_qubits": 6,
+                "input_gates": ["h", "s", "sx", "cx", "rx", "ry", "rz"],
+            },
+        },
+    }
+
+
 def main() -> None:
     """Run the server."""
     mcp.run(transport="stdio", show_banner=False)
