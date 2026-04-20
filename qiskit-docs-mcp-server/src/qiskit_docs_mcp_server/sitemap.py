@@ -18,13 +18,14 @@ import re
 from defusedxml.ElementTree import fromstring as parse_xml
 
 from qiskit_docs_mcp_server.constants import SITEMAP_URL
-from qiskit_docs_mcp_server.http import _get_http_client, _sitemap_cache
+from qiskit_docs_mcp_server.http import _get_http_client
 
 
 logger = logging.getLogger(__name__)
 
 _SITEMAP_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
-_SITEMAP_CACHE_KEY = "sitemap_pages"
+
+_sitemap_data: dict[str, list[str]] | None = None
 
 _VERSION_SEGMENT_RE = re.compile(r"/(?:\d+\.\d+|dev)(?:/|$)")
 
@@ -104,33 +105,32 @@ def _parse_sitemap_xml(xml_text: str) -> dict[str, list[str]]:
     return {key: sorted(values) for key, values in buckets.items()}
 
 
-async def _fetch_sitemap_pages() -> dict[str, list[str]] | None:
-    """Fetch and parse the documentation sitemap for dynamic page discovery.
+def get_sitemap_pages() -> dict[str, list[str]] | None:
+    """Return the sitemap data loaded at startup, or ``None`` if unavailable."""
+    return _sitemap_data
 
-    Results are cached using the standard TTL cache.
 
-    Returns:
-        Categorized page lists, or None if the sitemap cannot be fetched.
+async def load_sitemap() -> None:
+    """Fetch and parse the documentation sitemap at server startup.
+
+    Stores the result in a module-level variable so that all subsequent
+    resource calls can read it synchronously.
     """
-    cached: dict[str, list[str]] | None = _sitemap_cache.get(_SITEMAP_CACHE_KEY)
-    if cached is not None:
-        return cached
+    global _sitemap_data  # noqa: PLW0603
 
     try:
         client = _get_http_client()
         response = await client.get(SITEMAP_URL, follow_redirects=True)
         response.raise_for_status()
-        result = _parse_sitemap_xml(response.text)
-        _sitemap_cache.set(_SITEMAP_CACHE_KEY, result)
+        _sitemap_data = _parse_sitemap_xml(response.text)
         logger.info(
             "Sitemap loaded: %d modules, %d addons, %d api_packages, %d guides, %d tutorials",
-            len(result["modules"]),
-            len(result["addons"]),
-            len(result["api_packages"]),
-            len(result["guides"]),
-            len(result["tutorials"]),
+            len(_sitemap_data["modules"]),
+            len(_sitemap_data["addons"]),
+            len(_sitemap_data["api_packages"]),
+            len(_sitemap_data["guides"]),
+            len(_sitemap_data["tutorials"]),
         )
-        return result
     except Exception as e:
         logger.warning(f"Failed to fetch sitemap, using fallback constants: {e}")
-        return None
+        _sitemap_data = None

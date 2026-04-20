@@ -38,6 +38,7 @@ from qiskit_docs_mcp_server.data_fetcher import (
     search_qiskit_docs,
 )
 from qiskit_docs_mcp_server.http import clear_http_client, set_http_client
+from qiskit_docs_mcp_server.sitemap import load_sitemap
 
 
 # Configure logging
@@ -50,6 +51,7 @@ async def lifespan(server: FastMCP) -> AsyncIterator[None]:
     """Manage the httpx client lifecycle."""
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, follow_redirects=True) as client:
         set_http_client(client)
+        await load_sitemap()
         yield
     clear_http_client()
 

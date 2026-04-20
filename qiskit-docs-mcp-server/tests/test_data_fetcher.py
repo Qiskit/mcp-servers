@@ -49,13 +49,16 @@ from qiskit_docs_mcp_server.http import (
     _client_holder,
     _get_http_client,
     _json_cache,
-    _sitemap_cache,
     _text_cache,
     _TTLCache,
     fetch_text,
     fetch_text_json,
 )
-from qiskit_docs_mcp_server.sitemap import _parse_sitemap_xml
+from qiskit_docs_mcp_server.sitemap import (
+    _parse_sitemap_xml,
+    get_sitemap_pages,
+    load_sitemap,
+)
 
 
 class TestFetchText:
@@ -1017,18 +1020,18 @@ class TestParseSitemapXml:
         assert result["api_packages"] == []
 
 
-class TestFetchSitemapPages:
-    """Test _fetch_sitemap_pages function."""
+class TestLoadSitemap:
+    """Test load_sitemap / get_sitemap_pages functions."""
 
     def setup_method(self):
-        """Clear sitemap cache before each test."""
-        _sitemap_cache.clear()
+        """Reset sitemap state before each test."""
+        import qiskit_docs_mcp_server.sitemap as _mod
+
+        _mod._sitemap_data = None
 
     @patch("qiskit_docs_mcp_server.sitemap._get_http_client")
     async def test_returns_parsed_pages(self, mock_get_client):
-        """Test that _fetch_sitemap_pages returns categorized pages."""
-        from qiskit_docs_mcp_server.sitemap import _fetch_sitemap_pages
-
+        """Test that load_sitemap populates sitemap data."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
         <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
           <url><loc>https://quantum.cloud.ibm.com/docs/en/guides/transpile</loc></url>
@@ -1041,28 +1044,25 @@ class TestFetchSitemapPages:
         mock_client.get.return_value = mock_response
         mock_get_client.return_value = mock_client
 
-        result = await _fetch_sitemap_pages()
+        await load_sitemap()
+        result = get_sitemap_pages()
         assert result is not None
         assert "transpile" in result["guides"]
         assert "circuit" in result["modules"]
 
     @patch("qiskit_docs_mcp_server.sitemap._get_http_client")
     async def test_returns_none_on_failure(self, mock_get_client):
-        """Test that _fetch_sitemap_pages returns None on HTTP error."""
-        from qiskit_docs_mcp_server.sitemap import _fetch_sitemap_pages
-
+        """Test that get_sitemap_pages returns None on HTTP error."""
         mock_client = AsyncMock()
         mock_client.get.side_effect = httpx.HTTPError("Connection failed")
         mock_get_client.return_value = mock_client
 
-        result = await _fetch_sitemap_pages()
-        assert result is None
+        await load_sitemap()
+        assert get_sitemap_pages() is None
 
     @patch("qiskit_docs_mcp_server.sitemap._get_http_client")
-    async def test_caches_result(self, mock_get_client):
-        """Test that sitemap result is cached on second call."""
-        from qiskit_docs_mcp_server.sitemap import _fetch_sitemap_pages
-
+    async def test_stores_result(self, mock_get_client):
+        """Test that sitemap data persists after load_sitemap."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
         <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
           <url><loc>https://quantum.cloud.ibm.com/docs/en/guides/quick-start</loc></url>
@@ -1074,8 +1074,10 @@ class TestFetchSitemapPages:
         mock_client.get.return_value = mock_response
         mock_get_client.return_value = mock_client
 
-        await _fetch_sitemap_pages()
-        await _fetch_sitemap_pages()
+        await load_sitemap()
+        result1 = get_sitemap_pages()
+        result2 = get_sitemap_pages()
+        assert result1 is result2
         assert mock_client.get.call_count == 1
 
 
@@ -1083,10 +1085,12 @@ class TestListHelpers:
     """Test list helper functions."""
 
     def setup_method(self):
-        """Clear sitemap cache to force fallback."""
-        _sitemap_cache.clear()
+        """Reset sitemap state to force fallback."""
+        import qiskit_docs_mcp_server.sitemap as _mod
 
-    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+        _mod._sitemap_data = None
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.get_sitemap_pages", return_value=None)
     async def test_get_list_of_modules_fallback(self, _mock):
         """Test get_list_of_modules falls back to constants."""
         result = await get_list_of_modules()
@@ -1102,7 +1106,7 @@ class TestListHelpers:
         assert "full_url" in first
         assert first["full_url"].startswith("https://")
 
-    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    @patch("qiskit_docs_mcp_server.data_fetcher.get_sitemap_pages", return_value=None)
     async def test_get_list_of_addons_fallback(self, _mock):
         """Test get_list_of_addons falls back to constants."""
         result = await get_list_of_addons()
@@ -1116,7 +1120,7 @@ class TestListHelpers:
         assert "qiskit-addon-" in first["url_path"]
         assert "full_url" in first
 
-    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    @patch("qiskit_docs_mcp_server.data_fetcher.get_sitemap_pages", return_value=None)
     async def test_get_list_of_guides_fallback(self, _mock):
         """Test get_list_of_guides falls back to constants."""
         result = await get_list_of_guides()
@@ -1130,7 +1134,7 @@ class TestListHelpers:
         assert first["url_path"].startswith("guides/")
         assert "full_url" in first
 
-    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    @patch("qiskit_docs_mcp_server.data_fetcher.get_sitemap_pages", return_value=None)
     async def test_get_list_of_tutorials_fallback(self, _mock):
         """Test get_list_of_tutorials falls back to constants."""
         result = await get_list_of_tutorials()
@@ -1143,7 +1147,7 @@ class TestListHelpers:
         assert "url_path" in first
         assert first["url_path"].startswith("tutorials/")
 
-    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages", return_value=None)
+    @patch("qiskit_docs_mcp_server.data_fetcher.get_sitemap_pages", return_value=None)
     async def test_get_list_of_api_packages_fallback(self, _mock):
         """Test get_list_of_api_packages falls back to constants."""
         result = await get_list_of_api_packages()
@@ -1156,7 +1160,7 @@ class TestListHelpers:
         assert "url_path" in first
         assert first["url_path"].startswith("api/")
 
-    @patch("qiskit_docs_mcp_server.data_fetcher._fetch_sitemap_pages")
+    @patch("qiskit_docs_mcp_server.data_fetcher.get_sitemap_pages")
     async def test_get_list_of_modules_from_sitemap(self, mock_sitemap):
         """Test get_list_of_modules uses sitemap when available."""
         mock_sitemap.return_value = {
