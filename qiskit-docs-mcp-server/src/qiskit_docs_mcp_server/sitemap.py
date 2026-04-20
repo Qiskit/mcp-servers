@@ -14,7 +14,7 @@
 
 import logging
 import re
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 from qiskit_docs_mcp_server.constants import SITEMAP_URL
 from qiskit_docs_mcp_server.http import _get_http_client, _sitemap_cache
