@@ -63,7 +63,6 @@ class _TTLCache:
 
 _text_cache = _TTLCache(ttl=CACHE_TTL)
 _json_cache = _TTLCache(ttl=SEARCH_CACHE_TTL)
-_sitemap_cache = _TTLCache(ttl=CACHE_TTL)
 
 _client_holder: dict[str, httpx.AsyncClient] = {}
 

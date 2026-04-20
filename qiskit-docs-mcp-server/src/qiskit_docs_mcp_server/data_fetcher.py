@@ -36,7 +36,7 @@ from qiskit_docs_mcp_server.html_processing import (
     convert_html_to_markdown,
 )
 from qiskit_docs_mcp_server.http import fetch_text, fetch_text_json
-from qiskit_docs_mcp_server.sitemap import _fetch_sitemap_pages
+from qiskit_docs_mcp_server.sitemap import get_sitemap_pages
 
 
 logger = logging.getLogger(__name__)
@@ -350,7 +350,7 @@ async def get_list_of_modules() -> dict[str, Any]:
     Tries dynamic sitemap discovery first, falls back to hardcoded constants.
     """
     base = QISKIT_DOCS_BASE.rstrip("/")
-    sitemap = await _fetch_sitemap_pages()
+    sitemap = get_sitemap_pages()
     names = sitemap["modules"] if sitemap else AVAILABLE_MODULES
     return {
         "status": "success",
@@ -372,7 +372,7 @@ async def get_list_of_addons() -> dict[str, Any]:
     Tries dynamic sitemap discovery first, falls back to hardcoded constants.
     """
     base = QISKIT_DOCS_BASE.rstrip("/")
-    sitemap = await _fetch_sitemap_pages()
+    sitemap = get_sitemap_pages()
     names = sitemap["addons"] if sitemap else AVAILABLE_ADDONS
     return {
         "status": "success",
@@ -394,7 +394,7 @@ async def get_list_of_guides() -> dict[str, Any]:
     Tries dynamic sitemap discovery first, falls back to hardcoded constants.
     """
     base = QISKIT_DOCS_BASE.rstrip("/")
-    sitemap = await _fetch_sitemap_pages()
+    sitemap = get_sitemap_pages()
     names = sitemap["guides"] if sitemap else AVAILABLE_GUIDES
     return {
         "status": "success",
@@ -416,7 +416,7 @@ async def get_list_of_tutorials() -> dict[str, Any]:
     Tries dynamic sitemap discovery first, falls back to hardcoded constants.
     """
     base = QISKIT_DOCS_BASE.rstrip("/")
-    sitemap = await _fetch_sitemap_pages()
+    sitemap = get_sitemap_pages()
     names = sitemap["tutorials"] if sitemap else AVAILABLE_TUTORIALS
     return {
         "status": "success",
@@ -439,7 +439,7 @@ async def get_list_of_api_packages() -> dict[str, Any]:
     Tries dynamic sitemap discovery first, falls back to hardcoded constants.
     """
     base = QISKIT_DOCS_BASE.rstrip("/")
-    sitemap = await _fetch_sitemap_pages()
+    sitemap = get_sitemap_pages()
     names = sitemap["api_packages"] if sitemap else AVAILABLE_API_PACKAGES
     return {
         "status": "success",
