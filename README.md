@@ -13,194 +13,140 @@
 [![qiskit-docs-mcp-server](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-docs-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=qiskit-docs-mcp-server&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-docs-mcp-server)
 [![qiskit-gym-mcp-server](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-gym-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=qiskit-gym-mcp-server&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-gym-mcp-server)
 
-A collection of **Model Context Protocol (MCP)** servers that provide AI assistants, LLMs, and agents with seamless access to IBM Quantum services and Qiskit libraries for quantum computing development and research.
+A collection of [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) servers that give AI assistants, LLMs, and agents seamless access to IBM Quantum services and Qiskit libraries. Generate quantum code, connect to real hardware, analyze backends, execute circuits, and search Qiskit documentation — all through a standardized protocol that works with any MCP-compatible client.
 
-## 🌟 What is This?
-
-This repository contains production-ready MCP servers that enable AI systems to interact with quantum computing resources through Qiskit. Instead of manually configuring quantum backends, writing boilerplate code, or managing IBM Quantum accounts, AI assistants can now:
-
-- 🤖 **Generate intelligent quantum code** with context-aware suggestions
-- 🔌 **Connect to real quantum hardware** automatically  
-- 📊 **Analyze quantum backends** and find optimal resources
-- 🚀 **Execute quantum circuits** and monitor job status
-- 💡 **Provide quantum computing assistance** with expert knowledge
-
-## 🛠️ Available Servers
-
-### 🔬 Qiskit MCP Server
-**Core Qiskit quantum computing capabilities**
-
-Provides quantum circuit creation, manipulation, transpilation, and serialization utilities (QASM3, QPY) for local quantum development using [Qiskit](https://github.com/Qiskit/qiskit)
-
-**📁 Directory**: [`./qiskit-mcp-server/`](./qiskit-mcp-server/)
-
----
-
-### 🧠 Qiskit Code Assistant MCP Server
-**Intelligent quantum code completion and assistance**
-
-Provides access to [IBM's Qiskit Code Assistant](https://quantum.cloud.ibm.com/docs/en/guides/qiskit-code-assistant) for AI-assisted quantum programming
-
-**📁 Directory**: [`./qiskit-code-assistant-mcp-server/`](./qiskit-code-assistant-mcp-server/)
-
----
-
-### ⚙️ Qiskit IBM Runtime MCP Server
-**Complete access to IBM Quantum cloud services**
-
-Comprehensive interface to IBM Quantum hardware via [Qiskit IBM Runtime](https://github.com/Qiskit/qiskit-ibm-runtime/)
-
-**📁 Directory**: [`./qiskit-ibm-runtime-mcp-server/`](./qiskit-ibm-runtime-mcp-server/)
-
----
-
-### 🚀 Qiskit IBM Transpiler MCP Server
-**AI-powered circuit transpilation**
-
-Access to the [qiskit-ibm-transpiler](https://github.com/Qiskit/qiskit-ibm-transpiler) library for AI-optimized circuit routing and optimization.
-
-**📁 Directory**: [`./qiskit-ibm-transpiler-mcp-server/`](./qiskit-ibm-transpiler-mcp-server/)
-
----
-
-### 📚 Qiskit Documentation MCP Server
-**Qiskit documentation retrieval and search**
-
-Query and retrieve [Qiskit documentation](https://quantum.cloud.ibm.com/docs/), guides, and API references. No authentication required.
-
-**📁 Directory**: [`./qiskit-docs-mcp-server/`](./qiskit-docs-mcp-server/)
-
----
-
-## 🏋️ Community Servers
-
-### 🏋️ Qiskit Gym MCP Server
-**Reinforcement learning for quantum circuit synthesis**
-
-Uses [qiskit-gym](https://github.com/rl-institut/qiskit-gym) to train RL models for optimal quantum circuit synthesis, including permutation routing, linear function synthesis, and Clifford circuits.
-
-**📁 Directory**: [`./qiskit-gym-mcp-server/`](./qiskit-gym-mcp-server/)
-
-## 📚 Examples
-
-Each MCP server includes example code demonstrating how to build AI agents using LangChain:
-
-| Server | Examples |
-|--------|----------|
-| Qiskit MCP Server | [`qiskit-mcp-server/examples/`](./qiskit-mcp-server/examples/) |
-| Qiskit Code Assistant MCP Server | [`qiskit-code-assistant-mcp-server/examples/`](./qiskit-code-assistant-mcp-server/examples/) |
-| Qiskit IBM Runtime MCP Server | [`qiskit-ibm-runtime-mcp-server/examples/`](./qiskit-ibm-runtime-mcp-server/examples/) |
-| Qiskit IBM Transpiler MCP Server | [`qiskit-ibm-transpiler-mcp-server/examples/`](./qiskit-ibm-transpiler-mcp-server/examples/) |
-| Qiskit Documentation MCP Server | [`qiskit-docs-mcp-server/examples/`](./qiskit-docs-mcp-server/examples/) |
-| Qiskit Gym MCP Server (Community) | [`qiskit-gym-mcp-server/examples/`](./qiskit-gym-mcp-server/examples/) |
-
-Each examples directory contains:
-- **Jupyter Notebook** (`langchain_agent.ipynb`) - Interactive tutorial with step-by-step examples
-- **Python Script** (`langchain_agent.py`) - Command-line agent with multiple LLM provider support
-
-### Advanced: Quantum Volume Finder
-
-The [`examples/`](./examples/) directory contains a multi-agent system that combines multiple MCP servers to **find the highest achievable Quantum Volume** for IBM Quantum backends through actual hardware execution. It demonstrates multi-server orchestration, local tool wrappers to keep large data out of the LLM context, and both single-circuit and full statistical protocol modes. See the [examples README](./examples/README.md) for details.
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - **Python 3.10+** (3.11+ recommended)
-- **[uv](https://astral.sh/uv)** package manager (fastest Python package manager)
-- **IBM Quantum account** and API token
-- **Qiskit Code Assistant access** (for code assistant server)
+- **IBM Quantum account** and [API token](https://quantum.ibm.com) (only required for IBM cloud servers: Runtime, Transpiler, Code Assistant)
 
-### Installation
-
-#### Install from PyPI
+### Install from PyPI
 
 ```bash
-# Install all MCP servers (core + community)
-pip install qiskit-mcp-servers[all]
+# Install all servers (core + community)
+pip install "qiskit-mcp-servers[all]"
 
-# Install just the core servers (default)
+# Install core servers only (default, excludes community)
 pip install qiskit-mcp-servers
-
-# Install individual servers
-pip install qiskit-mcp-servers[qiskit]          # Qiskit server only
-pip install qiskit-mcp-servers[code-assistant]  # Code Assistant server only
-pip install qiskit-mcp-servers[runtime]         # IBM Runtime server only
-pip install qiskit-mcp-servers[transpiler]      # IBM Transpiler server only
-pip install qiskit-mcp-servers[docs]            # Documentation server only
-pip install qiskit-mcp-servers[gym]             # Qiskit Gym server only (community)
-
-# Install community servers only
-pip install qiskit-mcp-servers[community]
 ```
 
-#### Install from Source
+<details>
+<summary>Install individual servers</summary>
 
-Each server is designed to run independently. Choose the server you need:
-
-#### 🔬 Qiskit Server
 ```bash
-cd qiskit-mcp-server
-uv run qiskit-mcp-server
+pip install "qiskit-mcp-servers[qiskit]"          # Qiskit server only
+pip install "qiskit-mcp-servers[code-assistant]"  # Code Assistant server only
+pip install "qiskit-mcp-servers[runtime]"         # IBM Runtime server only
+pip install "qiskit-mcp-servers[transpiler]"      # IBM Transpiler server only
+pip install "qiskit-mcp-servers[docs]"            # Documentation server only
+pip install "qiskit-mcp-servers[gym]"             # Qiskit Gym server only (community)
 ```
 
-#### 🧠 Qiskit Code Assistant Server
+</details>
+
+### Install from Source
+
+Each server runs independently — the directory name and command are the same:
+
 ```bash
-cd qiskit-code-assistant-mcp-server
-uv run qiskit-code-assistant-mcp-server
+cd qiskit-mcp-server  # or any server directory
+pip install -e .
+qiskit-mcp-server
 ```
 
-#### ⚙️ IBM Runtime Server
-```bash
-cd qiskit-ibm-runtime-mcp-server
-uv run qiskit-ibm-runtime-mcp-server
-```
+### Configuration
 
-#### 🚀 IBM Transpiler Server
-```bash
-cd qiskit-ibm-transpiler-mcp-server
-uv run qiskit-ibm-transpiler-mcp-server
-```
+Servers that connect to IBM Quantum cloud services require a `QISKIT_IBM_TOKEN` environment variable. See each server's README for the full list of environment variables and configuration options.
 
-#### 📚 Documentation Server
 ```bash
-cd qiskit-docs-mcp-server
-uv run qiskit-docs-mcp-server
-```
-
-#### 🏋️ Qiskit Gym Server (Community)
-```bash
-cd qiskit-gym-mcp-server
-uv run qiskit-gym-mcp-server
-```
-
-### 🔧 Configuration
-
-#### Environment Variables
-```bash
-# For IBM Runtime Server
 export QISKIT_IBM_TOKEN="your_ibm_quantum_token_here"
-
-# For Code Assistant Server  
-export QISKIT_IBM_TOKEN="your_ibm_quantum_token_here"
-export QCA_TOOL_API_BASE="https://qiskit-code-assistant.quantum.ibm.com"
 ```
 
-#### Using with MCP Clients
+### Client Setup
 
-All servers are compatible with any MCP client. Test interactively with MCP Inspector:
+All servers are compatible with any MCP client. Pick your client below.
+
+#### Claude Code
+
+<video src="docs/videos/QiskitMCPServers-ClaudeCode.mp4" controls width="100%"></video>
 
 ```bash
-# Replace <server-name> with any server command
-npx @modelcontextprotocol/inspector uv run qiskit-mcp-server
-npx @modelcontextprotocol/inspector uv run qiskit-docs-mcp-server
-npx @modelcontextprotocol/inspector uv run qiskit-ibm-runtime-mcp-server
-# etc.
+# No auth required
+claude mcp add qiskit -- uvx qiskit-mcp-server
+claude mcp add qiskit-docs -- uvx qiskit-docs-mcp-server
+claude mcp add qiskit-gym -- uvx qiskit-gym-mcp-server
+
+# Require QISKIT_IBM_TOKEN (https://quantum.ibm.com)
+claude mcp add qiskit-code-assistant -e QISKIT_IBM_TOKEN=$QISKIT_IBM_TOKEN -- uvx qiskit-code-assistant-mcp-server
+claude mcp add qiskit-ibm-runtime -e QISKIT_IBM_TOKEN=$QISKIT_IBM_TOKEN -- uvx qiskit-ibm-runtime-mcp-server
+claude mcp add qiskit-ibm-transpiler -e QISKIT_IBM_TOKEN=$QISKIT_IBM_TOKEN -- uvx qiskit-ibm-transpiler-mcp-server
 ```
 
-#### Claude Desktop / Cline Configuration
+#### IBM Bob
 
-Add to your MCP client configuration (e.g., `claude_desktop_config.json`):
+<video src="docs/videos/QiskitMCPServers-IBMBob.mp4" controls width="100%"></video>
+
+Add to your `~/.bob/settings/mcp_settings.json`:
+
+```json
+{
+    "mcpServers": {
+        "qiskit": {
+            "command": "uvx",
+            "args": ["qiskit-mcp-server"],
+            "alwaysAllow": [],
+            "disabled": false
+        },
+        "qiskit-docs": {
+            "command": "uvx",
+            "args": ["qiskit-docs-mcp-server"],
+            "alwaysAllow": [],
+            "disabled": false
+        },
+        "qiskit-gym": {
+            "command": "uvx",
+            "args": ["qiskit-gym-mcp-server"],
+            "alwaysAllow": [],
+            "disabled": false
+        },
+        "qiskit-code-assistant": {
+            "command": "uvx",
+            "args": ["qiskit-code-assistant-mcp-server"],
+            "env": {
+                "QISKIT_IBM_TOKEN": "<your IBM Quantum token>"
+            },
+            "alwaysAllow": [],
+            "disabled": false
+        },
+        "qiskit-ibm-runtime": {
+            "command": "uvx",
+            "args": ["qiskit-ibm-runtime-mcp-server"],
+            "env": {
+                "QISKIT_IBM_TOKEN": "<your IBM Quantum token>",
+                "QISKIT_IBM_RUNTIME_MCP_INSTANCE": "<Optional: Your IBM Quantum instance CRN>"
+            },
+            "alwaysAllow": [],
+            "disabled": false
+        },
+        "qiskit-ibm-transpiler": {
+            "command": "uvx",
+            "args": ["qiskit-ibm-transpiler-mcp-server"],
+            "env": {
+                "QISKIT_IBM_TOKEN": "<your IBM Quantum token>"
+            },
+            "alwaysAllow": [],
+            "disabled": false
+        }
+    }
+}
+```
+
+<details>
+<summary>Claude Desktop / Cline</summary>
+
+Add to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -213,9 +159,27 @@ Add to your MCP client configuration (e.g., `claude_desktop_config.json`):
       "command": "uvx",
       "args": ["qiskit-docs-mcp-server"]
     },
-    "qiskit-runtime": {
+    "qiskit-gym": {
+      "command": "uvx",
+      "args": ["qiskit-gym-mcp-server"]
+    },
+    "qiskit-code-assistant": {
+      "command": "uvx",
+      "args": ["qiskit-code-assistant-mcp-server"],
+      "env": {
+        "QISKIT_IBM_TOKEN": "your_ibm_quantum_token_here"
+      }
+    },
+    "qiskit-ibm-runtime": {
       "command": "uvx",
       "args": ["qiskit-ibm-runtime-mcp-server"],
+      "env": {
+        "QISKIT_IBM_TOKEN": "your_ibm_quantum_token_here"
+      }
+    },
+    "qiskit-ibm-transpiler": {
+      "command": "uvx",
+      "args": ["qiskit-ibm-transpiler-mcp-server"],
       "env": {
         "QISKIT_IBM_TOKEN": "your_ibm_quantum_token_here"
       }
@@ -224,58 +188,77 @@ Add to your MCP client configuration (e.g., `claude_desktop_config.json`):
 }
 ```
 
-See each server's README for the full list of environment variables and configuration options.
+</details>
 
-## 🏗️ Architecture & Design
+<details>
+<summary>MCP Inspector (interactive testing)</summary>
 
-### 🎯 Unified Design Principles
-
-All servers follow a **consistent, production-ready architecture**:
-
-- **🔄 Async-first**: Built with FastMCP for high-performance async operations
-- **🧪 Test-driven**: Comprehensive test suites with 65%+ coverage
-- **🛡️ Type-safe**: Full mypy type checking and validation
-- **📦 Modern packaging**: Standard `pyproject.toml` with hatchling build system
-- **🔧 Developer-friendly**: Automated formatting (ruff), linting, and CI/CD
-
-### 🔌 MCP Protocol Support
-
-All servers implement the full **Model Context Protocol specification**:
-
-- **🛠️ Tools**: Execute quantum operations (code completion, job submission, backend queries)
-- **📚 Resources**: Access quantum data (service status, backend information, model details)
-- **⚡ Real-time**: Async operations for responsive AI interactions
-- **🔒 Secure**: Proper authentication and error handling
-
-## 🧪 Development
-
-### 🏃‍♂️ Running Tests
 ```bash
-# Run tests for any server
+npx @modelcontextprotocol/inspector uvx qiskit-mcp-server
+npx @modelcontextprotocol/inspector uvx qiskit-docs-mcp-server
+npx @modelcontextprotocol/inspector uvx qiskit-ibm-runtime-mcp-server
+# etc.
+```
+
+</details>
+
+## Available Servers
+
+### Core Servers
+
+| Server | Description | Directory |
+|--------|-------------|-----------|
+| **Qiskit MCP Server** | Circuit creation, transpilation, and serialization (QASM3, QPY) using [Qiskit](https://github.com/Qiskit/qiskit) | [`qiskit-mcp-server/`](./qiskit-mcp-server/) |
+| **Qiskit Code Assistant** | AI-assisted quantum programming via [IBM Qiskit Code Assistant](https://quantum.cloud.ibm.com/docs/en/guides/qiskit-code-assistant) | [`qiskit-code-assistant-mcp-server/`](./qiskit-code-assistant-mcp-server/) |
+| **Qiskit IBM Runtime** | Full access to IBM Quantum hardware via [Qiskit IBM Runtime](https://github.com/Qiskit/qiskit-ibm-runtime/) | [`qiskit-ibm-runtime-mcp-server/`](./qiskit-ibm-runtime-mcp-server/) |
+| **Qiskit IBM Transpiler** | AI-optimized circuit routing and optimization via [qiskit-ibm-transpiler](https://github.com/Qiskit/qiskit-ibm-transpiler) | [`qiskit-ibm-transpiler-mcp-server/`](./qiskit-ibm-transpiler-mcp-server/) |
+| **Qiskit Docs** | Search and retrieve [Qiskit documentation](https://quantum.cloud.ibm.com/docs/), guides, and API references. No auth required. | [`qiskit-docs-mcp-server/`](./qiskit-docs-mcp-server/) |
+
+### Community Servers
+
+| Server | Description | Directory |
+|--------|-------------|-----------|
+| **Qiskit Gym** | RL-based quantum circuit synthesis using [qiskit-gym](https://github.com/rl-institut/qiskit-gym) (permutation routing, linear functions, Clifford circuits) | [`qiskit-gym-mcp-server/`](./qiskit-gym-mcp-server/) |
+
+## Examples
+
+Each server includes an `examples/` directory with a **Jupyter notebook** (`langchain_agent.ipynb`) and a **Python script** (`langchain_agent.py`) showing how to build AI agents with LangChain.
+
+The root [`examples/`](./examples/) directory contains a multi-agent **Quantum Volume Finder** that orchestrates multiple MCP servers to find the highest achievable Quantum Volume on IBM Quantum hardware. See the [examples README](./examples/README.md) for details.
+
+## Architecture
+
+All servers are built on [FastMCP](https://github.com/jlowin/fastmcp) and share a consistent structure:
+
+- **Async-first** — all tool and resource handlers are async, using FastMCP's native async support
+- **Standalone packages** — each server is an independent PyPI package with its own `pyproject.toml`, tests, and CI
+- **MCP Registry** — every server ships a [`server.json`](https://registry.modelcontextprotocol.io/) manifest for automatic discovery
+- **Unified meta-package** — `qiskit-mcp-servers` installs any combination via pip extras
+- **Full MCP protocol** — tools (quantum operations), resources (backend info, service status), and stdio transport
+
+## Development
+
+### Running Tests
+```bash
 cd qiskit-code-assistant-mcp-server  # or any server directory
 ./run_tests.sh
 ```
 
-### 🔍 Code Quality
-All servers maintain high code quality standards:
-- **✅ Linting**: `ruff check` and `ruff format`  
-- **🛡️ Type checking**: `mypy src/`
-- **🧪 Testing**: `pytest` with async support and coverage reporting
-- **🚀 CI/CD**: GitHub Actions for automated testing
+### Code Quality
+- **Linting**: `ruff check` and `ruff format`
+- **Type checking**: `mypy src/`
+- **Testing**: `pytest` with async support and coverage reporting
+- **CI/CD**: GitHub Actions for automated testing
 
-## 📖 Resources & Documentation
+## Resources
 
-### 🔗 Essential Links
-- **[Model Context Protocol](https://modelcontextprotocol.io/introduction)** - Understanding MCP
-- **[Qiskit IBM Runtime](https://quantum.cloud.ibm.com/docs/en/api/qiskit-ibm-runtime)** - Quantum cloud services
-- **[Qiskit Code Assistant](https://quantum.cloud.ibm.com/docs/en/guides/qiskit-code-assistant)** - AI code assistance  
-- **[MCP Inspector](https://github.com/modelcontextprotocol/inspector)** - Interactive testing tool
-- **[FastMCP](https://github.com/jlowin/fastmcp)** - High-performance MCP framework
+- [Model Context Protocol](https://modelcontextprotocol.io/introduction) — understanding MCP
+- [Qiskit IBM Runtime docs](https://quantum.cloud.ibm.com/docs/en/api/qiskit-ibm-runtime) — quantum cloud services
+- [Qiskit Code Assistant docs](https://quantum.cloud.ibm.com/docs/en/guides/qiskit-code-assistant) — AI code assistance
+- [MCP Inspector](https://github.com/modelcontextprotocol/inspector) — interactive testing tool
+- [FastMCP](https://github.com/jlowin/fastmcp) — high-performance MCP framework
+- [AGENTS.md](AGENTS.md) — guidance for AI coding assistants (IBM Bob, Claude Code, Copilot, Cursor, and others)
 
-### AI Development Assistant Support
-
-This repository includes AI-generated code and offers comprehensive guidance for AI coding assistants (like [IBM Bob](https://www.ibm.com/products/bob), Claude Code, GitHub Copilot, Cursor AI, and others) in [AGENTS.md](AGENTS.md). This helps AI assistants provide more accurate, context-aware suggestions when working with this codebase. 
-
-## 📄 License
+## License
 
 This project is licensed under the **Apache License 2.0**.
