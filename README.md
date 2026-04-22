@@ -259,6 +259,10 @@ cd qiskit-code-assistant-mcp-server  # or any server directory
 - [FastMCP](https://github.com/jlowin/fastmcp) — high-performance MCP framework
 - [AGENTS.md](AGENTS.md) — guidance for AI coding assistants (IBM Bob, Claude Code, Copilot, Cursor, and others)
 
+## Contributing
+
+Contributions are welcome! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) guide for details.
+
 ## License
 
 This project is licensed under the **Apache License 2.0**.
