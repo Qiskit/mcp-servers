@@ -127,6 +127,7 @@ Each MCP server follows this standard structure:
 - `server.py`: FastMCP server with tool/resource definitions
 - `transpiler.py`: Qiskit transpilation functions (async)
 - `circuit_serialization.py`: QASM3/QPY conversion utilities
+- `utils.py`: Basis gate presets and coupling map topologies
 
 **Tools Provided**:
 | Tool | Description |
@@ -136,6 +137,8 @@ Each MCP server follows this standard structure:
 | `compare_optimization_levels_tool` | Compare all optimization levels (0-3) |
 | `convert_qpy_to_qasm3_tool` | Convert QPY to human-readable QASM3 |
 | `convert_qasm3_to_qpy_tool` | Convert QASM3 to base64-encoded QPY |
+| `load_circuit_from_qasm_tool` | Load circuit from QASM 2.0 or 3.0 string, return QPY + metadata |
+| `export_circuit_to_qasm_tool` | Export QPY circuit to QASM 2.0 or 3.0 format |
 
 **Resources Provided**:
 | Resource URI | Description |
@@ -193,66 +196,43 @@ Each MCP server follows this standard structure:
 **Directory**: [`qiskit-docs-mcp-server/`](qiskit-docs-mcp-server/)
 
 **Core Files**:
-- `server.py`: FastMCP server with tool/resource definitions
-- `data_fetcher.py`: Documentation fetching and search functions (async)
-- `constants.py`: Module/guide/addon lists, error code categories, URL configuration
+- `server.py`: FastMCP server with tool/resource definitions and lifespan management
+- `data_fetcher.py`: Documentation fetching, search, and listing functions (async)
+- `constants.py`: URL configuration, HTTP timeout settings
+- `html_processing.py`: HTML-to-Markdown conversion for documentation pages
+- `http.py`: Shared httpx client management
+- `sitemap.py`: Dynamic sitemap discovery (fetched at startup for module/guide/addon lists)
 
 **Tools Provided**:
 | Tool | Description |
 |------|-------------|
-| `get_sdk_module_docs_tool` | Get documentation for Qiskit SDK modules (circuit, quantum_info, transpiler, synthesis, primitives, result, visualization, and more) |
-| `get_addon_docs_tool` | Get documentation for Qiskit addon packages (sqd, cutting, mpf, obp, aqc-tensor, utils) |
-| `get_guide_tool` | Get Qiskit guides and best practices (optimization, error-mitigation, dynamic-circuits, etc.) |
-| `search_docs_tool` | Search Qiskit documentation for relevant content |
-| `lookup_error_code_tool` | Look up a Qiskit/IBM Quantum error code (e.g., 1002, 7001, 8004) |
+| `search_docs_tool` | Search across the entire Qiskit documentation. Supports scope filters: `all`, `documentation`, `api`, `learning`, `tutorials` |
+| `get_page_tool` | Fetch any Qiskit documentation page by URL (full or relative path). Supports pagination via `max_length` and `offset` |
+| `lookup_error_code_tool` | Look up a 4-digit Qiskit/IBM Quantum error code |
 
 **Resources Provided**:
 | Resource URI | Description |
 |--------------|-------------|
-| `qiskit-docs://modules` | List of all Qiskit SDK modules |
-| `qiskit-docs://addons` | List of all Qiskit addon modules and tutorials |
+| `qiskit-docs://modules` | List of all Qiskit SDK modules (dynamically discovered from sitemap) |
+| `qiskit-docs://addons` | List of all Qiskit addon packages |
 | `qiskit-docs://guides` | List of Qiskit guides and best practices |
+| `qiskit-docs://tutorials` | List of Qiskit tutorials |
+| `qiskit-docs://api-packages` | List of API packages (runtime, transpiler, REST API references) |
 | `qiskit-docs://error-codes` | List of Qiskit error code categories |
+| `qiskit-docs://modules/{module_name}` | Fetch documentation for a specific SDK module |
+| `qiskit-docs://guides/{guide_name}` | Fetch a specific implementation guide |
+| `qiskit-docs://addons/{addon_name}` | Fetch documentation for a specific addon package |
 
 **Environment Variables**:
 - `QISKIT_DOCS_BASE`: Base URL for Qiskit documentation (default: https://quantum.cloud.ibm.com/docs/)
 - `QISKIT_HTTP_TIMEOUT`: HTTP request timeout in seconds (default: 10.0)
 - `QISKIT_SEARCH_BASE_URL`: Search API base URL (default: https://quantum.cloud.ibm.com/)
 
-**Available Modules** (17 total, see `constants.py` for canonical list):
-- `circuit`: Quantum circuit construction and manipulation
-- `quantum_info`: Quantum information theory utilities
-- `transpiler`: Circuit transpilation and optimization
-- `synthesis`: Circuit synthesis algorithms
-- `dagcircuit`: DAG representation of circuits
-- `passmanager`: Pass manager framework
-- `converters`: Circuit format converters
-- `compiler`: High-level compilation functions
-- `primitives`: Sampler and Estimator primitives
-- `providers`: Backend provider interfaces
-- `result`: Job result handling
-- `visualization`: Circuit and result visualization
-- `qasm2`: OpenQASM 2.0 import/export
-- `qasm3`: OpenQASM 3.0 import/export
-- `qpy`: Qiskit Python serialization format
-- `utils`: Utility functions
-- `exceptions`: Qiskit exception classes
-
-**Available Guides** (~40 total, see `constants.py` for canonical list, key categories):
-- Getting started: `quick-start`
-- Circuit building: `construct-circuits`
-- Transpilation: `transpile`, `transpiler-stages`, `transpile-with-pass-managers`, `defaults-and-configuration-options`, `circuit-transpilation-settings`, `qiskit-transpiler-service`
-- Error handling: `error-mitigation-and-suppression-techniques`, `configure-error-mitigation`, `configure-error-suppression`
-- Execution: `primitives`, `execution-modes`, `runtime-options-overview`, `directed-execution-model`
-- Dynamic circuits: `dynamic-circuits`
-- Qiskit Functions: `functions`, `ibm-circuit-function`, `algorithmiq-tem`, `qedma-qesem`, `q-ctrl-performance-management`, and more
-- Application functions: `colibritd-pde`, `global-data-quantum-optimizer`, `qunova-chemistry`, `kipu-optimization`, and more
-- Security: `secure-data`, `support`
-
 **Features**:
-- Fuzzy matching for module/guide names (suggests corrections for typos)
+- Sitemap-based dynamic discovery of modules, guides, addons, and tutorials at startup
+- Generic `get_page_tool` replaces per-type tools — can fetch any page by URL
 - Converts HTML documentation to Markdown format
-- Includes metadata (URLs, timestamps, content length)
+- Pagination support for large pages
 - No authentication required (public documentation)
 
 ---
@@ -266,26 +246,56 @@ Each MCP server follows this standard structure:
 **Core Files**:
 - `server.py`: FastMCP server with tool/resource definitions
 - `ibm_runtime.py`: Qiskit IBM Runtime integration (async)
+- `utils.py`: Account setup and circuit format utilities
 
 **Tools Provided**:
+
+*Account Management*:
 | Tool | Description |
 |------|-------------|
 | `setup_ibm_quantum_account_tool` | Configure IBM Quantum account |
+| `delete_saved_account_tool` | Delete a saved account from disk |
+| `list_saved_accounts_tool` | List all saved IBM Quantum accounts |
+| `active_account_info_tool` | Get info about the currently active account |
+| `active_instance_info_tool` | Get the active instance CRN |
+| `available_instances_tool` | List all accessible instances |
+| `usage_info_tool` | Get usage statistics and quota information |
+
+*Backend Discovery & Analysis*:
+| Tool | Description |
+|------|-------------|
 | `list_backends_tool` | Get available quantum backends |
 | `least_busy_backend_tool` | Find least busy operational backend |
-| `get_backend_properties_tool` | Get detailed backend properties |
-| `get_backend_calibration_tool` | Get calibration data (T1, T2, error rates) |
+| `get_backend_properties_tool` | Get static backend properties (processor type, basis gates, qubit count) |
+| `get_backend_calibration_tool` | Get live calibration data (T1, T2, error rates, faulty qubits) |
+| `get_coupling_map_tool` | Get qubit connectivity (supports real and fake backends) |
+| `find_optimal_qubit_chains_tool` | Find best linear qubit chains by calibration quality |
+| `find_optimal_qv_qubits_tool` | Find optimal qubit subgraphs for Quantum Volume experiments |
+
+*Job Execution & Management*:
+| Tool | Description |
+|------|-------------|
+| `run_sampler_tool` | Run circuit with SamplerV2 (measurement counts). Includes dynamical decoupling and twirling |
+| `run_estimator_tool` | Run circuit with EstimatorV2 (expectation values). Includes ZNE error mitigation |
 | `list_my_jobs_tool` | List recent jobs |
 | `get_job_status_tool` | Check job status |
+| `get_job_results_tool` | Get measurement results from a completed job |
 | `cancel_job_tool` | Cancel a running/queued job |
 
 **Resources Provided**:
 | Resource URI | Description |
 |--------------|-------------|
 | `ibm://status` | Service status and connection info |
+| `circuits://bell-state` | Ready-to-run Bell state (entanglement) circuit |
+| `circuits://ghz-state` | Ready-to-run 3-qubit GHZ state circuit |
+| `circuits://random` | Ready-to-run quantum random number generator circuit |
+| `circuits://superposition` | Ready-to-run single-qubit superposition circuit |
+| `ibm://backends/{backend_name}` | Properties for a specific backend |
+| `ibm://jobs/{job_id}` | Status of a specific job |
 
 **Environment Variables**:
 - `QISKIT_IBM_TOKEN`: IBM Quantum API token (optional, can use saved credentials)
+- `QISKIT_IBM_RUNTIME_MCP_INSTANCE`: IBM Quantum instance CRN (optional, speeds up startup)
 
 **Credential Resolution Priority**:
 1. Explicit token passed to `setup_ibm_quantum_account()`
@@ -316,6 +326,12 @@ Each MCP server follows this standard structure:
 | `ai_pauli_network_synthesis_tool` | AI synthesis for Pauli Network circuits (up to 6 qubits) |
 | `hybrid_ai_transpile_tool` | End-to-end hybrid transpilation combining Qiskit heuristics with AI passes |
 
+**Resources Provided**:
+| Resource URI | Description |
+|--------------|-------------|
+| `qiskit-ibm-transpiler://info` | Server capabilities and recommended workflow |
+| `qiskit-ibm-transpiler://synthesis-types` | Documentation for all AI synthesis pass types (gates, qubit limits) |
+
 **Environment Variables**:
 - `QISKIT_IBM_TOKEN`: IBM Quantum API token (required)
 
@@ -332,28 +348,81 @@ Each MCP server follows this standard structure:
 **Directory**: [`qiskit-gym-mcp-server/`](qiskit-gym-mcp-server/)
 
 **Core Files**:
-- `server.py`: FastMCP server with tool/resource definitions
+- `server.py`: FastMCP server entry point
+- `server_tools.py`: All MCP tool definitions
+- `server_resources.py`: All MCP resource definitions
+- `app.py`: Application setup and server initialization
 - `gym_core.py`: Environment creation (PermutationGym, LinearFunctionGym, CliffordGym)
 - `training.py`: RL training session management
 - `synthesis.py`: Circuit synthesis from trained models
 - `models.py`: Model persistence (save/load)
 - `coupling_maps.py`: Hardware presets and subtopology extraction
 - `state.py`: Singleton state manager
+- `constants.py`: Configuration defaults
+- `utils.py`: Utility functions
 
 **Tools Provided**:
+
+*Environment Management*:
 | Tool | Description |
 |------|-------------|
 | `create_permutation_env_tool` | Create environment for SWAP routing |
 | `create_linear_function_env_tool` | Create environment for CNOT synthesis |
 | `create_clifford_env_tool` | Create environment for Clifford synthesis |
+| `list_environments_tool` | List all created environments |
+| `get_environment_info_tool` | Get details of a specific environment |
+| `delete_environment_tool` | Delete an environment |
+
+*Training*:
+| Tool | Description |
+|------|-------------|
 | `start_training_tool` | Start RL training (PPO/AlphaZero) |
 | `batch_train_environments_tool` | Train multiple environments |
+| `get_training_status_tool` | Get status of a training session |
+| `get_training_metrics_tool` | Get training metrics (rewards, episode lengths) |
+| `wait_for_training_tool` | Wait for training to complete |
+| `stop_training_tool` | Stop a running training session |
+| `list_training_sessions_tool` | List all training sessions |
+
+*TensorBoard*:
+| Tool | Description |
+|------|-------------|
+| `list_tensorboard_experiments_tool` | List TensorBoard experiments |
+| `get_tensorboard_metrics_tool` | Get metrics from TensorBoard logs |
+| `start_tensorboard_tool` | Start TensorBoard server |
+| `stop_tensorboard_tool` | Stop TensorBoard server |
+| `get_tensorboard_status_tool` | Check TensorBoard server status |
+
+*Synthesis*:
+| Tool | Description |
+|------|-------------|
 | `synthesize_permutation_tool` | Generate optimal SWAP circuit |
 | `synthesize_linear_function_tool` | Generate optimal CNOT circuit |
 | `synthesize_clifford_tool` | Generate optimal Clifford circuit |
+
+*Model Management*:
+| Tool | Description |
+|------|-------------|
 | `save_model_tool` | Save trained model to disk |
 | `load_model_tool` | Load model from disk |
+| `list_saved_models_tool` | List models saved on disk |
+| `list_loaded_models_tool` | List models loaded in memory |
+| `delete_model_tool` | Delete a saved model |
+| `get_model_info_tool` | Get detailed model information |
+
+*Coupling Maps & Utilities*:
+| Tool | Description |
+|------|-------------|
+| `create_coupling_map_tool` | Create a coupling map from edges or topology |
 | `extract_subtopologies_tool` | Extract N-qubit subtopologies from hardware |
+| `list_subtopology_shapes_tool` | List available subtopology shapes |
+| `get_fake_backend_coupling_map_tool` | Get coupling map from a fake backend |
+| `list_available_fake_backends_tool` | List available fake backends |
+| `generate_random_permutation_tool` | Generate random permutation for testing |
+| `generate_random_linear_function_tool` | Generate random linear function for testing |
+| `generate_random_clifford_tool` | Generate random Clifford for testing |
+| `convert_qpy_to_qasm3_tool` | Convert QPY to QASM3 |
+| `convert_qasm3_to_qpy_tool` | Convert QASM3 to QPY |
 
 **Resources Provided**:
 | Resource URI | Description |
@@ -362,9 +431,13 @@ Each MCP server follows this standard structure:
 | `qiskit-gym://algorithms` | PPO, AlphaZero documentation |
 | `qiskit-gym://policies` | BasicPolicy, Conv1dPolicy docs |
 | `qiskit-gym://environments` | Environment type documentation |
+| `qiskit-gym://workflows` | End-to-end workflow documentation |
 | `qiskit-gym://training/sessions` | Active training sessions |
 | `qiskit-gym://models` | Loaded models |
 | `qiskit-gym://server/config` | Server configuration |
+| `qiskit-gym://environments/{env_id}` | Specific environment info |
+| `qiskit-gym://models/{model_name}` | Specific model info |
+| `qiskit-gym://training/{session_id}` | Specific training session status |
 
 **Environment Variables**:
 - `QISKIT_GYM_MODEL_DIR`: Model storage directory (default: ~/.qiskit-gym/models)
@@ -407,7 +480,7 @@ AI Assistant → MCP Client → get_completion_tool
 
 ### Qiskit Documentation Server
 ```
-AI Assistant → MCP Client → get_sdk_module_docs_tool / search_docs_tool
+AI Assistant → MCP Client → search_docs_tool / get_page_tool
                                   ↓
                        data_fetcher.py (async functions)
                                   ↓
@@ -456,7 +529,7 @@ AI Assistant → MCP Client → create_*_env_tool → start_training_tool
 1. **Prerequisites**:
    - Python 3.10+ (3.11+ recommended)
    - [uv](https://astral.sh/uv) package manager
-   - IBM Quantum account and API token
+   - IBM Quantum account and API token (for cloud servers)
    - Git
 
 2. **Installation**:
@@ -776,8 +849,8 @@ When adding a new MCP server, you must update the following GitHub configuration
 7. **Create `server.json`** for MCP Registry:
    ```json
    {
-     "$schema": "https://static.modelcontextprotocol.io/schemas/draft/server.schema.json",
-     "name": "io.github.qiskit/qiskit-<name>-mcp-server",
+     "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+     "name": "io.github.Qiskit/qiskit-<name>-mcp-server",
      "title": "Qiskit <Name> MCP Server",
      "description": "Short description (max 100 chars)",
      "version": "0.1.0",
@@ -919,7 +992,7 @@ gh workflow run "Publish to MCP Registry" -f package=qiskit
 
 **server.json configuration**:
 Each server has a `server.json` file that defines its MCP Registry metadata:
-- `name`: Reverse-DNS format (`io.github.qiskit/server-name`)
+- `name`: Reverse-DNS format (`io.github.Qiskit/server-name`)
 - `description`: Short description (max 100 characters)
 - `version`: Must match the version in `pyproject.toml`
 - `packages`: PyPI package configuration with environment variables
@@ -1067,7 +1140,8 @@ qiskit-mcp-servers/
 │   │   ├── __init__.py
 │   │   ├── server.py                    # FastMCP server
 │   │   ├── transpiler.py                # Core transpilation
-│   │   └── circuit_serialization.py     # QASM3/QPY utilities
+│   │   ├── circuit_serialization.py     # QASM3/QPY utilities
+│   │   └── utils.py                     # Basis gates & topology presets
 │   ├── tests/
 │   │   ├── conftest.py
 │   │   ├── test_transpiler.py
@@ -1100,14 +1174,38 @@ qiskit-mcp-servers/
 │   ├── LICENSE
 │   ├── README.md
 │   └── run_tests.sh
+├── qiskit-docs-mcp-server/
+│   ├── src/qiskit_docs_mcp_server/
+│   │   ├── __init__.py
+│   │   ├── server.py                    # FastMCP server + lifespan
+│   │   ├── data_fetcher.py              # Documentation fetching & search
+│   │   ├── constants.py                 # URL config, timeouts
+│   │   ├── html_processing.py           # HTML-to-Markdown conversion
+│   │   ├── http.py                      # Shared httpx client
+│   │   └── sitemap.py                   # Dynamic sitemap discovery
+│   ├── tests/
+│   │   ├── conftest.py
+│   │   ├── test_data_fetcher.py
+│   │   └── test_server.py
+│   ├── examples/
+│   │   ├── README.md
+│   │   ├── langchain_agent.ipynb
+│   │   └── langchain_agent.py
+│   ├── pyproject.toml
+│   ├── LICENSE
+│   ├── README.md
+│   └── run_tests.sh
 ├── qiskit-ibm-runtime-mcp-server/
 │   ├── src/qiskit_ibm_runtime_mcp_server/
 │   │   ├── __init__.py
 │   │   ├── server.py                    # FastMCP server
-│   │   └── ibm_runtime.py               # Core async functions
+│   │   ├── ibm_runtime.py               # Core async functions
+│   │   └── utils.py                     # Account & circuit utilities
 │   ├── tests/
 │   │   ├── conftest.py
-│   │   └── test_*.py
+│   │   ├── test_server.py
+│   │   ├── test_integration.py
+│   │   └── test_sync.py
 │   ├── examples/
 │   │   ├── README.md
 │   │   ├── langchain_agent.ipynb
@@ -1141,7 +1239,10 @@ qiskit-mcp-servers/
 ├── qiskit-gym-mcp-server/
 │   ├── src/qiskit_gym_mcp_server/
 │   │   ├── __init__.py
-│   │   ├── server.py                    # FastMCP server
+│   │   ├── server.py                    # FastMCP server entry point
+│   │   ├── server_tools.py              # All MCP tool definitions
+│   │   ├── server_resources.py          # All MCP resource definitions
+│   │   ├── app.py                       # Application setup
 │   │   ├── gym_core.py                  # Environment creation
 │   │   ├── training.py                  # RL training functions
 │   │   ├── synthesis.py                 # Circuit synthesis
@@ -1153,9 +1254,19 @@ qiskit-mcp-servers/
 │   ├── tests/
 │   │   ├── conftest.py
 │   │   └── test_*.py
+│   ├── examples/
+│   │   ├── README.md
+│   │   ├── langchain_agent.ipynb
+│   │   └── langchain_agent.py
 │   ├── pyproject.toml
 │   ├── README.md
 │   └── run_tests.sh
+├── examples/
+│   ├── README.md
+│   ├── quantum_volume_optimizer.ipynb
+│   └── quantum_volume_optimizer.py
+├── docs/
+│   └── videos/                          # Demo videos for README
 ├── src/
 │   └── qiskit_mcp_servers/              # Meta-package
 ├── pyproject.toml                       # Workspace config & meta-package
