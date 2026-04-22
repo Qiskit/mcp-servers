@@ -70,7 +70,7 @@ All servers are compatible with any MCP client. Pick your client below.
 
 #### Claude Code
 
-<video src="docs/videos/QiskitMCPServers-ClaudeCode.mp4" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/b1a32e62-0a6e-4542-add3-5ee35145ad48" controls width="100%"></video>
 
 ```bash
 # No auth required
@@ -86,7 +86,7 @@ claude mcp add qiskit-ibm-transpiler -e QISKIT_IBM_TOKEN=$QISKIT_IBM_TOKEN -- uv
 
 #### IBM Bob
 
-<video src="docs/videos/QiskitMCPServers-IBMBob.mp4" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/d240cc7d-9c7a-4200-a2df-65e177e11da3" controls width="100%"></video>
 
 Add to your `~/.bob/settings/mcp_settings.json`:
 
