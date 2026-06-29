@@ -288,8 +288,10 @@ def _make_snippet(text: str, query: str, max_chars: int = SNIPPET_MAX_CHARS) -> 
     haystack = normalized.lower()
 
     # Prefer the full query phrase; fall back to the densest cluster of terms.
+    # Guard against an empty phrase: ``"".find`` is 0, which would otherwise
+    # short-circuit to a head-anchored window and skip term clustering.
     phrase = query.strip().lower()
-    anchor = haystack.find(phrase)
+    anchor = haystack.find(phrase) if phrase else -1
     if anchor != -1:
         # Center on the phrase's middle so a long phrase isn't clipped.
         anchor += len(phrase) // 2
@@ -363,9 +365,12 @@ async def search_qiskit_docs(
             get_page for full content).
 
     Returns:
-        Search results with matching entries, counts, and metadata. Each entry
-        carries 'id', 'url', 'title', 'pageTitle', 'module', 'section' (when
-        available) and either a 'snippet' or, for detail='full', a 'text' body.
+        Search results with matching entries, counts, and metadata.
+        'total_results' is the grand total of matches found; 'returned_results'
+        is the (possibly smaller) number included after the top_k cap, with a
+        'truncated' flag. Each entry carries 'id', 'url', 'title', 'pageTitle',
+        'module', 'section' (when available) and either a 'snippet' or, for
+        detail='full', a 'text' body.
     """
     query = query.strip()
     if not query:
@@ -389,9 +394,10 @@ async def search_qiskit_docs(
         }
 
     # Clamp top_k: non-positive falls back to the default, and an upper bound
-    # guards against a single call ballooning the response.
+    # guards against a single call ballooning the response. The final max(1, ...)
+    # keeps the slice valid even if MAX_SEARCH_TOP_K were misconfigured low.
     effective_top_k = top_k if top_k > 0 else DEFAULT_SEARCH_TOP_K
-    effective_top_k = min(effective_top_k, MAX_SEARCH_TOP_K)
+    effective_top_k = max(1, min(effective_top_k, MAX_SEARCH_TOP_K))
 
     url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(scope)}"
     logger.info("Searching docs for '%s' in scope '%s'", query, scope)
@@ -408,11 +414,13 @@ async def search_qiskit_docs(
             },
         }
 
-    total_matches = len(results)
+    # `total_results` keeps its pre-PR meaning: the grand total of matches found.
+    # `returned_results` is the (possibly smaller) count actually included here.
+    total_results = len(results)
     base = QISKIT_DOCS_BASE.rstrip("/")
     selected = results[:effective_top_k]
     cleaned = [_build_result_entry(item, query, detail, base) for item in selected]
-    truncated = total_matches > len(cleaned)
+    truncated = total_results > len(cleaned)
 
     if detail == "snippet":
         note = "Showing snippets; call get_page_tool with a result's url for full page content."
@@ -420,7 +428,7 @@ async def search_qiskit_docs(
         note = "Showing full page bodies; for a single page, get_page_tool is more economical."
     if truncated:
         note = (
-            f"Showing top {len(cleaned)} of {total_matches} matches. "
+            f"Showing top {len(cleaned)} of {total_results} matches. "
             "Refine the query for fewer, more relevant results. " + note
         )
 
@@ -430,8 +438,8 @@ async def search_qiskit_docs(
         "scope": scope,
         "detail": detail,
         "results": cleaned,
-        "total_results": len(cleaned),
-        "total_matches": total_matches,
+        "total_results": total_results,
+        "returned_results": len(cleaned),
         "truncated": truncated,
         "note": note,
         "metadata": {

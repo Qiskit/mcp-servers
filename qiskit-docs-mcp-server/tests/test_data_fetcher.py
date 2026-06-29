@@ -773,6 +773,18 @@ class TestMakeSnippet:
         assert "gamma" in snippet
         assert len(snippet) <= 80 + 8
 
+    def test_blank_query_falls_back_to_head(self):
+        """A whitespace-only query must not anchor at offset 0 via "".find().
+
+        An empty phrase has no terms either, so the snippet should fall back to
+        the head of the body rather than short-circuiting on the empty match.
+        """
+        text = "first part here " + ("filler " * 400)
+        snippet = _make_snippet(text, "   ", max_chars=100)
+        assert snippet.startswith("first")
+        assert not snippet.startswith("…")
+        assert snippet.endswith("…")
+
 
 class TestNormalizeResultUrl:
     """Test the _normalize_result_url helper."""
@@ -804,8 +816,9 @@ class TestSearchSnippetsAndPaging:
         result = await search_qiskit_docs("load QASM3 circuit", scope="api")
         assert result["status"] == "success"
         assert len(result["results"]) == DEFAULT_SEARCH_TOP_K
-        assert result["total_results"] == DEFAULT_SEARCH_TOP_K
-        assert result["total_matches"] == 20
+        # total_results is the grand total of matches; returned_results is capped.
+        assert result["total_results"] == 20
+        assert result["returned_results"] == DEFAULT_SEARCH_TOP_K
         assert result["truncated"] is True
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
@@ -855,13 +868,29 @@ class TestSearchSnippetsAndPaging:
         result = await search_qiskit_docs("circuit", top_k=0)
         assert len(result["results"]) == DEFAULT_SEARCH_TOP_K
 
+    @patch("qiskit_docs_mcp_server.data_fetcher.MAX_SEARCH_TOP_K", -1)
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_misconfigured_max_does_not_negative_slice(self, mock_fetch):
+        """A misconfigured (negative) cap must not silently drop the last result.
+
+        Guards the effective_top_k = max(1, min(...)) floor: with a negative cap,
+        a naive min() would yield results[:-1]; we must still return >= 1 result
+        and keep returned_results consistent with the list length.
+        """
+        mock_fetch.return_value = _make_search_payload(5)
+        result = await search_qiskit_docs("circuit")
+        assert result["status"] == "success"
+        assert result["returned_results"] >= 1
+        assert len(result["results"]) == result["returned_results"]
+
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
     async def test_not_truncated_when_few_results(self, mock_fetch):
         """truncated is False when the API returns fewer than top_k results."""
         mock_fetch.return_value = _make_search_payload(2)
         result = await search_qiskit_docs("circuit")
         assert result["truncated"] is False
-        assert result["total_matches"] == 2
+        assert result["total_results"] == 2
+        assert result["returned_results"] == 2
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
     async def test_detail_full_returns_full_body(self, mock_fetch):

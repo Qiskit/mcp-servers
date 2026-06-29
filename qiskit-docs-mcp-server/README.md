@@ -211,7 +211,7 @@ asyncio.run(main())
 ```python
 # Search returns short snippets (not full pages) — cheap to call inside an agent
 result = await search_docs_tool("transpiler optimization")
-print(f"Showing {result['total_results']} of {result['total_matches']} matches")
+print(f"Showing {result['returned_results']} of {result['total_results']} matches")
 for item in result["results"]:
     print(f"- {item['title']}: {item['url']}")
     print(f"    {item['snippet']}")
@@ -220,6 +220,14 @@ for item in result["results"]:
 page = await get_page_tool(result["results"][0]["url"])
 print(page["documentation"])
 ```
+
+> **Note (behavior change):** `search_docs_tool` now returns short, query-centered
+> **snippets** by default and caps results to `top_k` (default 5). In default
+> (`detail="snippet"`) mode each result carries a `snippet` field — not the full
+> `text` body — and is limited to `id, url, title, pageTitle, module, section,
+> snippet`. For full content, pass `detail="full"` or fetch the page with
+> `get_page_tool`. `total_results` is the grand total of matches; `returned_results`
+> is the count after the `top_k` cap.
 
 ### Fetch a Documentation Page
 

@@ -97,9 +97,11 @@ SEARCH_CACHE_TTL = _get_env_float("QISKIT_SEARCH_CACHE_TTL", 300.0)  # 5 min def
 # token-economical, search returns short query-centered snippets by default
 # and caps the number of results; full page content is fetched separately via
 # get_page. These knobs bound the default response to roughly ~2k tokens.
-DEFAULT_SEARCH_TOP_K = _get_env_int("QISKIT_DOCS_SEARCH_TOP_K", 5)
-MAX_SEARCH_TOP_K = _get_env_int("QISKIT_DOCS_MAX_SEARCH_TOP_K", 10)
-SNIPPET_MAX_CHARS = _get_env_int("QISKIT_DOCS_SNIPPET_CHARS", 320)
+# Floored at sensible minimums so an out-of-range env override (e.g. a negative
+# value) can't produce a negative list slice or snippet window at runtime.
+DEFAULT_SEARCH_TOP_K = max(1, _get_env_int("QISKIT_DOCS_SEARCH_TOP_K", 5))
+MAX_SEARCH_TOP_K = max(1, _get_env_int("QISKIT_DOCS_MAX_SEARCH_TOP_K", 10))
+SNIPPET_MAX_CHARS = max(50, _get_env_int("QISKIT_DOCS_SNIPPET_CHARS", 320))
 VALID_SEARCH_DETAIL = ("snippet", "full")
 
 # ---------------------------------------------------------------------------

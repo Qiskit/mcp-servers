@@ -118,7 +118,8 @@ async def search_docs_tool(
 
     Returns:
         Matching documentation entries (id, url, title, pageTitle, module,
-        section, and a snippet) plus 'total_matches' and 'truncated' flags.
+        section, and a snippet) plus 'total_results' (grand total of matches),
+        'returned_results' (count after the top_k cap), and a 'truncated' flag.
         Use a result's URL with get_page_tool to fetch the full page content.
     """
     return await search_qiskit_docs(query, scope, top_k=top_k, detail=detail)
