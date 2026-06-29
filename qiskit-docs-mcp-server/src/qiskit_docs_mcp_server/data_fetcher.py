@@ -27,9 +27,13 @@ from qiskit_docs_mcp_server.constants import (
     AVAILABLE_MODULES,
     AVAILABLE_TUTORIALS,
     BASE_URL,
+    DEFAULT_SEARCH_TOP_K,
     ERROR_CODE_CATEGORIES,
+    MAX_SEARCH_TOP_K,
     QISKIT_DOCS_BASE,
     SEARCH_PATH,
+    SNIPPET_MAX_CHARS,
+    VALID_SEARCH_DETAIL,
 )
 from qiskit_docs_mcp_server.html_processing import (
     _strip_html_tags,
@@ -195,17 +199,173 @@ async def get_page_docs(url: str, max_length: int = 20000, offset: int = 0) -> d
 
 _VALID_SCOPES = {"all", "documentation", "api", "learning", "tutorials"}
 
+# Metadata fields kept from each upstream search result. The full page body
+# (the upstream ``text`` field) is deliberately excluded and replaced with a
+# short ``snippet``; whitelisting also keeps the response small and stable if
+# the upstream API later adds new (potentially large) fields.
+_RESULT_META_FIELDS = ("id", "url", "title", "pageTitle", "module", "section")
 
-async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
+# Words this short are ignored when locating the query match in a body, so that
+# stop-word-like fragments don't anchor the snippet on a noisy position.
+_MIN_TERM_LEN = 2
+
+_ELLIPSIS = "…"  # single-character "..."
+
+
+def _densest_window_start(positions: list[int], width: int) -> int:
+    """Return the center of the densest cluster of match positions.
+
+    Given sorted character offsets where query terms occur, find the window of
+    ``width`` characters that contains the most matches and return the midpoint
+    of that cluster (a good place to center a snippet). Returns -1 if there are
+    no positions.
+    """
+    if not positions:
+        return -1
+    best_count = 0
+    best_center = positions[0]
+    left = 0
+    for right, pos in enumerate(positions):
+        while pos - positions[left] > width:
+            left += 1
+        count = right - left + 1
+        if count > best_count:
+            best_count = count
+            best_center = (positions[left] + pos) // 2
+    return best_center
+
+
+def _trim_partial_words(window: str, *, head: bool, tail: bool) -> str:
+    """Trim partial words at clipped edges and add ellipsis markers.
+
+    Args:
+        window: The raw character window sliced out of the body.
+        head: True if the window was clipped at the start (text precedes it).
+        tail: True if the window was clipped at the end (text follows it).
+    """
+    if head:
+        # Drop a leading partial word (text before the first space).
+        space = window.find(" ")
+        if space != -1:
+            window = window[space + 1 :]
+    if tail:
+        # Drop a trailing partial word (text after the last space).
+        space = window.rfind(" ")
+        if space != -1:
+            window = window[:space]
+    window = window.strip()
+    if head:
+        window = f"{_ELLIPSIS} {window}"
+    if tail:
+        window = f"{window} {_ELLIPSIS}"
+    return window
+
+
+def _make_snippet(text: str, query: str, max_chars: int = SNIPPET_MAX_CHARS) -> str:
+    """Build a compact, query-centered excerpt from a documentation body.
+
+    Whitespace is collapsed so the character budget reflects real content. When
+    the query (or its terms) appears in the body, the snippet is a window
+    centered on the densest cluster of matches; otherwise it falls back to the
+    start of the body. Partial words at clipped edges are trimmed and marked
+    with an ellipsis.
+
+    Args:
+        text: Plain-text body (HTML already stripped).
+        query: The search query, used to locate the most relevant window.
+        max_chars: Maximum length of the returned snippet (excluding ellipses).
+
+    Returns:
+        A snippet no longer than roughly ``max_chars`` characters.
+    """
+    if not text:
+        return ""
+
+    normalized = " ".join(text.split())
+    if len(normalized) <= max_chars:
+        return normalized
+
+    haystack = normalized.lower()
+
+    # Prefer the full query phrase; fall back to the densest cluster of terms.
+    phrase = query.strip().lower()
+    anchor = haystack.find(phrase)
+    if anchor != -1:
+        # Center on the phrase's middle so a long phrase isn't clipped.
+        anchor += len(phrase) // 2
+    else:
+        terms = {t for t in re.findall(r"\w+", query.lower()) if len(t) >= _MIN_TERM_LEN}
+        positions = sorted(
+            match.start() for term in terms for match in re.finditer(re.escape(term), haystack)
+        )
+        anchor = _densest_window_start(positions, max_chars)
+
+    if anchor == -1:
+        # No query term present (e.g. a semantic match) — use the body's head.
+        return _trim_partial_words(normalized[:max_chars], head=False, tail=True)
+
+    # Center a window of max_chars on the anchor, clamped to the body bounds.
+    start = max(0, anchor - max_chars // 2)
+    end = min(len(normalized), start + max_chars)
+    start = max(0, end - max_chars)  # pull the start back if we hit the tail
+    return _trim_partial_words(normalized[start:end], head=start > 0, tail=end < len(normalized))
+
+
+def _normalize_result_url(url_val: Any, base: str) -> Any:
+    """Resolve a relative search-result URL to a full documentation URL."""
+    if not url_val or not isinstance(url_val, str):
+        return url_val
+    parsed = urlparse(url_val)
+    if not parsed.scheme and not parsed.netloc:
+        return f"{base}/{url_val.lstrip('/')}"
+    return url_val
+
+
+def _build_result_entry(item: dict[str, Any], query: str, detail: str, base: str) -> dict[str, Any]:
+    """Build a single search-result entry with a snippet (or full text)."""
+    entry: dict[str, Any] = {
+        key: item[key] for key in _RESULT_META_FIELDS if item.get(key) is not None
+    }
+    if isinstance(entry.get("title"), str):
+        entry["title"] = _strip_html_tags(entry["title"])
+    if "url" in entry:
+        entry["url"] = _normalize_result_url(entry["url"], base)
+
+    raw_text = item.get("text")
+    clean_text = _strip_html_tags(raw_text) if isinstance(raw_text, str) else ""
+    if detail == "full":
+        entry["text"] = clean_text
+    else:
+        entry["snippet"] = _make_snippet(clean_text, query)
+    return entry
+
+
+async def search_qiskit_docs(
+    query: str,
+    scope: str = "all",
+    top_k: int = DEFAULT_SEARCH_TOP_K,
+    detail: str = "snippet",
+) -> dict[str, Any]:
     """Search Qiskit documentation for relevant results.
+
+    Returns concise, query-centered snippets by default so the response stays
+    small enough for repeated use inside an LLM agent loop. Use ``get_page_docs``
+    with a result's ``url`` to read a page in full.
 
     Args:
         query: Search query string
         scope: Search scope filter. Valid values (case-sensitive):
             'all', 'documentation', 'api', 'learning', 'tutorials'
+        top_k: Maximum number of results to return (clamped to
+            [1, MAX_SEARCH_TOP_K]). Defaults to DEFAULT_SEARCH_TOP_K.
+        detail: 'snippet' (default) returns a short excerpt per result;
+            'full' returns each result's full page body (heavier — prefer
+            get_page for full content).
 
     Returns:
-        Search results with matching entries, total count, and metadata
+        Search results with matching entries, counts, and metadata. Each entry
+        carries 'id', 'url', 'title', 'pageTitle', 'module', 'section' (when
+        available) and either a 'snippet' or, for detail='full', a 'text' body.
     """
     query = query.strip()
     if not query:
@@ -220,6 +380,18 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
                 f"Invalid scope '{scope}'. Valid values: {', '.join(sorted(_VALID_SCOPES))}."
             ),
         }
+    if detail not in VALID_SEARCH_DETAIL:
+        return {
+            "status": "error",
+            "message": (
+                f"Invalid detail '{detail}'. Valid values: {', '.join(VALID_SEARCH_DETAIL)}."
+            ),
+        }
+
+    # Clamp top_k: non-positive falls back to the default, and an upper bound
+    # guards against a single call ballooning the response.
+    effective_top_k = top_k if top_k > 0 else DEFAULT_SEARCH_TOP_K
+    effective_top_k = min(effective_top_k, MAX_SEARCH_TOP_K)
 
     url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(scope)}"
     logger.info("Searching docs for '%s' in scope '%s'", query, scope)
@@ -236,29 +408,32 @@ async def search_qiskit_docs(query: str, scope: str = "all") -> dict[str, Any]:
             },
         }
 
-    # Strip HTML tags from search result fields (shallow copy to avoid mutating cached data)
-    cleaned = []
+    total_matches = len(results)
     base = QISKIT_DOCS_BASE.rstrip("/")
-    for item in results:
-        entry = dict(item)
-        if "title" in entry:
-            entry["title"] = _strip_html_tags(entry["title"])
-        if "text" in entry:
-            entry["text"] = _strip_html_tags(entry["text"])
-        # Normalize URL to full URL if relative
-        url_val = entry.get("url")
-        if url_val:
-            parsed = urlparse(url_val)
-            if not parsed.scheme and not parsed.netloc:
-                entry["url"] = f"{base}/{url_val.lstrip('/')}"
-        cleaned.append(entry)
+    selected = results[:effective_top_k]
+    cleaned = [_build_result_entry(item, query, detail, base) for item in selected]
+    truncated = total_matches > len(cleaned)
+
+    if detail == "snippet":
+        note = "Showing snippets; call get_page_tool with a result's url for full page content."
+    else:
+        note = "Showing full page bodies; for a single page, get_page_tool is more economical."
+    if truncated:
+        note = (
+            f"Showing top {len(cleaned)} of {total_matches} matches. "
+            "Refine the query for fewer, more relevant results. " + note
+        )
 
     return {
         "status": "success",
         "query": query,
         "scope": scope,
+        "detail": detail,
         "results": cleaned,
         "total_results": len(cleaned),
+        "total_matches": total_matches,
+        "truncated": truncated,
+        "note": note,
         "metadata": {
             "url": url,
             "timestamp": datetime.now(timezone.utc).isoformat(),

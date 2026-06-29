@@ -25,7 +25,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from qiskit_docs_mcp_server.constants import HTTP_TIMEOUT
+from qiskit_docs_mcp_server.constants import DEFAULT_SEARCH_TOP_K, HTTP_TIMEOUT
 from qiskit_docs_mcp_server.data_fetcher import (
     get_list_of_addons,
     get_list_of_api_packages,
@@ -64,9 +64,10 @@ mcp = FastMCP(
 This server provides access to the Qiskit and IBM Quantum documentation.
 
 Recommended workflow:
-1. Use search_docs_tool to find relevant pages. Specific queries yield \
-better results than broad ones.
-2. Use get_page_tool to fetch the full content of pages found by search. \
+1. Use search_docs_tool to find relevant pages. It returns short snippets \
+(not full pages), so it is cheap to call. Specific queries yield better \
+results than broad ones.
+2. Use get_page_tool to fetch the full content of a page found by search. \
 For large pages, use the offset parameter to paginate through content.
 3. Browse qiskit-docs:// resources (modules, addons, guides, error-codes) \
 to discover what documentation is available.
@@ -88,12 +89,18 @@ logger.info("Qiskit Documentation MCP Server initialized")
 
 
 @mcp.tool()
-async def search_docs_tool(query: str, scope: str = "all") -> dict[str, Any]:
+async def search_docs_tool(
+    query: str,
+    scope: str = "all",
+    top_k: int = DEFAULT_SEARCH_TOP_K,
+    detail: str = "snippet",
+) -> dict[str, Any]:
     """Search across the entire Qiskit documentation for relevant content.
 
-    Use this as the primary entry point to discover documentation pages.
-    Returns ranked results with titles, URLs, sections, and text snippets.
-    Use get_page_tool to fetch the full content of any result URL.
+    Use this as the primary entry point to discover documentation pages. Returns
+    a small set of ranked results, each with a short query-centered snippet plus
+    its title, URL, and section. This keeps the response compact for repeated use
+    inside an agent. To read a page in full, pass a result's URL to get_page_tool.
 
     Args:
         query: Search query string (e.g., 'error mitigation', 'QuantumCircuit',
@@ -104,12 +111,17 @@ async def search_docs_tool(query: str, scope: str = "all") -> dict[str, Any]:
             'api' — API reference pages only
             'learning' — Learning resources and tutorials
             'tutorials' — Tutorial content only
+        top_k: Maximum number of results to return (default: 5, capped at 10).
+        detail: Per-result content level. 'snippet' (default) returns a short
+            excerpt; 'full' returns each result's full page body — heavier, so
+            prefer get_page_tool when you only need one page in full.
 
     Returns:
-        List of matching documentation entries with URLs, titles, sections,
-        and text snippets. Use the URLs with get_page_tool to fetch full content.
+        Matching documentation entries (id, url, title, pageTitle, module,
+        section, and a snippet) plus 'total_matches' and 'truncated' flags.
+        Use a result's URL with get_page_tool to fetch the full page content.
     """
-    return await search_qiskit_docs(query, scope)
+    return await search_qiskit_docs(query, scope, top_k=top_k, detail=detail)
 
 
 @mcp.tool()

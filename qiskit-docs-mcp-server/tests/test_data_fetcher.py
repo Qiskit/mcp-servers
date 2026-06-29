@@ -12,6 +12,7 @@
 
 """Tests for data_fetcher module."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -23,11 +24,17 @@ from qiskit_docs_mcp_server.constants import (
     AVAILABLE_MODULES,
     AVAILABLE_TUTORIALS,
     CACHE_TTL,
+    DEFAULT_SEARCH_TOP_K,
     HTTP_TIMEOUT,
+    MAX_SEARCH_TOP_K,
     SEARCH_CACHE_TTL,
+    SNIPPET_MAX_CHARS,
     _get_env_float,
+    _get_env_int,
 )
 from qiskit_docs_mcp_server.data_fetcher import (
+    _make_snippet,
+    _normalize_result_url,
     _resolve_url,
     _truncate_content,
     get_list_of_addons,
@@ -576,7 +583,7 @@ class TestSearchQiskitDocs:
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
     async def test_search_strips_html_tags(self, mock_fetch):
-        """Test that HTML tags are stripped from search results."""
+        """Test that HTML tags are stripped from search result titles and snippets."""
         mock_fetch.return_value = [
             {
                 "title": "<em>Transpiler</em> options",
@@ -585,7 +592,9 @@ class TestSearchQiskitDocs:
         ]
         result = await search_qiskit_docs("transpiler")
         assert result["results"][0]["title"] == "Transpiler options"
-        assert result["results"][0]["text"] == "Transpiler passes"
+        # Default detail is 'snippet'; short bodies pass through whole, HTML-free.
+        assert result["results"][0]["snippet"] == "Transpiler passes"
+        assert "text" not in result["results"][0]
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
     async def test_search_uses_scope_param(self, mock_fetch):
@@ -678,6 +687,233 @@ class TestSearchQiskitDocs:
         mock_fetch.return_value = []
         result = await search_qiskit_docs("a" * 1000)
         assert result["status"] == "success"
+
+
+def _make_search_payload(n: int, body_chars: int = 3500) -> list[dict]:
+    """Build a realistic upstream search payload of ``n`` full-body results."""
+    body = (
+        "The QuantumCircuit class represents a quantum circuit. "
+        "Use load to read a QASM3 program into a circuit. " + ("lorem ipsum " * 400)
+    )[:body_chars]
+    return [
+        {
+            "id": f"qiskit_current_section-en-{i}",
+            "url": f"https://quantum.cloud.ibm.com/docs/api/qiskit/qasm3#load-{i}",
+            "pageTitle": "qasm3 (latest version)",
+            "module": "api",
+            "section": "Qiskit SDK",
+            "language": "en",
+            "title": f"load {i}",
+            "text": body,
+            "package": "qiskit",
+        }
+        for i in range(n)
+    ]
+
+
+class TestMakeSnippet:
+    """Test the _make_snippet helper."""
+
+    def test_short_text_passthrough(self):
+        """Short bodies are returned whole (whitespace-normalized)."""
+        assert _make_snippet("A short body.", "body") == "A short body."
+
+    def test_collapses_whitespace(self):
+        """Runs of whitespace/newlines are collapsed to single spaces."""
+        assert _make_snippet("a\n\n  b\t c", "a") == "a b c"
+
+    def test_empty_text(self):
+        """Empty body yields an empty snippet."""
+        assert _make_snippet("", "anything") == ""
+
+    def test_long_text_is_capped(self):
+        """A long body is truncated to roughly max_chars (plus ellipses)."""
+        text = "alpha " * 2000
+        snippet = _make_snippet(text, "alpha", max_chars=100)
+        # Allow a small margin for the ellipsis markers and word-boundary trim.
+        assert len(snippet) <= 100 + 8
+
+    def test_centers_on_query_match(self):
+        """The snippet window is centered on the query match deep in the body."""
+        filler = "x" * 4000
+        text = filler + " UNIQUEMATCHTOKEN " + filler
+        snippet = _make_snippet(text, "UNIQUEMATCHTOKEN", max_chars=200)
+        assert "UNIQUEMATCHTOKEN" in snippet
+        assert len(snippet) <= 200 + 8
+        # Window is interior, so both edges are clipped with ellipses.
+        assert snippet.startswith("…")
+        assert snippet.endswith("…")
+
+    def test_head_fallback_when_no_match(self):
+        """When no query term appears, the snippet falls back to the head."""
+        text = "zzz " * 2000
+        snippet = _make_snippet(text, "nonexistentterm", max_chars=100)
+        assert snippet.startswith("zzz")
+        assert snippet.endswith("…")
+        assert not snippet.startswith("…")
+
+    def test_phrase_match_preferred(self):
+        """A contiguous phrase anchors the snippet even with scattered terms."""
+        text = "load " + ("noise " * 500) + "load a QASM3 circuit here " + ("noise " * 500)
+        snippet = _make_snippet(text, "load a QASM3 circuit", max_chars=120)
+        assert "load a QASM3 circuit" in snippet
+
+    def test_centers_on_densest_term_cluster(self):
+        """With no contiguous phrase, the window lands on the densest term cluster.
+
+        'alpha' appears alone early and 'beta' alone in the middle, but all three
+        query terms cluster together at the end (in a different order, so the exact
+        phrase never matches). The snippet must center on that dense cluster — this
+        exercises the two-pointer narrowing in _densest_window_start.
+        """
+        text = "alpha " + ("x " * 600) + "beta " + ("y " * 600) + "gamma beta alpha tail"
+        snippet = _make_snippet(text, "alpha beta gamma", max_chars=80)
+        # 'gamma' only occurs in the end cluster, so its presence proves the window
+        # centered there rather than on the lone early 'alpha'.
+        assert "gamma" in snippet
+        assert len(snippet) <= 80 + 8
+
+
+class TestNormalizeResultUrl:
+    """Test the _normalize_result_url helper."""
+
+    def test_relative_url_resolved(self):
+        """A relative URL is resolved against the docs base."""
+        out = _normalize_result_url("/docs/api/qiskit/circuit", "https://quantum.cloud.ibm.com")
+        assert out == "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit"
+
+    def test_absolute_url_passthrough(self):
+        """An absolute URL is returned unchanged."""
+        url = "https://quantum.cloud.ibm.com/docs/api/qiskit/circuit"
+        assert _normalize_result_url(url, "https://quantum.cloud.ibm.com") == url
+
+    def test_empty_or_non_string_passthrough(self):
+        """Falsy or non-string URL values are returned as-is (defensive guard)."""
+        assert _normalize_result_url("", "https://base") == ""
+        assert _normalize_result_url(None, "https://base") is None
+        assert _normalize_result_url(123, "https://base") == 123
+
+
+class TestSearchSnippetsAndPaging:
+    """Test snippet/full detail modes, top_k, and response-size control."""
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_default_caps_results_to_top_k(self, mock_fetch):
+        """Default search returns at most DEFAULT_SEARCH_TOP_K results."""
+        mock_fetch.return_value = _make_search_payload(20)
+        result = await search_qiskit_docs("load QASM3 circuit", scope="api")
+        assert result["status"] == "success"
+        assert len(result["results"]) == DEFAULT_SEARCH_TOP_K
+        assert result["total_results"] == DEFAULT_SEARCH_TOP_K
+        assert result["total_matches"] == 20
+        assert result["truncated"] is True
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_results_carry_snippet_not_full_text(self, mock_fetch):
+        """Each default result has a bounded snippet and no full text body."""
+        mock_fetch.return_value = _make_search_payload(3)
+        result = await search_qiskit_docs("load QASM3 circuit", scope="api")
+        for entry in result["results"]:
+            assert "snippet" in entry
+            assert "text" not in entry
+            assert len(entry["snippet"]) <= SNIPPET_MAX_CHARS + 8
+            # Navigation metadata is preserved.
+            assert entry["url"].startswith("https://")
+            assert "id" in entry
+            assert "title" in entry
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_default_response_under_size_cap(self, mock_fetch):
+        """Regression: a large upstream payload yields a compact response.
+
+        Reproduces the reported case (full bodies for many results, ~43 KB)
+        and asserts the default response stays well under ~2000 tokens.
+        """
+        mock_fetch.return_value = _make_search_payload(15)
+        result = await search_qiskit_docs("load QASM3 circuit", scope="api")
+        serialized = json.dumps(result)
+        assert len(serialized) < 8000  # ~2000 tokens at ~4 chars/token
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_custom_top_k(self, mock_fetch):
+        """An explicit top_k limits the number of results."""
+        mock_fetch.return_value = _make_search_payload(20)
+        result = await search_qiskit_docs("circuit", top_k=2)
+        assert len(result["results"]) == 2
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_top_k_clamped_to_max(self, mock_fetch):
+        """top_k above the ceiling is clamped to MAX_SEARCH_TOP_K."""
+        mock_fetch.return_value = _make_search_payload(50)
+        result = await search_qiskit_docs("circuit", top_k=999)
+        assert len(result["results"]) == MAX_SEARCH_TOP_K
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_non_positive_top_k_uses_default(self, mock_fetch):
+        """A non-positive top_k falls back to the default."""
+        mock_fetch.return_value = _make_search_payload(20)
+        result = await search_qiskit_docs("circuit", top_k=0)
+        assert len(result["results"]) == DEFAULT_SEARCH_TOP_K
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_not_truncated_when_few_results(self, mock_fetch):
+        """truncated is False when the API returns fewer than top_k results."""
+        mock_fetch.return_value = _make_search_payload(2)
+        result = await search_qiskit_docs("circuit")
+        assert result["truncated"] is False
+        assert result["total_matches"] == 2
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_detail_full_returns_full_body(self, mock_fetch):
+        """detail='full' returns each result's full (HTML-stripped) text."""
+        mock_fetch.return_value = _make_search_payload(2)
+        result = await search_qiskit_docs("circuit", detail="full")
+        assert result["detail"] == "full"
+        for entry in result["results"]:
+            assert "text" in entry
+            assert "snippet" not in entry
+            assert len(entry["text"]) > SNIPPET_MAX_CHARS
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_detail_full_strips_html(self, mock_fetch):
+        """detail='full' still strips HTML tags from the body."""
+        mock_fetch.return_value = [
+            {"url": "/docs/api/qiskit/circuit", "text": "<em>Circuit</em> module body"},
+        ]
+        result = await search_qiskit_docs("circuit", detail="full")
+        assert result["results"][0]["text"] == "Circuit module body"
+
+    async def test_invalid_detail_returns_error(self):
+        """An invalid detail value returns an error without hitting the API."""
+        result = await search_qiskit_docs("circuit", detail="verbose")
+        assert result["status"] == "error"
+        assert "Invalid detail" in result["message"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_note_present_in_snippet_mode(self, mock_fetch):
+        """The response includes a note nudging toward get_page_tool."""
+        mock_fetch.return_value = _make_search_payload(1)
+        result = await search_qiskit_docs("circuit")
+        assert "get_page_tool" in result["note"]
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_extra_upstream_fields_are_dropped(self, mock_fetch):
+        """Unknown/large upstream fields are not echoed back."""
+        mock_fetch.return_value = [
+            {
+                "url": "/docs/api/qiskit/circuit",
+                "title": "circuit",
+                "text": "body",
+                "language": "en",
+                "package": "qiskit",
+                "huge_unknown_field": "x" * 10000,
+            },
+        ]
+        result = await search_qiskit_docs("circuit")
+        entry = result["results"][0]
+        assert "huge_unknown_field" not in entry
+        assert "language" not in entry
+        assert "package" not in entry
 
 
 class TestLookupErrorCode:
@@ -1296,6 +1532,44 @@ class TestEnvironmentConfiguration:
     def test_search_cache_ttl_default(self):
         """Test that SEARCH_CACHE_TTL defaults to 300.0 (5 minutes)."""
         assert SEARCH_CACHE_TTL == 300.0
+
+    def test_get_env_int_valid(self):
+        """Test _get_env_int parses a valid integer."""
+        import os
+
+        original = os.environ.get("TEST_ENV_INT")
+        try:
+            os.environ["TEST_ENV_INT"] = "7"
+            assert _get_env_int("TEST_ENV_INT", 3) == 7
+        finally:
+            if original is not None:
+                os.environ["TEST_ENV_INT"] = original
+            else:
+                os.environ.pop("TEST_ENV_INT", None)
+
+    def test_get_env_int_invalid_returns_default(self):
+        """Test _get_env_int returns default on a non-integer value."""
+        import os
+
+        original = os.environ.get("TEST_ENV_INT_BAD")
+        try:
+            os.environ["TEST_ENV_INT_BAD"] = "not_an_int"
+            assert _get_env_int("TEST_ENV_INT_BAD", 3) == 3
+        finally:
+            if original is not None:
+                os.environ["TEST_ENV_INT_BAD"] = original
+            else:
+                os.environ.pop("TEST_ENV_INT_BAD", None)
+
+    def test_get_env_int_missing_returns_default(self):
+        """Test _get_env_int returns default when the var is unset."""
+        assert _get_env_int("NONEXISTENT_INT_VAR_98765", 42) == 42
+
+    def test_search_budget_constants_sane(self):
+        """Test that the search-budget constants have sensible defaults."""
+        assert DEFAULT_SEARCH_TOP_K >= 1
+        assert MAX_SEARCH_TOP_K >= DEFAULT_SEARCH_TOP_K
+        assert SNIPPET_MAX_CHARS >= 100
 
     @patch("qiskit_docs_mcp_server.http.httpx.AsyncClient")
     def test_fetch_text_uses_http_timeout(self, mock_client_class):

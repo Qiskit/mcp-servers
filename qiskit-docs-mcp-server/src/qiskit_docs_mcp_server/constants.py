@@ -38,6 +38,27 @@ def _get_env_float(name: str, default: float) -> float:
         return default
 
 
+def _get_env_int(name: str, default: int) -> int:
+    """
+    Get environment variable as int with fallback to default.
+
+    Args:
+        name: Environment variable name
+        default: Default value if not set or invalid
+
+    Returns:
+        Int value from environment or default
+    """
+    try:
+        value = os.getenv(name)
+        if value is None:
+            return default
+        return int(value)
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid {name} value: {os.getenv(name)}, using default {default}")
+        return default
+
+
 # Qiskit documentation base URL (configurable via environment variable)
 QISKIT_DOCS_BASE = os.getenv("QISKIT_DOCS_BASE", "https://quantum.cloud.ibm.com/docs/")
 BASE_URL = os.getenv("QISKIT_SEARCH_BASE_URL", "https://quantum.cloud.ibm.com/")
@@ -65,6 +86,21 @@ ERROR_CODE_CATEGORIES = {
 HTTP_TIMEOUT = _get_env_float("QISKIT_HTTP_TIMEOUT", 10.0)
 CACHE_TTL = _get_env_float("QISKIT_DOCS_CACHE_TTL", 3600.0)
 SEARCH_CACHE_TTL = _get_env_float("QISKIT_SEARCH_CACHE_TTL", 300.0)  # 5 min default
+
+# ---------------------------------------------------------------------------
+# search_docs response budget
+# ---------------------------------------------------------------------------
+# search_docs is used inside LLM agent loops, where the whole conversation
+# (including every past tool result) is re-sent to the model on every turn.
+# Returning full page bodies for many results makes a single call cost
+# ~12k tokens and stacks per call, overflowing the context window. To stay
+# token-economical, search returns short query-centered snippets by default
+# and caps the number of results; full page content is fetched separately via
+# get_page. These knobs bound the default response to roughly ~2k tokens.
+DEFAULT_SEARCH_TOP_K = _get_env_int("QISKIT_DOCS_SEARCH_TOP_K", 5)
+MAX_SEARCH_TOP_K = _get_env_int("QISKIT_DOCS_MAX_SEARCH_TOP_K", 10)
+SNIPPET_MAX_CHARS = _get_env_int("QISKIT_DOCS_SNIPPET_CHARS", 320)
+VALID_SEARCH_DETAIL = ("snippet", "full")
 
 # ---------------------------------------------------------------------------
 # Fallback lists — used when sitemap discovery is unavailable
