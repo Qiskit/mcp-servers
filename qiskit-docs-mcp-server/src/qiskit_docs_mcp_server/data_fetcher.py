@@ -368,14 +368,18 @@ def _resolve_effective_top_k(top_k: int | None, detail: str, total_results: int)
     ``full`` mode it is only floored at 1 (never clamped to the max), since full
     is an opt-in heavy path where the caller has asked for everything.
     """
-    unspecified = top_k is None or top_k <= 0
+    if top_k is None or top_k <= 0:
+        # No explicit limit: full mode returns everything, snippet mode falls
+        # back to the default (still clamped below).
+        if detail == "full":
+            return total_results
+        top_k = DEFAULT_SEARCH_TOP_K
+    # top_k is now a positive int. Full mode honors it as-is; snippet mode
+    # clamps to [1, MAX_SEARCH_TOP_K]. The final max(1, ...) keeps the slice
+    # valid even if MAX_SEARCH_TOP_K were misconfigured below 1.
     if detail == "full":
-        return total_results if unspecified else max(1, top_k)
-    # Snippet mode: default when unspecified, then clamp to [1, MAX_SEARCH_TOP_K].
-    # The final max(1, ...) keeps the slice valid even if MAX_SEARCH_TOP_K were
-    # misconfigured below 1.
-    k = DEFAULT_SEARCH_TOP_K if unspecified else top_k
-    return max(1, min(k, MAX_SEARCH_TOP_K))
+        return top_k
+    return max(1, min(top_k, MAX_SEARCH_TOP_K))
 
 
 async def search_qiskit_docs(
