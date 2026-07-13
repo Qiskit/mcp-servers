@@ -25,7 +25,7 @@ from typing import Any
 import httpx
 from fastmcp import FastMCP
 
-from qiskit_docs_mcp_server.constants import DEFAULT_SEARCH_TOP_K, HTTP_TIMEOUT
+from qiskit_docs_mcp_server.constants import HTTP_TIMEOUT
 from qiskit_docs_mcp_server.data_fetcher import (
     get_list_of_addons,
     get_list_of_api_packages,
@@ -92,7 +92,7 @@ logger.info("Qiskit Documentation MCP Server initialized")
 async def search_docs_tool(
     query: str,
     scope: str = "all",
-    top_k: int = DEFAULT_SEARCH_TOP_K,
+    top_k: int | None = None,
     detail: str = "snippet",
 ) -> dict[str, Any]:
     """Search across the entire Qiskit documentation for relevant content.
@@ -111,10 +111,13 @@ async def search_docs_tool(
             'api' — API reference pages only
             'learning' — Learning resources and tutorials
             'tutorials' — Tutorial content only
-        top_k: Maximum number of results to return (default: 5, capped at 10).
+        top_k: Maximum number of results to return. Left unset, snippet mode
+            returns up to 5 and full mode returns every match. An explicit
+            value is capped at 10 in snippet mode; full mode honors it as-is.
         detail: Per-result content level. 'snippet' (default) returns a short
-            excerpt and a trimmed field set; 'full' returns each result's full
-            page body as 'text' and preserves all original fields (backwards
+            excerpt, a trimmed field set, and a small ranked subset; 'full'
+            restores the original behavior — every match by default, each with
+            its full page body as 'text' and all original fields (backwards
             compatible) — heavier, so prefer get_page_tool for a single page.
 
     Returns:

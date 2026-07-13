@@ -904,6 +904,33 @@ class TestSearchSnippetsAndPaging:
             assert len(entry["text"]) > SNIPPET_MAX_CHARS
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_detail_full_returns_all_results_by_default(self, mock_fetch):
+        """detail='full' with no top_k returns the complete result set (issue #218)."""
+        mock_fetch.return_value = _make_search_payload(50)
+        result = await search_qiskit_docs("circuit", detail="full")
+        # Not capped at MAX_SEARCH_TOP_K: every match comes back.
+        assert len(result["results"]) == 50
+        assert result["total_results"] == 50
+        assert result["returned_results"] == 50
+        assert result["truncated"] is False
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_detail_full_explicit_top_k_not_clamped_to_max(self, mock_fetch):
+        """In full mode an explicit top_k is honored as-is, above MAX_SEARCH_TOP_K."""
+        mock_fetch.return_value = _make_search_payload(50)
+        result = await search_qiskit_docs("circuit", top_k=25, detail="full")
+        assert len(result["results"]) == 25
+        assert result["returned_results"] == 25
+        assert result["truncated"] is True
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_detail_full_non_positive_top_k_returns_all(self, mock_fetch):
+        """A non-positive top_k in full mode means 'no limit' -> all results."""
+        mock_fetch.return_value = _make_search_payload(20)
+        result = await search_qiskit_docs("circuit", top_k=0, detail="full")
+        assert len(result["results"]) == 20
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
     async def test_detail_full_preserves_upstream_fields(self, mock_fetch):
         """detail='full' is backwards compatible: original fields pass through."""
         mock_fetch.return_value = [

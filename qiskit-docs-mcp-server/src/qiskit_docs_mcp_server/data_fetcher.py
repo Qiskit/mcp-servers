@@ -352,10 +352,36 @@ def _build_result_entry(item: dict[str, Any], query: str, detail: str, base: str
     return entry
 
 
+def _resolve_effective_top_k(top_k: int | None, detail: str, total_results: int) -> int:
+    """Resolve how many results to return.
+
+    A ``None`` or non-positive ``top_k`` means "no explicit limit":
+
+    * In ``snippet`` mode (token-economical default) it falls back to
+      ``DEFAULT_SEARCH_TOP_K``.
+    * In ``full`` mode (the backwards-compatible option for issue #218) it
+      returns the *complete* result set, matching the pre-snippet behavior of
+      returning every match with full text.
+
+    An explicit positive ``top_k`` is honored. In ``snippet`` mode it is clamped
+    to ``[1, MAX_SEARCH_TOP_K]`` so a single agent-loop call can't balloon; in
+    ``full`` mode it is only floored at 1 (never clamped to the max), since full
+    is an opt-in heavy path where the caller has asked for everything.
+    """
+    unspecified = top_k is None or top_k <= 0
+    if detail == "full":
+        return total_results if unspecified else max(1, top_k)
+    # Snippet mode: default when unspecified, then clamp to [1, MAX_SEARCH_TOP_K].
+    # The final max(1, ...) keeps the slice valid even if MAX_SEARCH_TOP_K were
+    # misconfigured below 1.
+    k = DEFAULT_SEARCH_TOP_K if unspecified else top_k
+    return max(1, min(k, MAX_SEARCH_TOP_K))
+
+
 async def search_qiskit_docs(
     query: str,
     scope: str = "all",
-    top_k: int = DEFAULT_SEARCH_TOP_K,
+    top_k: int | None = None,
     detail: str = "snippet",
 ) -> dict[str, Any]:
     """Search Qiskit documentation for relevant results.
@@ -368,13 +394,17 @@ async def search_qiskit_docs(
         query: Search query string
         scope: Search scope filter. Valid values (case-sensitive):
             'all', 'documentation', 'api', 'learning', 'tutorials'
-        top_k: Maximum number of results to return (clamped to
-            [1, MAX_SEARCH_TOP_K]). Defaults to DEFAULT_SEARCH_TOP_K.
-        detail: 'snippet' (default) returns a short excerpt per result and a
-            trimmed field set; 'full' returns each result's full page body as
-            'text' and preserves the original upstream fields (backwards
-            compatible with the pre-snippet response — heavier, so prefer
-            get_page for a single page's full content).
+        top_k: Maximum number of results to return. When None or non-positive
+            (the default), snippet mode falls back to DEFAULT_SEARCH_TOP_K and
+            full mode returns every match. An explicit value is clamped to
+            [1, MAX_SEARCH_TOP_K] in snippet mode and only floored at 1 in
+            full mode.
+        detail: 'snippet' (default) returns a short excerpt per result, a
+            trimmed field set, and at most DEFAULT_SEARCH_TOP_K/top_k results;
+            'full' restores the pre-snippet behavior — every match by default,
+            each with its full page body as 'text' and all original upstream
+            fields (backwards compatible, heavier, so prefer get_page for a
+            single page's full content).
 
     Returns:
         Search results with matching entries, counts, and metadata.
@@ -405,12 +435,6 @@ async def search_qiskit_docs(
             ),
         }
 
-    # Clamp top_k: non-positive falls back to the default, and an upper bound
-    # guards against a single call ballooning the response. The final max(1, ...)
-    # keeps the slice valid even if MAX_SEARCH_TOP_K were misconfigured low.
-    effective_top_k = top_k if top_k > 0 else DEFAULT_SEARCH_TOP_K
-    effective_top_k = max(1, min(effective_top_k, MAX_SEARCH_TOP_K))
-
     url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(scope)}"
     logger.info("Searching docs for '%s' in scope '%s'", query, scope)
 
@@ -430,6 +454,7 @@ async def search_qiskit_docs(
     # `returned_results` is the (possibly smaller) count actually included here.
     total_results = len(results)
     base = QISKIT_DOCS_BASE.rstrip("/")
+    effective_top_k = _resolve_effective_top_k(top_k, detail, total_results)
     selected = results[:effective_top_k]
     cleaned = [_build_result_entry(item, query, detail, base) for item in selected]
     truncated = total_results > len(cleaned)
