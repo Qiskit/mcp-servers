@@ -76,12 +76,12 @@ This project recommends using [uv](https://astral.sh/uv) for virtual environment
    **Option C: Pass Token Directly**
    ```python
    # Provide token when setting up the account
-   await setup_ibm_quantum_account(token="your_token_here")
+   await setup_ibm_quantum_account_tool(token="your_token_here")
    ```
 
    **Credential Resolution Priority:**
    The server looks for credentials in this order:
-   1. Explicit token passed to `setup_ibm_quantum_account()`
+   1. Explicit token passed to `setup_ibm_quantum_account_tool()`
    2. `QISKIT_IBM_TOKEN` environment variable
    3. Saved credentials in `~/.qiskit/qiskit-ibm.json`
 
@@ -110,41 +110,41 @@ The server will start and listen for MCP connections.
 
 ### Basic Usage Examples
 
-#### Async Usage (MCP Server)
+#### Async Usage (Library)
 
 ```python
 # 1. Setup IBM Quantum Account (optional if credentials already configured)
 # Will use saved credentials or environment variable if token not provided
-await setup_ibm_quantum_account_tool()  # Uses saved credentials/env var
+await setup_ibm_quantum_account()  # Uses saved credentials/env var
 # OR
-await setup_ibm_quantum_account_tool(token="your_token_here")  # Explicit token
+await setup_ibm_quantum_account(token="your_token_here")  # Explicit token
 
 # 2. List Available Backends (no setup needed if credentials are saved)
-backends = await list_backends_tool()
+backends = await list_backends()
 print(f"Available backends: {len(backends['backends'])}")
 
 # 3. Get the least busy backend
-backend = await least_busy_backend_tool()
+backend = await least_busy_backend()
 print(f"Least busy backend: {backend}")
 
 # 4. Get backend's properties
-backend_props = await get_backend_properties_tool("backend_name")
+backend_props = await get_backend_properties("backend_name")
 print(f"Backend_name properties: {backend_props}")
 
 # 5. List recent jobs
-jobs = await list_my_jobs_tool(10)
+jobs = await list_my_jobs(10)
 print(f"Last 10 jobs: {jobs}")
 
 # 6. Get job status
-job_status = await get_job_status_tool("job_id")
+job_status = await get_job_status("job_id")
 print(f"Job status: {job_status}")
 
 # 7. Get job results (when job is DONE)
-results = await get_job_results_tool("job_id")
+results = await get_job_results("job_id")
 print(f"Counts: {results['counts']}")
 
 # 8. Cancel job
-cancelled_job = await cancel_job_tool("job_id")
+cancelled_job = await cancel_job("job_id")
 print(f"Cancelled job: {cancelled_job}")
 ```
 
@@ -250,7 +250,7 @@ For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed example
 
 ### Tools
 
-These are the names MCP clients see in `tools/list`, so use them in allowlists, permission rules and agent prompts. The Python functions in `qiskit_ibm_runtime_mcp_server.ibm_runtime` (see [Sync Usage](#sync-usage-scripts-jupyter)) have the same names without the `_tool` suffix.
+These are the names MCP clients see in `tools/list`. Hosts can add a prefix to them (for example `mcp__<server>__<tool>`), so check how your client shows the name before you write an allowlist or a permission rule. The Python functions in `qiskit_ibm_runtime_mcp_server.ibm_runtime` (see [Sync Usage](#sync-usage-scripts-jupyter)) have the same names without the `_tool` suffix.
 
 #### `setup_ibm_quantum_account_tool(token: str = "", channel: str = "ibm_quantum_platform")`
 Configure IBM Quantum account with API token.
