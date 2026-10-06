@@ -115,36 +115,36 @@ The server will start and listen for MCP connections.
 ```python
 # 1. Setup IBM Quantum Account (optional if credentials already configured)
 # Will use saved credentials or environment variable if token not provided
-await setup_ibm_quantum_account()  # Uses saved credentials/env var
+await setup_ibm_quantum_account_tool()  # Uses saved credentials/env var
 # OR
-await setup_ibm_quantum_account(token="your_token_here")  # Explicit token
+await setup_ibm_quantum_account_tool(token="your_token_here")  # Explicit token
 
 # 2. List Available Backends (no setup needed if credentials are saved)
-backends = await list_backends()
+backends = await list_backends_tool()
 print(f"Available backends: {len(backends['backends'])}")
 
 # 3. Get the least busy backend
-backend = await least_busy_backend()
+backend = await least_busy_backend_tool()
 print(f"Least busy backend: {backend}")
 
 # 4. Get backend's properties
-backend_props = await get_backend_properties("backend_name")
+backend_props = await get_backend_properties_tool("backend_name")
 print(f"Backend_name properties: {backend_props}")
 
 # 5. List recent jobs
-jobs = await list_my_jobs(10)
+jobs = await list_my_jobs_tool(10)
 print(f"Last 10 jobs: {jobs}")
 
 # 6. Get job status
-job_status = await get_job_status("job_id")
+job_status = await get_job_status_tool("job_id")
 print(f"Job status: {job_status}")
 
 # 7. Get job results (when job is DONE)
-results = await get_job_results("job_id")
+results = await get_job_results_tool("job_id")
 print(f"Counts: {results['counts']}")
 
 # 8. Cancel job
-cancelled_job = await cancel_job("job_id")
+cancelled_job = await cancel_job_tool("job_id")
 print(f"Cancelled job: {cancelled_job}")
 ```
 
@@ -250,7 +250,9 @@ For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed example
 
 ### Tools
 
-#### `setup_ibm_quantum_account(token: str = "", channel: str = "ibm_quantum_platform")`
+These are the names MCP clients see in `tools/list`, so use them in allowlists, permission rules and agent prompts. The Python functions in `qiskit_ibm_runtime_mcp_server.ibm_runtime` (see [Sync Usage](#sync-usage-scripts-jupyter)) have the same names without the `_tool` suffix.
+
+#### `setup_ibm_quantum_account_tool(token: str = "", channel: str = "ibm_quantum_platform")`
 Configure IBM Quantum account with API token.
 
 **Parameters:**
@@ -263,7 +265,7 @@ Configure IBM Quantum account with API token.
 
 **Note:** If you already have saved credentials or have set the `QISKIT_IBM_TOKEN` environment variable, you can call this function without parameters or skip it entirely and use other functions directly.
 
-#### `list_backends()`
+#### `list_backends_tool()`
 Get list of available quantum backends.
 
 **Returns:** Array of backend information including:
@@ -271,12 +273,12 @@ Get list of available quantum backends.
 - Number of qubits, coupling map
 - Simulator vs. hardware designation
 
-#### `least_busy_backend()`
+#### `least_busy_backend_tool()`
 Get the current least busy IBM Quantum backend available.
 
 **Returns:** The backend with the fewest number of pending jobs
 
-#### `get_backend_properties(backend_name: str)`
+#### `get_backend_properties_tool(backend_name: str)`
 Get detailed properties of specific backend.
 
 **Returns:** Complete backend configuration including:
@@ -285,7 +287,7 @@ Get detailed properties of specific backend.
 - Current operational status
 - Queue information
 
-#### `get_coupling_map(backend_name: str)`
+#### `get_coupling_map_tool(backend_name: str)`
 Get the coupling map (qubit connectivity) for a backend with detailed analysis.
 
 Supports both real backends (requires credentials) and fake backends (no credentials needed).
@@ -305,7 +307,7 @@ Use `fake_` prefix for offline testing (e.g., `fake_sherbrooke`, `fake_brisbane`
 - SWAP gate minimization planning
 - Offline testing with fake backends
 
-#### `get_backend_calibration(backend_name: str, qubit_indices: list[int] | None = None)`
+#### `get_backend_calibration_tool(backend_name: str, qubit_indices: list[int] | None = None)`
 Get calibration data for a backend including T1, T2 coherence times and error rates.
 
 **Parameters:**
@@ -321,9 +323,9 @@ Get calibration data for a backend including T1, T2 coherence times and error ra
 - `faulty_gates`: List of non-operational gates with affected qubits
 - Last calibration timestamp
 
-**Note:** For static backend info (processor_type, backend_version, quantum_volume), use `get_backend_properties` instead.
+**Note:** For static backend info (processor_type, backend_version, quantum_volume), use `get_backend_properties_tool` instead.
 
-#### `find_optimal_qubit_chains(backend_name, chain_length, num_results, metric)`
+#### `find_optimal_qubit_chains_tool(backend_name, chain_length, num_results, metric)`
 Find optimal linear qubit chains for quantum experiments based on connectivity and calibration data.
 
 Algorithmically identifies the best qubit chains by combining coupling map connectivity
@@ -350,7 +352,7 @@ with real-time calibration data. Essential for experiments requiring linear qubi
 - Identify high-fidelity qubit paths for state transfer
 - Optimize qubit selection for 1D physics simulations
 
-#### `find_optimal_qv_qubits(backend_name, num_qubits, num_results, metric)`
+#### `find_optimal_qv_qubits_tool(backend_name, num_qubits, num_results, metric)`
 Find optimal qubit subgraphs for Quantum Volume experiments.
 
 Unlike linear chains, Quantum Volume benefits from densely connected qubit sets where
@@ -381,13 +383,13 @@ and ranks them by connectivity and calibration quality.
 - Identify high-quality qubit clusters for variational algorithms
 - Plan qubit allocation for algorithms requiring all-to-all connectivity
 
-#### `list_my_jobs(limit: int = 10)`
+#### `list_my_jobs_tool(limit: int = 10)`
 Get list of recent jobs from your account.
 
 **Parameters:**
 - `limit`: The N of jobs to retrieve
 
-#### `get_job_status(job_id: str)`
+#### `get_job_status_tool(job_id: str)`
 Check status of submitted job.
 
 **Parameters:**
@@ -403,7 +405,7 @@ Check status of submitted job.
 - `CANCELLED`: Job was cancelled
 - `ERROR`: Job failed with an error
 
-#### `get_job_results(job_id: str)`
+#### `get_job_results_tool(job_id: str)`
 Retrieve measurement results from a completed quantum job.
 
 **Parameters:**
@@ -426,22 +428,22 @@ result = await run_sampler_tool(circuit, backend_name)
 job_id = result["job_id"]
 
 # 2. Check status (poll until DONE)
-status = await get_job_status(job_id)
+status = await get_job_status_tool(job_id)
 print(f"Status: {status['job_status']}")
 
 # 3. When DONE, retrieve results
 if status['job_status'] == 'DONE':
-    results = await get_job_results(job_id)
+    results = await get_job_results_tool(job_id)
     print(f"Counts: {results['counts']}")
 ```
 
-#### `cancel_job(job_id: str)`
+#### `cancel_job_tool(job_id: str)`
 Cancel a running or queued job.
 
 **Parameters:**
 - `job_id`: The ID of the job to cancel
 
-#### `run_estimator(circuit, observables, ...)`
+#### `run_estimator_tool(circuit, observables, ...)`
 Run a quantum circuit using the Qiskit Runtime EstimatorV2 primitive. Computes expectation values of observables with built-in error mitigation.
 
 **Parameters:**
@@ -460,9 +462,9 @@ Run a quantum circuit using the Qiskit Runtime EstimatorV2 primitive. Computes e
 
 **Returns:** Job submission status including `job_id`, `backend`, and `error_mitigation` summary.
 
-**Note:** Jobs run asynchronously. Use `get_job_status` to monitor and `get_job_results` to retrieve expectation values.
+**Note:** Jobs run asynchronously. Use `get_job_status_tool` to monitor and `get_job_results_tool` to retrieve expectation values.
 
-#### `run_sampler(circuit, ...)`
+#### `run_sampler_tool(circuit, ...)`
 Run a quantum circuit using the Qiskit Runtime SamplerV2 primitive. Returns measurement outcome samples with built-in error mitigation.
 
 **Parameters:**
@@ -477,9 +479,9 @@ Run a quantum circuit using the Qiskit Runtime SamplerV2 primitive. Returns meas
 
 **Returns:** Job submission status including `job_id`, `backend`, `shots`, and `error_mitigation` summary.
 
-**Note:** Jobs run asynchronously. Use `get_job_status` to monitor and `get_job_results` to retrieve measurement counts.
+**Note:** Jobs run asynchronously. Use `get_job_status_tool` to monitor and `get_job_results_tool` to retrieve measurement counts.
 
-#### `list_saved_accounts()`
+#### `list_saved_accounts_tool()`
 List all IBM Quantum accounts saved on disk.
 
 **Returns:** Dictionary containing:
@@ -490,20 +492,20 @@ List all IBM Quantum accounts saved on disk.
 
 **Note:** Tokens are masked in the response, showing only the last 4 characters.
 
-#### `delete_saved_account(account_name: str)`
+#### `delete_saved_account_tool(account_name: str)`
 Delete a saved IBM Quantum account from disk.
 
 **WARNING:** This permanently removes credentials from `~/.qiskit/qiskit-ibm.json`. The operation cannot be undone.
 
 **Parameters:**
-- `account_name`: Name of the saved account to delete. Use `list_saved_accounts()` to find available names.
+- `account_name`: Name of the saved account to delete. Use `list_saved_accounts_tool()` to find available names.
 
 **Returns:** Dictionary containing:
 - `status`: "success" or "error"
 - `deleted`: Boolean indicating if deletion was successful
 - `message`: Status message
 
-#### `active_account_info()`
+#### `active_account_info_tool()`
 Get information about the currently active IBM Quantum account.
 
 **Returns:** Dictionary containing:
@@ -512,14 +514,14 @@ Get information about the currently active IBM Quantum account.
 
 **Note:** Tokens are masked in the response, showing only the last 4 characters.
 
-#### `active_instance_info()`
+#### `active_instance_info_tool()`
 Get the Cloud Resource Name (CRN) of the currently active instance.
 
 **Returns:** Dictionary containing:
 - `status`: "success" or "error"
 - `instance_crn`: The CRN string identifying the active instance
 
-#### `available_instances()`
+#### `available_instances_tool()`
 List all IBM Quantum instances available to the active account.
 
 **Returns:** Dictionary containing:
@@ -527,7 +529,7 @@ List all IBM Quantum instances available to the active account.
 - `instances`: List of available instances with CRN, plan, name, and pricing info
 - `total_instances`: Count of available instances
 
-#### `usage_info()`
+#### `usage_info_tool()`
 Get usage statistics and quota information for the active instance.
 
 **Returns:** Dictionary containing:
@@ -546,7 +548,7 @@ Get usage statistics and quota information for the active instance.
 Get current IBM Quantum service status and connection info.
 
 #### `circuits://bell-state`
-Pre-built 2-qubit Bell state circuit creating |Phi+> = (|00> + |11>)/sqrt(2). Pass the returned `circuit` field directly to `run_sampler`. Expected results: ~50% '00' and ~50% '11'.
+Pre-built 2-qubit Bell state circuit creating |Phi+> = (|00> + |11>)/sqrt(2). Pass the returned `circuit` field directly to `run_sampler_tool`. Expected results: ~50% '00' and ~50% '11'.
 
 #### `circuits://ghz-state`
 Pre-built 3-qubit GHZ state circuit creating (|000> + |111>)/sqrt(2). Expected results: ~50% '000' and ~50% '111'.
